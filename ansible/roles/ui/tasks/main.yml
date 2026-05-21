@@ -62,23 +62,68 @@
   when: tls_mode == 'certbot' and not cert_file.stat.exists
 
 - name: Request Let's Encrypt certificate (Initial - DNS)
-  command: >
-    docker run --rm
-    -v "/etc/letsencrypt:/etc/letsencrypt"
-    -v "/var/lib/letsencrypt:/var/lib/letsencrypt"
-    -v "/etc/cognitor/cloudflare.ini:/cloudflare.ini:ro"
-    certbot/dns-cloudflare certonly
-    --dns-cloudflare
-    --dns-cloudflare-credentials /cloudflare.ini
-    --dns-cloudflare-propagation-seconds 20
-    -d {{ app_domain }}
-    --email {{ certbot_email }}
-    {{ '--test-cert' if certbot_staging else '' }}
-    --agree-tos --non-interactive
-  register: certbot_initial_request
-  retries: 3
-  delay: 20
-  until: certbot_initial_request.rc == 0
+  block:
+    - name: Request Let's Encrypt certificate (Initial - DNS)
+      command: >
+        docker run --rm
+        -v "/etc/letsencrypt:/etc/letsencrypt"
+        -v "/var/lib/letsencrypt:/var/lib/letsencrypt"
+        -v "/etc/cognitor/cloudflare.ini:/cloudflare.ini:ro"
+        certbot/dns-cloudflare certonly
+        --dns-cloudflare
+        --dns-cloudflare-credentials /cloudflare.ini
+        --dns-cloudflare-propagation-seconds 20
+        -d {{ app_domain }}
+        --email {{ certbot_email }}
+        {{ '--test-cert' if certbot_staging else '' }}
+        --agree-tos --non-interactive
+      register: certbot_initial_request
+      retries: 3
+      delay: 20
+      until: certbot_initial_request.rc == 0
+  rescue:
+    - name: Reset stale Let's Encrypt state after failed authorization
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "/etc/letsencrypt/live/{{ app_domain }}"
+        - "/etc/letsencrypt/archive/{{ app_domain }}"
+        - "/etc/letsencrypt/renewal/{{ app_domain }}.conf"
+      when:
+        - certbot_initial_request is defined
+        - "'No such authorization' in (certbot_initial_request.stderr | default(''))"
+
+    - name: Retry Let's Encrypt certificate request after cleanup
+      command: >
+        docker run --rm
+        -v "/etc/letsencrypt:/etc/letsencrypt"
+        -v "/var/lib/letsencrypt:/var/lib/letsencrypt"
+        -v "/etc/cognitor/cloudflare.ini:/cloudflare.ini:ro"
+        certbot/dns-cloudflare certonly
+        --dns-cloudflare
+        --dns-cloudflare-credentials /cloudflare.ini
+        --dns-cloudflare-propagation-seconds 60
+        -d {{ app_domain }}
+        --email {{ certbot_email }}
+        {{ '--test-cert' if certbot_staging else '' }}
+        --agree-tos --non-interactive
+      register: certbot_retry_after_cleanup
+      retries: 2
+      delay: 30
+      until: certbot_retry_after_cleanup.rc == 0
+      when:
+        - certbot_initial_request is defined
+        - "'No such authorization' in (certbot_initial_request.stderr | default(''))"
+
+    - name: Re-raise non-recoverable certbot bootstrap failure
+      fail:
+        msg: >-
+          Initial Let's Encrypt request failed and was not recoverable automatically.
+          stderr={{ certbot_initial_request.stderr | default('') }}
+      when:
+        - certbot_initial_request is not defined
+          or ('No such authorization' not in (certbot_initial_request.stderr | default('')))
   when: tls_mode == 'certbot' and not cert_file.stat.exists
 
 - name: Create secrets directory

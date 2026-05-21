@@ -4,7 +4,7 @@ moved {
 }
 
 resource "aws_route" "private_via_nat_instance" {
-  for_each = var.private_route_table_id != "" ? var.private_routes : {}
+  for_each = var.private_routes
 
   route_table_id         = var.private_route_table_id
   destination_cidr_block = each.value.destination_cidr
@@ -12,7 +12,7 @@ resource "aws_route" "private_via_nat_instance" {
 }
 
 resource "aws_route" "public_via_nat_instance" {
-  for_each = var.public_route_table_id != "" ? var.public_routes : {}
+  for_each = var.public_routes
 
   route_table_id         = var.public_route_table_id
   destination_cidr_block = each.value.destination_cidr
