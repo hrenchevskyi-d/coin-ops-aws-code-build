@@ -72,3 +72,8 @@ output "control_plane_cloud" {
   description = "Cloud selected in JSON as the intended Terraform control plane. The active backend is generated into backend.active.tf by bootstrap."
   value       = local.control_plane_cloud
 }
+
+output "gcp_k3s_api_load_balancer_ip" {
+  description = "Internal HA endpoint for the k3s Kubernetes API in GCP."
+  value       = local.gcp_k3s_api_lb_enabled ? try(module.gcp_k3s_api_lb[0].ip_address, "") : ""
+}

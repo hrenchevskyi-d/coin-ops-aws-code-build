@@ -71,6 +71,20 @@ module "gcp_database" {
   disk_size    = try(local.gcp_db_profile.disk_size, 10)
 }
 
+module "gcp_k3s_api_lb" {
+  count               = local.gcp_k3s_api_lb_enabled ? 1 : 0
+  source              = "./modules/cloud/gcp/internal_api_lb"
+  name                = try(local.gcp_k3s_api_lb_cfg.name, "${local.project_name}-k3s-api")
+  region              = local.gcp_region
+  network_id          = module.gcp_network[0].network_id
+  subnetwork_id       = module.gcp_network[0].subnet_ids[try(local.gcp_k3s_api_lb_cfg.internal_subnet, "internal")]
+  backend_zone        = local.gcp_zone
+  backend_instances   = local.gcp_k3s_api_lb_backends
+  port                = try(local.gcp_k3s_api_lb_cfg.port, 6443)
+  allow_global_access = try(local.gcp_k3s_api_lb_cfg.allow_global_access, false)
+  address             = try(local.gcp_k3s_api_lb_cfg.address, "")
+}
+
 module "gcp_secrets" {
   count                = local.write_gcp_secret_backend ? 1 : 0
   source               = "./modules/cloud/gcp/secrets"

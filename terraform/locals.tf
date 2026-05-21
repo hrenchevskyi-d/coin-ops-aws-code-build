@@ -157,9 +157,34 @@ locals {
   write_aws_secret_backend   = local.secrets_enabled && local.aws_enabled
   write_azure_secret_backend = local.secrets_enabled && local.azure_enabled
 
-  gcp_hosts   = local.gcp_compute_enabled ? try(module.gcp_instances[0].instance_ips, {}) : {}
-  aws_hosts   = local.aws_compute_enabled ? try(module.aws_instances[0].instance_ips, {}) : {}
-  azure_hosts = local.azure_compute_enabled ? try(module.azure_instances[0].instance_ips, {}) : {}
+  gcp_hosts        = local.gcp_compute_enabled ? try(module.gcp_instances[0].instance_ips, {}) : {}
+  gcp_host_details = local.gcp_compute_enabled ? try(module.gcp_instances[0].instance_details, {}) : {}
+  aws_hosts        = local.aws_compute_enabled ? try(module.aws_instances[0].instance_ips, {}) : {}
+  azure_hosts      = local.azure_compute_enabled ? try(module.azure_instances[0].instance_ips, {}) : {}
+
+  gcp_k3s_server_names = local.gcp_compute_enabled ? [
+    for name, cfg in local.gcp_instances_base : name
+    if lookup(cfg, "role", "") == "k3s-server"
+  ] : []
+  gcp_k3s_api_lb_cfg = merge(
+    {
+      enabled             = false
+      name                = "${local.project_name}-k3s-api"
+      port                = 6443
+      internal_subnet     = "internal"
+      allow_global_access = false
+      address             = ""
+    },
+    try(local.gcp_network_cfg.k3s_api_load_balancer, {})
+  )
+  gcp_k3s_api_lb_enabled = (
+    local.gcp_compute_enabled
+    && try(local.gcp_k3s_api_lb_cfg.enabled, false)
+    && length(local.gcp_k3s_server_names) > 0
+  )
+  gcp_k3s_api_lb_backends = local.gcp_k3s_api_lb_enabled ? {
+    for name in local.gcp_k3s_server_names : name => local.gcp_host_details[name]
+  } : {}
 
   gcp_jump_host_name = local.gcp_compute_enabled ? try([
     for name, cfg in local.gcp_instances_base : name

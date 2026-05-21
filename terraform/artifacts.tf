@@ -117,8 +117,9 @@ resource "local_file" "ansible_runtime" {
   content = jsonencode(merge(
     local.gcp_enabled ? {
       gcp = {
-        database_ip    = try(module.gcp_database[0].private_ip, "")
-        use_managed_db = try(module.gcp_database[0].private_ip, "") != ""
+        k3s_api_endpoint = local.gcp_k3s_api_lb_enabled ? try(module.gcp_k3s_api_lb[0].ip_address, "") : ""
+        database_ip      = try(module.gcp_database[0].private_ip, "")
+        use_managed_db   = try(module.gcp_database[0].private_ip, "") != ""
         database = {
           host    = try(module.gcp_database[0].private_ip, "")
           port    = local.db_port

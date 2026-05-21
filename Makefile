@@ -4,8 +4,12 @@ REPO_ROOT := $(CURDIR)
 TF_DIR := $(REPO_ROOT)/terraform
 ANSIBLE_DIR := $(REPO_ROOT)/ansible
 INVENTORY := $(ANSIBLE_DIR)/inventory
+GCP_INVENTORY := $(ANSIBLE_DIR)/inventory/inventory.gcp_compute.yml
 ENV_FILE := $(REPO_ROOT)/local/generated-env.sh
 COMPOSE := docker compose
+K8S_ARTIFACTS_DIR := $(ANSIBLE_DIR)/artifacts
+K8S_TUNNELED_KUBECONFIG := $(K8S_ARTIFACTS_DIR)/kubeconfig-gcp-k3s-tunneled.yaml
+HEADLAMP_START_SCRIPT := $(K8S_ARTIFACTS_DIR)/headlamp-start.sh
 
 HOST ?=
 LIMIT ?=
@@ -19,7 +23,7 @@ ANSIBLE_CMD = $(ENV_PREFIX) ANSIBLE_CONFIG="$(REPO_ROOT)/ansible.cfg"
 	local-up local-down local-logs local-ps local-restart local-config \
 	tf-check-backend tf-plan tf-apply tf-destroy-compute tf-full-destroy \
 	inventory-graph inventory-host ssh-host \
-	provision deploy
+	provision deploy k3s-cluster k3s-platform headlamp-start headlamp-token
 
 help:
 	@echo "Local development:"
@@ -47,6 +51,10 @@ help:
 	@echo "Ansible:"
 	@echo "  make provision               - Run ansible/provision.yml"
 	@echo "  make deploy                  - Run ansible/deploy.yml"
+	@echo "  make k3s-cluster             - Run ansible/k3s-cluster.yml against GCP dynamic inventory"
+	@echo "  make k3s-platform            - Run ansible/k3s-platform.yml against GCP dynamic inventory"
+	@echo "  make headlamp-start          - Run generated Headlamp access helper"
+	@echo "  make headlamp-token          - Print a Headlamp login token"
 	@echo ""
 	@echo "Optional variables:"
 	@echo "  LIMIT=role_app_backend       - Pass --limit to provision/deploy"
@@ -114,3 +122,17 @@ provision:
 
 deploy:
 	$(ANSIBLE_CMD) ansible-playbook -i "$(INVENTORY)" "$(ANSIBLE_DIR)/deploy.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
+
+k3s-cluster:
+	$(ANSIBLE_CMD) ansible-playbook -i "$(GCP_INVENTORY)" "$(ANSIBLE_DIR)/k3s-cluster.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
+
+k3s-platform:
+	$(ANSIBLE_CMD) ansible-playbook -i "$(GCP_INVENTORY)" "$(ANSIBLE_DIR)/k3s-platform.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
+
+headlamp-start:
+	@test -x "$(HEADLAMP_START_SCRIPT)" || (echo "Missing $(HEADLAMP_START_SCRIPT). Run 'make k3s-platform' first."; exit 1)
+	"$(HEADLAMP_START_SCRIPT)"
+
+headlamp-token:
+	@test -f "$(K8S_TUNNELED_KUBECONFIG)" || (echo "Missing $(K8S_TUNNELED_KUBECONFIG). Run 'make k3s-cluster' first."; exit 1)
+	KUBECONFIG="$(K8S_TUNNELED_KUBECONFIG)" kubectl create token headlamp-admin -n kube-system

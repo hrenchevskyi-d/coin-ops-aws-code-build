@@ -53,7 +53,9 @@ This runbook explains:
 After a successful run, the following local helper files are created:
 
 - `ansible/artifacts/kubeconfig-gcp-k3s.yaml`
-  Standard kubeconfig pointing at the private bootstrap node IP.
+  Standard kubeconfig pointing at the preferred private Kubernetes API endpoint.
+  When the GCP HA API load balancer is enabled, this points at the load
+  balancer IP instead of a single control-plane node.
 - `ansible/artifacts/kubeconfig-gcp-k3s-tunneled.yaml`
   Operator kubeconfig intended for local use through the generated SSH tunnel.
 - `ansible/artifacts/k8s-api-tunnel.sh`
@@ -170,6 +172,10 @@ rm -f /home/notebook/projects/coin-ops/ansible/artifacts/.k8s-api-tunnel.pid
 - Headlamp access is currently not exposed through Ingress; this runbook uses
   direct operator access via `kubectl port-forward`.
 - Traefik may still exist in the cluster for future ingress-based workloads.
+- If you enable or change the GCP HA API load balancer in Terraform, re-run
+  `ansible/k3s-cluster.yml` afterwards so the `k3s` server certificates include
+  the load balancer endpoint in `tls-san` and the local kubeconfig artifacts are
+  regenerated accordingly.
 
 ## Security Notes
 

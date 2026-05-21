@@ -10,6 +10,8 @@ common_allowed_ports:
   - "10250"
 
 k3s_bootstrap_host: "{{ groups['role_k3s_server'] | sort | first }}"
+k3s_api_endpoint: "{{ cloud_runtime_metadata.get('k3s_api_endpoint', '') | default('', true) }}"
+k3s_tls_sans: "{{ ([ansible_host] + ([k3s_api_endpoint] if (k3s_api_endpoint | length > 0) else [])) | unique }}"
 k3s_channel: stable
 k3s_install_script_url: https://get.k3s.io
 k3s_server_disable_components: []

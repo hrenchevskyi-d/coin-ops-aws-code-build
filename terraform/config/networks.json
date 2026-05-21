@@ -11,6 +11,13 @@
                 "enabled": true,
                 "subnet_names": ["internal"]
             },
+            "k3s_api_load_balancer": {
+                "enabled": true,
+                "name": "coin-ops-k3s-api",
+                "port": 6443,
+                "internal_subnet": "internal",
+                "allow_global_access": false
+            },
             "subnets": {
                 "internal": {
                     "cidr": "10.20.1.0/24",
@@ -57,6 +64,11 @@
                 { "protocol": "icmp" }
             ],
             "source_cidrs": ["10.20.0.0/16"],
+            "target_role": "k3s-server"
+        },
+        "allow-k3s-api-lb-health-checks": {
+            "protocols": [{ "protocol": "tcp", "ports": ["6443"] }],
+            "source_cidrs": ["35.191.0.0/16", "130.211.0.0/22"],
             "target_role": "k3s-server"
         }
     }
