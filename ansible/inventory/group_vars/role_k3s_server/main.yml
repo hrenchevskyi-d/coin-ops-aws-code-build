@@ -1,6 +1,8 @@
 ---
 common_allowed_ports:
   - "{{ infra_general.get('ssh_port', 53725) }}"
+  - "80"
+  - "443"
   - "6443"
   - "9345"
   - "2379"
@@ -10,9 +12,7 @@ common_allowed_ports:
 k3s_bootstrap_host: "{{ groups['role_k3s_server'] | sort | first }}"
 k3s_channel: stable
 k3s_install_script_url: https://get.k3s.io
-k3s_server_disable_components:
-  - traefik
-  - servicelb
+k3s_server_disable_components: []
 k3s_flannel_backend: vxlan
 k3s_write_kubeconfig_mode: "0644"
 k3s_token_file: /var/lib/rancher/k3s/server/node-token
@@ -21,3 +21,14 @@ k3s_local_artifact_dir: "{{ repo_root ~ '/ansible/artifacts' }}"
 k3s_vpc_cidr: "{{ cloud_vpc_cidr | default('10.20.0.0/16', true) }}"
 k3s_udp_ports:
   - "8472"
+
+helm_install_script_url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+headlamp_release_name: headlamp
+headlamp_namespace: kube-system
+headlamp_chart_repo_name: headlamp
+headlamp_chart_repo_url: https://kubernetes-sigs.github.io/headlamp/
+headlamp_chart_ref: headlamp/headlamp
+headlamp_values_file: /tmp/headlamp-values.yaml
+headlamp_admin_service_account: headlamp-admin
+headlamp_admin_cluster_role: cluster-admin
+headlamp_local_port: 8080

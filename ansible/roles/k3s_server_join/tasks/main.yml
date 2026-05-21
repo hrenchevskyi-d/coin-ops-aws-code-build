@@ -19,10 +19,12 @@
       tls-san:
         - "{{ ansible_host }}"
       flannel-backend: "{{ k3s_flannel_backend }}"
+      {% if k3s_server_disable_components | length > 0 %}
       disable:
       {% for component in k3s_server_disable_components %}
         - {{ component }}
       {% endfor %}
+      {% endif %}
   register: k3s_join_config
 
 - name: Download k3s installation script

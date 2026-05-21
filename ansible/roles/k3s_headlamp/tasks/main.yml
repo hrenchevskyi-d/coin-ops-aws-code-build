@@ -1,0 +1,190 @@
+---
+- name: Download Helm installation script
+  get_url:
+    url: "{{ helm_install_script_url }}"
+    dest: /tmp/get-helm-3.sh
+    mode: "0755"
+
+- name: Install Helm on bootstrap node when missing
+  command: /tmp/get-helm-3.sh
+  args:
+    creates: /usr/local/bin/helm
+
+- name: Add Headlamp Helm repository
+  command: helm repo add --force-update {{ headlamp_chart_repo_name }} {{ headlamp_chart_repo_url }}
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Update Helm repositories
+  command: helm repo update
+  changed_when: false
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Render Headlamp Helm values
+  copy:
+    dest: "{{ headlamp_values_file }}"
+    mode: "0600"
+    content: |
+      replicaCount: 2
+      service:
+        type: ClusterIP
+      ingress:
+        enabled: false
+
+- name: Install or upgrade Headlamp
+  command: >-
+    helm upgrade --install {{ headlamp_release_name }} {{ headlamp_chart_ref }}
+    --namespace {{ headlamp_namespace }}
+    --create-namespace
+    --values {{ headlamp_values_file }}
+  register: headlamp_helm
+  changed_when: >-
+    'STATUS: deployed' in headlamp_helm.stdout
+    or 'STATUS: pending-upgrade' in headlamp_helm.stdout
+    or 'STATUS: pending-install' in headlamp_helm.stdout
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Wait for Headlamp deployment rollout
+  command: k3s kubectl -n {{ headlamp_namespace }} rollout status deployment/{{ headlamp_release_name }} --timeout=300s
+  register: headlamp_rollout
+  changed_when: false
+
+- name: Apply Headlamp operator RBAC
+  copy:
+    dest: /tmp/headlamp-operator-rbac.yaml
+    mode: "0600"
+    content: |
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: {{ headlamp_admin_service_account }}
+        namespace: {{ headlamp_namespace }}
+      ---
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: {{ headlamp_admin_service_account }}
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: {{ headlamp_admin_cluster_role }}
+      subjects:
+        - kind: ServiceAccount
+          name: {{ headlamp_admin_service_account }}
+          namespace: {{ headlamp_namespace }}
+
+- name: Apply Headlamp operator RBAC manifest
+  command: k3s kubectl apply -f /tmp/headlamp-operator-rbac.yaml
+  changed_when: false
+
+- name: Read Headlamp service definition
+  command: k3s kubectl -n {{ headlamp_namespace }} get svc {{ headlamp_release_name }} -o json
+  register: headlamp_service_json
+  changed_when: false
+
+- name: Parse Headlamp service definition
+  set_fact:
+    headlamp_service: "{{ headlamp_service_json.stdout | from_json }}"
+    headlamp_service_port: "{{ (headlamp_service_json.stdout | from_json).spec.ports[0].port }}"
+
+- name: Ensure local artifact directory exists
+  command: mkdir -p "{{ k3s_local_artifact_dir }}"
+  changed_when: false
+  delegate_to: localhost
+  become: false
+
+- name: Remove obsolete SOCKS proxy PAC helper when present
+  file:
+    path: "{{ k3s_local_artifact_dir }}/headlamp-socks-proxy.pac"
+    state: absent
+  delegate_to: localhost
+  become: false
+
+- name: Write Headlamp port-forward helper
+  copy:
+    dest: "{{ k3s_local_artifact_dir }}/headlamp-port-forward.sh"
+    mode: "0755"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      KUBECONFIG="{{ k3s_local_artifact_dir }}/kubeconfig-gcp-k3s-tunneled.yaml" \
+      kubectl -n {{ headlamp_namespace }} port-forward svc/{{ headlamp_release_name }} {{ headlamp_local_port }}:{{ headlamp_service_port }}
+  delegate_to: localhost
+  become: false
+
+- name: Write Headlamp full-access helper
+  copy:
+    dest: "{{ k3s_local_artifact_dir }}/headlamp-start.sh"
+    mode: "0755"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      ARTIFACT_DIR="{{ k3s_local_artifact_dir }}"
+      TUNNEL_PID_FILE="${ARTIFACT_DIR}/.k8s-api-tunnel.pid"
+
+      if [ -f "${TUNNEL_PID_FILE}" ] && kill -0 "$(cat "${TUNNEL_PID_FILE}")" 2>/dev/null; then
+        echo "Kubernetes API tunnel already running with PID $(cat "${TUNNEL_PID_FILE}")."
+      else
+        nohup "${ARTIFACT_DIR}/k8s-api-tunnel.sh" >/tmp/coinops-k8s-api-tunnel.log 2>&1 &
+        echo $! > "${TUNNEL_PID_FILE}"
+        sleep 2
+      fi
+
+      KUBECONFIG="${ARTIFACT_DIR}/kubeconfig-gcp-k3s-tunneled.yaml" \
+      kubectl -n {{ headlamp_namespace }} port-forward svc/{{ headlamp_release_name }} {{ headlamp_local_port }}:{{ headlamp_service_port }}
+  delegate_to: localhost
+  become: false
+
+- name: Write Headlamp access summary
+  copy:
+    dest: "{{ k3s_local_artifact_dir }}/headlamp-access-summary.md"
+    mode: "0644"
+    content: |
+      # Headlamp Access
+
+      Headlamp service type: `{{ headlamp_service.spec.type }}`
+      Headlamp service port: `{{ headlamp_service_port }}`
+      Local forwarded URL: `http://127.0.0.1:{{ headlamp_local_port }}/`
+
+      ## 1. Start the Kubernetes API tunnel
+
+      ```bash
+      {{ k3s_local_artifact_dir }}/k8s-api-tunnel.sh
+      ```
+
+      ## 2. Start the Headlamp port-forward
+
+      ```bash
+      {{ k3s_local_artifact_dir }}/headlamp-port-forward.sh
+      ```
+
+      Or run the combined helper:
+
+      ```bash
+      {{ k3s_local_artifact_dir }}/headlamp-start.sh
+      ```
+
+      ## 3. Open Headlamp in your browser
+
+      `http://127.0.0.1:{{ headlamp_local_port }}/`
+
+      ## 4. Get a login token
+
+      From your local machine:
+
+      ```bash
+      KUBECONFIG={{ k3s_local_artifact_dir }}/kubeconfig-gcp-k3s-tunneled.yaml kubectl create token {{ headlamp_admin_service_account }} -n {{ headlamp_namespace }}
+      ```
+
+      Paste that token into the Headlamp login form.
+
+      ## Notes
+
+      - This setup does not require browser proxy configuration or hosts-file overrides.
+      - Access is local to the machine where the tunnel and `kubectl port-forward` are running.
+      - Traefik may still be present in the cluster for future ingress-based workloads, but Headlamp access currently uses direct port-forwarding.
+  delegate_to: localhost
+  become: false
