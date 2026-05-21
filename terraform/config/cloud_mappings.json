@@ -3,14 +3,14 @@
         "gcp": {
             "micro": "e2-micro",
             "small": "e2-small",
-            "medium": "e2-standard-2",
+            "medium": "e2-medium",
             "large": "e2-standard-4"
         },
         "aws": {
             "micro": "t3.micro",
             "small": "t3.small",
-            "medium": "m7i-flex.large",
-            "large": "c7i-flex.large"
+            "medium": "c7i-flex.large",
+            "large": "m7i-flex.large"
         },
         "azure": {
             "micro": "Standard_B2s_v2",

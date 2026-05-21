@@ -36,6 +36,7 @@ terraform/config/hosts.json
 terraform/config/ssh_config
 terraform/config/ansible-runtime.json
 ansible/vars/local.generated.json
+ansible/artifacts/
 
 # React build output
 ui-react/dist/

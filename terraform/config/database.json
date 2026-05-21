@@ -1,6 +1,6 @@
 {
     "database": {
-        "enabled": true,
+        "enabled": false,
         "engine": "postgres",
         "version": "16",
         "name": "cognitor",

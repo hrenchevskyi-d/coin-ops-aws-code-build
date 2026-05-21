@@ -1,0 +1,78 @@
+---
+- name: Assert that the bootstrap token is available
+  assert:
+    that:
+      - hostvars[k3s_bootstrap_host].k3s_cluster_token is defined
+      - hostvars[k3s_bootstrap_host].k3s_cluster_token | length > 0
+    fail_msg: >-
+      Missing k3s cluster token from bootstrap host {{ k3s_bootstrap_host }}.
+
+- name: Render join k3s server configuration
+  copy:
+    dest: "{{ k3s_config_file }}"
+    mode: "0600"
+    content: |
+      server: "https://{{ hostvars[k3s_bootstrap_host].ansible_host }}:6443"
+      token: "{{ hostvars[k3s_bootstrap_host].k3s_cluster_token }}"
+      write-kubeconfig-mode: "{{ k3s_write_kubeconfig_mode }}"
+      node-name: "{{ inventory_hostname }}"
+      tls-san:
+        - "{{ ansible_host }}"
+      flannel-backend: "{{ k3s_flannel_backend }}"
+      disable:
+      {% for component in k3s_server_disable_components %}
+        - {{ component }}
+      {% endfor %}
+  register: k3s_join_config
+
+- name: Download k3s installation script
+  get_url:
+    url: "{{ k3s_install_script_url }}"
+    dest: /tmp/get-k3s.sh
+    mode: "0755"
+
+- name: Install joining k3s server
+  command: /tmp/get-k3s.sh
+  environment:
+    INSTALL_K3S_CHANNEL: "{{ k3s_channel }}"
+    INSTALL_K3S_EXEC: server
+  args:
+    creates: /usr/local/bin/k3s
+  register: k3s_join_install
+
+- name: Show k3s service status when join installation fails
+  command: systemctl status k3s --no-pager --full
+  register: k3s_join_status
+  changed_when: false
+  failed_when: false
+  when: k3s_join_install is failed
+
+- name: Show k3s journal when join installation fails
+  command: journalctl -u k3s --no-pager -n 80
+  register: k3s_join_journal
+  changed_when: false
+  failed_when: false
+  when: k3s_join_install is failed
+
+- name: Fail with captured k3s diagnostics
+  fail:
+    msg: |-
+      Joining server installation failed on {{ inventory_hostname }}.
+      systemctl status:
+      {{ k3s_join_status.stdout | default('n/a') }}
+
+      journalctl:
+      {{ k3s_join_journal.stdout | default('n/a') }}
+  when: k3s_join_install is failed
+
+- name: Ensure k3s service is enabled and running on joining node
+  systemd:
+    name: k3s
+    enabled: yes
+    state: started
+
+- name: Restart joining k3s service when configuration changes
+  systemd:
+    name: k3s
+    state: restarted
+  when: k3s_join_config.changed

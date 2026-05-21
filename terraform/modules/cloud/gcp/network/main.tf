@@ -4,6 +4,22 @@ locals {
     external = { cidr = "10.10.2.0/24" }
   }
   subnets = length(var.subnets) > 0 ? var.subnets : local.fallback_subnets
+
+  cloud_nat_cfg = jsondecode(
+    length(var.cloud_nat) > 0
+    ? jsonencode(var.cloud_nat)
+    : jsonencode({})
+  )
+  cloud_nat_enabled     = try(local.cloud_nat_cfg.enabled, false)
+  cloud_nat_name        = try(local.cloud_nat_cfg.name, "${var.vpc_name}-nat")
+  cloud_nat_router_name = try(local.cloud_nat_cfg.router_name, "${var.vpc_name}-router")
+  cloud_nat_subnets     = try(local.cloud_nat_cfg.subnet_names, ["internal"])
+  cloud_nat_subnetwork_entries = [
+    for subnet_name in local.cloud_nat_subnets : {
+      name = google_compute_subnetwork.subnet[subnet_name].id
+    }
+    if contains(keys(google_compute_subnetwork.subnet), subnet_name)
+  ]
 }
 
 resource "google_compute_network" "vpc" {
@@ -17,4 +33,29 @@ resource "google_compute_subnetwork" "subnet" {
   ip_cidr_range = each.value.cidr
   region        = var.region
   network       = google_compute_network.vpc.id
+}
+
+resource "google_compute_router" "nat" {
+  count   = local.cloud_nat_enabled ? 1 : 0
+  name    = local.cloud_nat_router_name
+  network = google_compute_network.vpc.id
+  region  = var.region
+}
+
+resource "google_compute_router_nat" "nat" {
+  count  = local.cloud_nat_enabled ? 1 : 0
+  name   = local.cloud_nat_name
+  router = google_compute_router.nat[0].name
+  region = var.region
+
+  nat_ip_allocate_option             = "AUTO_ONLY"
+  source_subnetwork_ip_ranges_to_nat = "LIST_OF_SUBNETWORKS"
+
+  dynamic "subnetwork" {
+    for_each = local.cloud_nat_subnetwork_entries
+    content {
+      name                    = subnetwork.value.name
+      source_ip_ranges_to_nat = ["ALL_IP_RANGES"]
+    }
+  }
 }

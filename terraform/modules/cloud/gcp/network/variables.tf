@@ -13,3 +13,9 @@ variable "subnets" {
   description = "Map of subnets from networks.json (keyed by subnet name)."
   default     = {}
 }
+
+variable "cloud_nat" {
+  type        = any
+  description = "Optional Cloud NAT configuration from networks.json."
+  default     = {}
+}

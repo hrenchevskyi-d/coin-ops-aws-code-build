@@ -218,6 +218,14 @@ EOF
 cd "${TMP_TERRAFORM_DIR}"
 terraform init
 
+GCP_PROJECT_ARG=()
+if command -v gcloud >/dev/null 2>&1; then
+  CURRENT_GCP_PROJECT="$(gcloud config get-value project 2>/dev/null || true)"
+  if [[ -n "${CURRENT_GCP_PROJECT}" && "${CURRENT_GCP_PROJECT}" != "(unset)" ]]; then
+    GCP_PROJECT_ARG=(--project="${CURRENT_GCP_PROJECT}")
+  fi
+fi
+
 disable_aws_rds_deletion_protection() {
   if ! command -v aws >/dev/null 2>&1; then
     return 0
@@ -366,6 +374,7 @@ disable_gcp_sql_deletion_protection() {
     fi
 
     gcloud sql instances patch "${instance_name}" \
+      "${GCP_PROJECT_ARG[@]}" \
       --no-deletion-protection \
       --quiet >/dev/null
   done
@@ -390,8 +399,9 @@ gcp_private_service_connection_exists() {
   local network_name="$1"
   local peerings_output=""
 
-  if ! peerings_output="$(
+    if ! peerings_output="$(
     gcloud services vpc-peerings list \
+      "${GCP_PROJECT_ARG[@]}" \
       --network="${network_name}" \
       --service=servicenetworking.googleapis.com \
       --format='value(network)' 2>/dev/null
@@ -406,8 +416,17 @@ list_gcp_network_peerings() {
   local network_name="$1"
 
   gcloud compute networks peerings list \
+    "${GCP_PROJECT_ARG[@]}" \
     --network="${network_name}" \
     --format='value(name)' 2>/dev/null || true
+}
+
+gcp_compute_peerings_exist() {
+  local network_name="$1"
+  local peerings_output=""
+
+  peerings_output="$(list_gcp_network_peerings "${network_name}")"
+  [[ -n "${peerings_output}" ]]
 }
 
 force_delete_gcp_compute_peerings() {
@@ -425,14 +444,19 @@ force_delete_gcp_compute_peerings() {
 
   for peering_name in "${peering_names[@]}"; do
     [[ -n "${peering_name}" ]] || continue
+    echo "  Trying compute peering delete: ${peering_name}"
 
     if gcloud compute networks peerings delete "${peering_name}" \
+      "${GCP_PROJECT_ARG[@]}" \
       --network="${network_name}" \
       --quiet >/dev/null 2>&1; then
+      echo "  Compute peering delete succeeded: ${peering_name}"
       continue
     fi
 
+    echo "  Compute peering delete did not complete cleanly, requesting delete: ${peering_name}"
     gcloud compute networks peerings request-delete "${peering_name}" \
+      "${GCP_PROJECT_ARG[@]}" \
       --network="${network_name}" \
       --quiet >/dev/null 2>&1 || true
   done
@@ -440,10 +464,27 @@ force_delete_gcp_compute_peerings() {
 
 delete_gcp_private_service_connection_with_retry() {
   local network_name="$1"
-  local attempts=12
+  local attempts=3
   local sleep_seconds=10
   local delete_error=""
-  local forced_compute_cleanup=false
+
+  if ! gcp_private_service_connection_exists "${network_name}"; then
+    echo "Private service connection for ${network_name} is already absent."
+    return 0
+  fi
+
+  if gcp_compute_peerings_exist "${network_name}"; then
+    echo "Private service connection for ${network_name} still has underlying Compute peerings. Deleting them first..."
+    force_delete_gcp_compute_peerings "${network_name}"
+    if ! gcp_private_service_connection_exists "${network_name}"; then
+      echo "Private service connection for ${network_name} disappeared after direct Compute peering delete."
+      return 0
+    fi
+    if ! gcp_compute_peerings_exist "${network_name}"; then
+      echo "Underlying Compute peerings for ${network_name} are gone after direct delete; proceeding without waiting for Service Networking to converge."
+      return 0
+    fi
+  fi
 
   for ((i = 1; i <= attempts; i++)); do
     if ! gcp_private_service_connection_exists "${network_name}"; then
@@ -453,6 +494,7 @@ delete_gcp_private_service_connection_with_retry() {
 
     if delete_error="$(
       gcloud services vpc-peerings delete \
+        "${GCP_PROJECT_ARG[@]}" \
         --network="${network_name}" \
         --service=servicenetworking.googleapis.com \
         --quiet 2>&1 >/dev/null
@@ -470,11 +512,14 @@ delete_gcp_private_service_connection_with_retry() {
         return 0
       fi
 
-      if [[ "${forced_compute_cleanup}" == false ]]; then
+      if gcp_compute_peerings_exist "${network_name}"; then
         force_delete_gcp_compute_peerings "${network_name}"
-        forced_compute_cleanup=true
         if ! gcp_private_service_connection_exists "${network_name}"; then
           echo "Private service connection for ${network_name} disappeared after break-glass Compute peering delete."
+          return 0
+        fi
+        if ! gcp_compute_peerings_exist "${network_name}"; then
+          echo "Underlying Compute peerings for ${network_name} are gone after break-glass delete; proceeding without waiting for Service Networking to converge."
           return 0
         fi
       fi
@@ -489,6 +534,10 @@ delete_gcp_private_service_connection_with_retry() {
   done
 
   echo "Timed out waiting for private service connection on ${network_name} to become deletable." >&2
+  if ! gcp_compute_peerings_exist "${network_name}"; then
+    echo "Underlying Compute peerings for ${network_name} are already absent; proceeding despite stale Service Networking delete errors." >&2
+    return 0
+  fi
   echo "${delete_error}" >&2
   return 1
 }
@@ -528,12 +577,14 @@ delete_gcp_sql_instances() {
       continue
     fi
 
-    if gcloud sql instances describe "${instance_name}" >/dev/null 2>&1; then
+    if gcloud sql instances describe "${instance_name}" "${GCP_PROJECT_ARG[@]}" >/dev/null 2>&1; then
       echo "Deleting Cloud SQL instance ${instance_name}..."
       gcloud sql instances patch "${instance_name}" \
+        "${GCP_PROJECT_ARG[@]}" \
         --no-deletion-protection \
         --quiet >/dev/null
       gcloud sql instances delete "${instance_name}" \
+        "${GCP_PROJECT_ARG[@]}" \
         --quiet >/dev/null
       wait_for_gcp_sql_instance_absent "${instance_name}"
     else
@@ -600,6 +651,7 @@ delete_gcp_private_service_access() {
 
     if ! describe_error="$(
       gcloud compute addresses describe "${reserved_name}" \
+        "${GCP_PROJECT_ARG[@]}" \
         --global 2>&1 >/dev/null
     )"; then
       if grep -Eqi 'was not found|Could not fetch resource|NOT_FOUND' <<<"${describe_error}"; then
@@ -613,6 +665,7 @@ delete_gcp_private_service_access() {
 
     echo "Deleting reserved peering range ${reserved_name}..."
     gcloud compute addresses delete "${reserved_name}" \
+      "${GCP_PROJECT_ARG[@]}" \
       --global \
       --quiet >/dev/null
     remove_state_if_present "${address}"

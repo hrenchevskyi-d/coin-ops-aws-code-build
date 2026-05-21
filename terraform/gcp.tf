@@ -13,11 +13,12 @@ data "google_secret_manager_secret_version" "app_secrets" {
 }
 
 module "gcp_network" {
-  count    = local.gcp_enabled ? 1 : 0
-  source   = "./modules/cloud/gcp/network"
-  vpc_name = local.gcp_vpc_name
-  region   = local.gcp_region
-  subnets  = local.gcp_subnets
+  count     = local.gcp_enabled ? 1 : 0
+  source    = "./modules/cloud/gcp/network"
+  vpc_name  = local.gcp_vpc_name
+  region    = local.gcp_region
+  subnets   = local.gcp_subnets
+  cloud_nat = try(local.gcp_network_cfg.cloud_nat, {})
 }
 
 module "gcp_firewall" {

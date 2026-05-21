@@ -1,0 +1,69 @@
+---
+- name: Read k3s node list as JSON
+  command: k3s kubectl get nodes -o json
+  register: k3s_nodes_json
+  changed_when: false
+  retries: 20
+  delay: 10
+  until: k3s_nodes_json.rc == 0
+
+- name: Parse node list payload
+  set_fact:
+    k3s_nodes: "{{ (k3s_nodes_json.stdout | from_json)['items'] }}"
+
+- name: Assert that three k3s nodes are registered
+  assert:
+    that:
+      - (k3s_nodes | length) == 3
+    fail_msg: >-
+      Expected 3 nodes in the k3s control plane, got {{ k3s_nodes | length }}.
+
+- name: Assert that all k3s nodes report Ready
+  assert:
+    that:
+      - >-
+        (
+          item.status.conditions
+          | selectattr('type', 'equalto', 'Ready')
+          | map(attribute='status')
+          | first
+        ) == 'True'
+    fail_msg: "Node {{ item.metadata.name }} is not Ready."
+  loop: "{{ k3s_nodes }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+
+- name: Read kubeconfig from bootstrap node
+  slurp:
+    src: /etc/rancher/k3s/k3s.yaml
+  register: k3s_kubeconfig_raw
+
+- name: Ensure local artifact directory exists
+  command: mkdir -p "{{ k3s_local_artifact_dir }}"
+  changed_when: false
+  delegate_to: localhost
+  become: false
+
+- name: Write kubeconfig artifact for operator use
+  copy:
+    dest: "{{ k3s_local_artifact_dir }}/kubeconfig-gcp-k3s.yaml"
+    mode: "0600"
+    content: >-
+      {{
+        (k3s_kubeconfig_raw.content | b64decode)
+        | regex_replace('127.0.0.1', ansible_host)
+      }}
+  delegate_to: localhost
+  become: false
+
+- name: Write cluster bootstrap summary
+  copy:
+    dest: "{{ k3s_local_artifact_dir }}/k3s-bootstrap-summary.txt"
+    mode: "0644"
+    content: |
+      Bootstrap host: {{ inventory_hostname }}
+      API endpoint: https://{{ ansible_host }}:6443
+      Kubeconfig: {{ k3s_local_artifact_dir }}/kubeconfig-gcp-k3s.yaml
+      Access model: connect to private nodes through the configured jump-host SSH path.
+  delegate_to: localhost
+  become: false

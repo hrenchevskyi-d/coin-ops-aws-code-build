@@ -1,0 +1,23 @@
+---
+common_allowed_ports:
+  - "{{ infra_general.get('ssh_port', 53725) }}"
+  - "6443"
+  - "9345"
+  - "2379"
+  - "2380"
+  - "10250"
+
+k3s_bootstrap_host: "{{ groups['role_k3s_server'] | sort | first }}"
+k3s_channel: stable
+k3s_install_script_url: https://get.k3s.io
+k3s_server_disable_components:
+  - traefik
+  - servicelb
+k3s_flannel_backend: vxlan
+k3s_write_kubeconfig_mode: "0644"
+k3s_token_file: /var/lib/rancher/k3s/server/node-token
+k3s_config_file: /etc/rancher/k3s/config.yaml
+k3s_local_artifact_dir: "{{ repo_root ~ '/ansible/artifacts' }}"
+k3s_vpc_cidr: "{{ cloud_vpc_cidr | default('10.20.0.0/16', true) }}"
+k3s_udp_ports:
+  - "8472"
