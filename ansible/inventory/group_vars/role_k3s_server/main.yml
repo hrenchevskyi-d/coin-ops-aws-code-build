@@ -34,3 +34,6 @@ headlamp_values_file: /tmp/headlamp-values.yaml
 headlamp_admin_service_account: headlamp-admin
 headlamp_admin_cluster_role: cluster-admin
 headlamp_local_port: 8080
+headlamp_ingress_enabled: true
+headlamp_ingress_host: "headlamp.{{ app_domain }}"
+headlamp_ingress_class_name: traefik

@@ -71,6 +71,19 @@ module "gcp_database" {
   disk_size    = try(local.gcp_db_profile.disk_size, 10)
 }
 
+resource "google_compute_instance_group" "gcp_k3s_servers" {
+  count = (local.gcp_k3s_api_lb_enabled || local.gcp_k3s_ingress_lb_enabled) ? 1 : 0
+
+  name = "${local.project_name}-k3s-servers-${replace(local.gcp_zone, "/[^a-z0-9-]/", "-")}"
+  zone = local.gcp_zone
+  instances = [
+    for instance in values(local.gcp_host_details) : instance.self_link
+    if instance.role == "k3s-server"
+  ]
+
+  depends_on = [module.gcp_instances]
+}
+
 module "gcp_k3s_api_lb" {
   count               = local.gcp_k3s_api_lb_enabled ? 1 : 0
   source              = "./modules/cloud/gcp/internal_api_lb"
@@ -78,11 +91,23 @@ module "gcp_k3s_api_lb" {
   region              = local.gcp_region
   network_id          = module.gcp_network[0].network_id
   subnetwork_id       = module.gcp_network[0].subnet_ids[try(local.gcp_k3s_api_lb_cfg.internal_subnet, "internal")]
-  backend_zone        = local.gcp_zone
-  backend_instances   = local.gcp_k3s_api_lb_backends
+  backend_group_id    = google_compute_instance_group.gcp_k3s_servers[0].id
   port                = try(local.gcp_k3s_api_lb_cfg.port, 6443)
   allow_global_access = try(local.gcp_k3s_api_lb_cfg.allow_global_access, false)
   address             = try(local.gcp_k3s_api_lb_cfg.address, "")
+}
+
+module "gcp_k3s_ingress_lb" {
+  count               = local.gcp_k3s_ingress_lb_enabled ? 1 : 0
+  source              = "./modules/cloud/gcp/internal_api_lb"
+  name                = try(local.gcp_k3s_ingress_lb_cfg.name, "${local.project_name}-k3s-ingress")
+  region              = local.gcp_region
+  network_id          = module.gcp_network[0].network_id
+  subnetwork_id       = module.gcp_network[0].subnet_ids[try(local.gcp_k3s_ingress_lb_cfg.internal_subnet, "internal")]
+  backend_group_id    = google_compute_instance_group.gcp_k3s_servers[0].id
+  port                = try(local.gcp_k3s_ingress_lb_cfg.port, 80)
+  allow_global_access = try(local.gcp_k3s_ingress_lb_cfg.allow_global_access, false)
+  address             = try(local.gcp_k3s_ingress_lb_cfg.address, "")
 }
 
 module "gcp_secrets" {

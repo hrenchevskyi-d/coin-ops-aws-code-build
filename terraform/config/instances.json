@@ -7,7 +7,22 @@
             "can_ip_forward": false,
             "role": "jump-host",
             "clouds": [
-                "gcp"
+                "gcp",
+                "aws",
+                "azure"
+            ]
+        },
+        "gateway": {
+            "subnet": "external",
+            "has_public_ip": true,
+            "instance_size": "small",
+            "can_ip_forward": true,
+            "role": "gateway",
+            "startup_script": "scripts/gateway-init.sh.tpl",
+            "clouds": [
+                "gcp",
+                "aws",
+                "azure"
             ]
         },
         "k3s-server-1": {

@@ -88,6 +88,37 @@
   set_fact:
     headlamp_service: "{{ headlamp_service_json.stdout | from_json }}"
     headlamp_service_port: "{{ (headlamp_service_json.stdout | from_json).spec.ports[0].port }}"
+    headlamp_access_ip: "{{ cloud_runtime_metadata.get('headlamp_ingress_ip', '') | default(hostvars[groups['role_k3s_server'] | sort | first].ansible_host, true) }}"
+
+- name: Render Headlamp ingress manifest
+  copy:
+    dest: /tmp/headlamp-ingress.yaml
+    mode: "0600"
+    content: |
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: {{ headlamp_release_name }}
+        namespace: {{ headlamp_namespace }}
+      spec:
+        ingressClassName: {{ headlamp_ingress_class_name }}
+        rules:
+          - host: {{ headlamp_ingress_host }}
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: {{ headlamp_release_name }}
+                      port:
+                        number: {{ headlamp_service_port }}
+  when: headlamp_ingress_enabled | bool
+
+- name: Apply Headlamp ingress manifest
+  command: k3s kubectl apply -f /tmp/headlamp-ingress.yaml
+  changed_when: false
+  when: headlamp_ingress_enabled | bool
 
 - name: Ensure local artifact directory exists
   command: mkdir -p "{{ k3s_local_artifact_dir }}"
@@ -145,17 +176,35 @@
     content: |
       # Headlamp Access
 
+      Preferred ingress URL: `http://{{ headlamp_ingress_host }}/`
+      Preferred private target IP: `{{ headlamp_access_ip }}`
       Headlamp service type: `{{ headlamp_service.spec.type }}`
       Headlamp service port: `{{ headlamp_service_port }}`
       Local forwarded URL: `http://127.0.0.1:{{ headlamp_local_port }}/`
 
-      ## 1. Start the Kubernetes API tunnel
+      ## Primary path: Tailscale + Ingress
+
+      Add a hosts entry on the machine where your browser runs:
+
+      ```text
+      {{ headlamp_access_ip }} {{ headlamp_ingress_host }}
+      ```
+
+      Then open:
+
+      ```text
+      http://{{ headlamp_ingress_host }}/
+      ```
+
+      ## Fallback path: API tunnel + port-forward
+
+      ### 1. Start the Kubernetes API tunnel
 
       ```bash
       {{ k3s_local_artifact_dir }}/k8s-api-tunnel.sh
       ```
 
-      ## 2. Start the Headlamp port-forward
+      ### 2. Start the Headlamp port-forward
 
       ```bash
       {{ k3s_local_artifact_dir }}/headlamp-port-forward.sh
@@ -167,11 +216,11 @@
       {{ k3s_local_artifact_dir }}/headlamp-start.sh
       ```
 
-      ## 3. Open Headlamp in your browser
+      ### 3. Open Headlamp in your browser
 
       `http://127.0.0.1:{{ headlamp_local_port }}/`
 
-      ## 4. Get a login token
+      ## Login token
 
       From your local machine:
 
@@ -183,8 +232,49 @@
 
       ## Notes
 
-      - This setup does not require browser proxy configuration or hosts-file overrides.
-      - Access is local to the machine where the tunnel and `kubectl port-forward` are running.
-      - Traefik may still be present in the cluster for future ingress-based workloads, but Headlamp access currently uses direct port-forwarding.
+      - Tailscale on Windows is recommended for browser access.
+      - Port-forward remains available as a fallback when direct tailnet browser access is not convenient.
+      - The current ingress hostname maps to one private `k3s` node IP; add an internal load balancer in front of Traefik later for fully HA browser access.
+  delegate_to: localhost
+  become: false
+
+- name: Write Headlamp ingress access summary
+  copy:
+    dest: "{{ k3s_local_artifact_dir }}/headlamp-ingress-access.md"
+    mode: "0644"
+    content: |
+      # Headlamp Ingress Access
+
+      Primary URL: `http://{{ headlamp_ingress_host }}/`
+      Current private target IP: `{{ headlamp_access_ip }}`
+      Ingress class: `{{ headlamp_ingress_class_name }}`
+
+      ## Access model
+
+      - Install and sign in to Tailscale on your **Windows host**, not just inside WSL.
+      - Ensure the GCP subnet route `10.20.0.0/16` is approved in the Tailscale admin console.
+      - Add a local hosts entry on the machine where your browser runs:
+
+      ```text
+      {{ headlamp_access_ip }} {{ headlamp_ingress_host }}
+      ```
+
+      - Open:
+
+      ```text
+      http://{{ headlamp_ingress_host }}/
+      ```
+
+      ## Login token
+
+      ```bash
+      KUBECONFIG={{ k3s_local_artifact_dir }}/kubeconfig-gcp-k3s-tunneled.yaml kubectl create token {{ headlamp_admin_service_account }} -n {{ headlamp_namespace }}
+      ```
+
+      ## Notes
+
+      - This ingress path is internal-only and assumes Tailscale subnet routing into GCP.
+      - The hosts entry currently points at one `k3s` server IP. For fully HA browser access, add an internal load balancer in front of Traefik later.
+      - Port-forward remains available as a fallback via `headlamp-start.sh`.
   delegate_to: localhost
   become: false

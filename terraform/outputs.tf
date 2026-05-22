@@ -77,3 +77,8 @@ output "gcp_k3s_api_load_balancer_ip" {
   description = "Internal HA endpoint for the k3s Kubernetes API in GCP."
   value       = local.gcp_k3s_api_lb_enabled ? try(module.gcp_k3s_api_lb[0].ip_address, "") : ""
 }
+
+output "gcp_k3s_ingress_load_balancer_ip" {
+  description = "Internal ingress endpoint for Traefik/Headlamp in GCP."
+  value       = local.gcp_k3s_ingress_lb_enabled ? try(module.gcp_k3s_ingress_lb[0].ip_address, "") : ""
+}

@@ -185,6 +185,25 @@ locals {
   gcp_k3s_api_lb_backends = local.gcp_k3s_api_lb_enabled ? {
     for name in local.gcp_k3s_server_names : name => local.gcp_host_details[name]
   } : {}
+  gcp_k3s_ingress_lb_cfg = merge(
+    {
+      enabled             = false
+      name                = "${local.project_name}-k3s-ingress"
+      port                = 80
+      internal_subnet     = "internal"
+      allow_global_access = false
+      address             = ""
+    },
+    try(local.gcp_network_cfg.k3s_ingress_load_balancer, {})
+  )
+  gcp_k3s_ingress_lb_enabled = (
+    local.gcp_compute_enabled
+    && try(local.gcp_k3s_ingress_lb_cfg.enabled, false)
+    && length(local.gcp_k3s_server_names) > 0
+  )
+  gcp_k3s_ingress_lb_backends = local.gcp_k3s_ingress_lb_enabled ? {
+    for name in local.gcp_k3s_server_names : name => local.gcp_host_details[name]
+  } : {}
 
   gcp_jump_host_name = local.gcp_compute_enabled ? try([
     for name, cfg in local.gcp_instances_base : name
@@ -245,15 +264,36 @@ locals {
   aws_route_host_name   = local.aws_gateway_host_name != "" ? local.aws_gateway_host_name : local.aws_nat_host_name
   azure_route_host_name = local.azure_gateway_host_name != "" ? local.azure_gateway_host_name : local.azure_nat_host_name
 
-  gcp_has_route_host   = local.gcp_route_host_name != ""
-  aws_has_route_host   = local.aws_route_host_name != ""
-  azure_has_route_host = local.azure_route_host_name != ""
+  private_default_route_cfg     = try(local.routing.private_default_route, null)
+  private_default_route_enabled = local.private_default_route_cfg != null
 
-  nat_route_name       = try(local.private_default_route.name, "private-default-via-gateway")
-  nat_destination_cidr = try(local.private_default_route.destination_cidr, "0.0.0.0/0")
-  nat_priority         = try(local.private_default_route.priority, 800)
-  nat_target_tags      = try(local.private_default_route.target_tags, ["internal-vm"])
-  gcp_default_route_specs = local.gcp_has_route_host ? {
+  gcp_has_route_host = (
+    local.gcp_route_host_name != ""
+    && (
+      local.private_default_route_enabled
+      || length(try(local.gcp_network_cfg.remote_routes, [])) > 0
+    )
+  )
+  aws_has_route_host = (
+    local.aws_route_host_name != ""
+    && (
+      local.private_default_route_enabled
+      || length(try(local.aws_network_cfg.remote_routes, [])) > 0
+    )
+  )
+  azure_has_route_host = (
+    local.azure_route_host_name != ""
+    && (
+      local.private_default_route_enabled
+      || length(try(local.azure_network_cfg.remote_routes, [])) > 0
+    )
+  )
+
+  nat_route_name       = try(local.private_default_route_cfg.name, "private-default-via-gateway")
+  nat_destination_cidr = try(local.private_default_route_cfg.destination_cidr, "0.0.0.0/0")
+  nat_priority         = try(local.private_default_route_cfg.priority, 800)
+  nat_target_tags      = try(local.private_default_route_cfg.target_tags, ["internal-vm"])
+  gcp_default_route_specs = (local.gcp_has_route_host && local.private_default_route_enabled) ? {
     (local.nat_route_name) = {
       destination_cidr = local.nat_destination_cidr
       priority         = local.nat_priority
@@ -274,7 +314,8 @@ locals {
   )
   aws_private_route_specs = local.aws_has_route_host ? merge(
     {
-      (local.nat_route_name) = {
+      for route_name in(local.private_default_route_enabled ? [local.nat_route_name] : []) :
+      route_name => {
         destination_cidr = local.nat_destination_cidr
       }
     },
@@ -293,7 +334,8 @@ locals {
   } : {}
   azure_private_route_specs = local.azure_has_route_host ? merge(
     {
-      "default-via-gateway" = {
+      for route_name in(local.private_default_route_enabled ? ["default-via-gateway"] : []) :
+      route_name => {
         destination_cidr = local.nat_destination_cidr
       }
     },

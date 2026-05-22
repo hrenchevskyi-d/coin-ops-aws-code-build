@@ -86,3 +86,4 @@ terraform/sa-key.json
 
 .venv/*
 local/generated-azure-python-env.sh
+backups/*

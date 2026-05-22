@@ -18,6 +18,14 @@
                 "internal_subnet": "internal",
                 "allow_global_access": false
             },
+            "k3s_ingress_load_balancer": {
+                "enabled": true,
+                "name": "coin-ops-k3s-ingress",
+                "port": 80,
+                "address": "10.20.1.77",
+                "internal_subnet": "internal",
+                "allow_global_access": false
+            },
             "subnets": {
                 "internal": {
                     "cidr": "10.20.1.0/24",
@@ -33,18 +41,59 @@
                 }
             }
         },
-        "aws": {},
-        "azure": {}
+        "aws": {
+            "vpc_name": "coin-ops-aws-vpc",
+            "vpc_cidr": "10.30.0.0/16",
+            "subnets": {
+                "internal": {
+                    "cidr": "10.30.1.0/24",
+                    "availability_zone_key": "primary"
+                },
+                "database": {
+                    "cidr": "10.30.3.0/24",
+                    "availability_zone_key": "secondary"
+                },
+                "external": {
+                    "cidr": "10.30.2.0/24",
+                    "public": true
+                }
+            }
+        },
+        "azure": {
+            "vpc_name": "coin-ops-azure-vpc",
+            "vpc_cidr": "10.40.0.0/16",
+            "subnets": {
+                "internal": {
+                    "cidr": "10.40.1.0/24",
+                    "availability_zone_key": "primary"
+                },
+                "database": {
+                    "cidr": "10.40.3.0/24",
+                    "availability_zone_key": "secondary"
+                },
+                "external": {
+                    "cidr": "10.40.2.0/24",
+                    "public": true
+                }
+            }
+        }
     },
     "tailscale": {
-        "enabled": false,
+        "enabled": true,
         "control_plane": "saas",
         "auth_key_secret_name": "TAILSCALE_AUTH_KEY",
         "accept_routes": true,
-        "snat_subnet_routes": false,
+        "snat_subnet_routes": true,
+        "client_cidrs": ["100.64.0.0/10"],
         "static_route_roles": [],
-        "tags": {},
-        "advertised_routes_per_cloud": {}
+        "tags": {
+            "gateway": ["tag:coinops-gateway"]
+        },
+        "advertised_routes_per_cloud": {
+            "gcp": ["10.20.0.0/16"],
+            "aws": ["10.30.0.0/16"],
+            "azure": ["10.40.0.0/16"]
+        }
     },
     "firewall_rules": {
         "allow-ssh-jump-host": {
@@ -52,9 +101,27 @@
             "source_cidrs": ["0.0.0.0/0"],
             "target_role": "jump-host"
         },
+        "allow-tailscale-gateway-udp": {
+            "protocols": [{ "protocol": "udp", "ports": ["41641"] }],
+            "source_cidrs": ["0.0.0.0/0"],
+            "target_role": "gateway"
+        },
+        "allow-gateway-admin-from-jump": {
+            "protocols": [{ "protocol": "tcp", "ports": ["53725"] }],
+            "source_role": "jump-host",
+            "target_role": "gateway"
+        },
         "allow-k3s-server-admin-from-jump": {
             "protocols": [{ "protocol": "tcp", "ports": ["53725"] }],
             "source_role": "jump-host",
+            "target_role": "k3s-server"
+        },
+        "allow-k3s-ingress-from-gateway": {
+            "protocols": [
+                { "protocol": "tcp", "ports": ["80", "443"] },
+                { "protocol": "icmp" }
+            ],
+            "source_role": "gateway",
             "target_role": "k3s-server"
         },
         "allow-k3s-control-plane-internal": {
@@ -66,8 +133,21 @@
             "source_cidrs": ["10.20.0.0/16"],
             "target_role": "k3s-server"
         },
+        "allow-k3s-from-tailnet": {
+            "protocols": [
+                { "protocol": "tcp", "ports": ["80", "443", "6443"] },
+                { "protocol": "icmp" }
+            ],
+            "source_cidrs": ["100.64.0.0/10"],
+            "target_role": "k3s-server"
+        },
         "allow-k3s-api-lb-health-checks": {
             "protocols": [{ "protocol": "tcp", "ports": ["6443"] }],
+            "source_cidrs": ["35.191.0.0/16", "130.211.0.0/22"],
+            "target_role": "k3s-server"
+        },
+        "allow-k3s-ingress-lb-health-checks": {
+            "protocols": [{ "protocol": "tcp", "ports": ["80"] }],
             "source_cidrs": ["35.191.0.0/16", "130.211.0.0/22"],
             "target_role": "k3s-server"
         }

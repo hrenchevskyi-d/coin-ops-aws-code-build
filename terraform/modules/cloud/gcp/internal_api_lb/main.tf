@@ -9,14 +9,6 @@ resource "google_compute_region_health_check" "api" {
   }
 }
 
-resource "google_compute_instance_group" "api" {
-  name = "${var.name}-${replace(var.backend_zone, "/[^a-z0-9-]/", "-")}"
-  zone = var.backend_zone
-  instances = [
-    for instance in values(var.backend_instances) : instance.self_link
-  ]
-}
-
 resource "google_compute_region_backend_service" "api" {
   name                  = "${var.name}-backend"
   region                = var.region
@@ -26,7 +18,7 @@ resource "google_compute_region_backend_service" "api" {
   session_affinity      = "NONE"
 
   backend {
-    group          = google_compute_instance_group.api.id
+    group          = var.backend_group_id
     balancing_mode = "CONNECTION"
   }
 }

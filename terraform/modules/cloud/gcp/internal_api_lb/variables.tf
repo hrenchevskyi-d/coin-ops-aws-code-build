@@ -18,20 +18,9 @@ variable "subnetwork_id" {
   description = "Subnetwork ID for the internal forwarding rule IP."
 }
 
-variable "backend_zone" {
+variable "backend_group_id" {
   type        = string
-  description = "GCP zone shared by the backend instances in the unmanaged instance group."
-}
-
-variable "backend_instances" {
-  type = map(object({
-    self_link  = string
-    zone       = string
-    private_ip = string
-    public_ip  = optional(string)
-    role       = string
-  }))
-  description = "Map of backend instances keyed by instance name. Each value must include self_link and zone."
+  description = "ID of a pre-created unmanaged instance group shared by the k3s server backends."
 }
 
 variable "port" {
