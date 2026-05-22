@@ -1,3 +1,8 @@
+locals {
+  effective_ports       = length(var.ports) > 0 ? var.ports : [var.port]
+  effective_health_port = var.health_check_port > 0 ? var.health_check_port : local.effective_ports[0]
+}
+
 resource "google_compute_region_health_check" "api" {
   name               = "${var.name}-hc"
   region             = var.region
@@ -5,7 +10,7 @@ resource "google_compute_region_health_check" "api" {
   timeout_sec        = 5
 
   tcp_health_check {
-    port = var.port
+    port = local.effective_health_port
   }
 }
 
@@ -37,7 +42,7 @@ resource "google_compute_forwarding_rule" "api" {
   load_balancing_scheme = "INTERNAL"
   backend_service       = google_compute_region_backend_service.api.id
   ip_protocol           = "TCP"
-  ports                 = [tostring(var.port)]
+  ports                 = [for port in local.effective_ports : tostring(port)]
   subnetwork            = var.subnetwork_id
   ip_address            = google_compute_address.api.id
   allow_global_access   = var.allow_global_access

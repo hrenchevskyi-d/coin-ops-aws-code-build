@@ -15,6 +15,106 @@
   environment:
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
 
+- name: Render cert-manager Helm values
+  copy:
+    dest: "{{ cert_manager_values_file }}"
+    mode: "0600"
+    content: |
+      crds:
+        enabled: true
+      prometheus:
+        enabled: false
+  when: headlamp_tls_enabled | bool
+
+- name: Install or upgrade cert-manager
+  command: >-
+    helm upgrade --install {{ cert_manager_release_name }} {{ cert_manager_chart_ref }}
+    --namespace {{ cert_manager_namespace }}
+    --create-namespace
+    --version {{ cert_manager_chart_version }}
+    --values {{ cert_manager_values_file }}
+  register: cert_manager_helm
+  changed_when: >-
+    'STATUS: deployed' in cert_manager_helm.stdout
+    or 'STATUS: pending-upgrade' in cert_manager_helm.stdout
+    or 'STATUS: pending-install' in cert_manager_helm.stdout
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  when: headlamp_tls_enabled | bool
+
+- name: Wait for cert-manager deployment rollout
+  command: k3s kubectl -n {{ cert_manager_namespace }} rollout status deployment/{{ item }} --timeout=300s
+  changed_when: false
+  loop:
+    - cert-manager
+    - cert-manager-cainjector
+    - cert-manager-webhook
+  when: headlamp_tls_enabled | bool
+
+- name: Validate Cloudflare secret availability for Headlamp TLS
+  assert:
+    that:
+      - cloudflare_api_token | length > 0
+    fail_msg: >-
+      CLOUDFLARE_API_TOKEN must be present in the configured secret backend secret
+      {{ app_secret_name }} when TLS_MODE=certbot and Headlamp TLS is enabled.
+  when: headlamp_tls_enabled | bool
+
+- name: Apply cert-manager Cloudflare API token secret
+  copy:
+    dest: /tmp/cert-manager-cloudflare-secret.yaml
+    mode: "0600"
+    content: |
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: {{ cert_manager_cloudflare_secret_name }}
+        namespace: {{ cert_manager_namespace }}
+      type: Opaque
+      stringData:
+        api-token: {{ cloudflare_api_token }}
+  no_log: true
+  when: headlamp_tls_enabled | bool
+
+- name: Apply cert-manager Cloudflare API token manifest
+  command: k3s kubectl apply -f /tmp/cert-manager-cloudflare-secret.yaml
+  changed_when: false
+  no_log: true
+  when: headlamp_tls_enabled | bool
+
+- name: Apply Headlamp ACME ClusterIssuer
+  copy:
+    dest: /tmp/headlamp-clusterissuer.yaml
+    mode: "0600"
+    content: |
+      apiVersion: cert-manager.io/v1
+      kind: ClusterIssuer
+      metadata:
+        name: {{ headlamp_cluster_issuer_name }}
+      spec:
+        acme:
+          email: {{ certbot_email }}
+          server: {{ headlamp_acme_directory_url }}
+          privateKeySecretRef:
+            name: {{ headlamp_cluster_issuer_name }}-account-key
+          solvers:
+            - dns01:
+                cloudflare:
+                  apiTokenSecretRef:
+                    name: {{ cert_manager_cloudflare_secret_name }}
+                    key: api-token
+  when: headlamp_tls_enabled | bool
+
+- name: Apply Headlamp ACME ClusterIssuer manifest
+  command: k3s kubectl apply -f /tmp/headlamp-clusterissuer.yaml
+  changed_when: false
+  when: headlamp_tls_enabled | bool
+
+- name: Wait for Headlamp ACME ClusterIssuer readiness
+  command: k3s kubectl wait --for=condition=Ready clusterissuer/{{ headlamp_cluster_issuer_name }} --timeout=300s
+  changed_when: false
+  when: headlamp_tls_enabled | bool
+
 - name: Update Helm repositories
   command: helm repo update
   changed_when: false
@@ -89,36 +189,48 @@
     headlamp_service: "{{ headlamp_service_json.stdout | from_json }}"
     headlamp_service_port: "{{ (headlamp_service_json.stdout | from_json).spec.ports[0].port }}"
     headlamp_access_ip: "{{ cloud_runtime_metadata.get('headlamp_ingress_ip', '') | default(hostvars[groups['role_k3s_server'] | sort | first].ansible_host, true) }}"
+    headlamp_access_scheme: "{{ 'https' if (headlamp_tls_enabled | bool) else 'http' }}"
 
-- name: Render Headlamp ingress manifest
+- name: Apply Headlamp TLS certificate manifest
   copy:
-    dest: /tmp/headlamp-ingress.yaml
+    dest: /tmp/headlamp-certificate.yaml
     mode: "0600"
     content: |
-      apiVersion: networking.k8s.io/v1
-      kind: Ingress
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
       metadata:
-        name: {{ headlamp_release_name }}
+        name: {{ headlamp_certificate_name }}
         namespace: {{ headlamp_namespace }}
       spec:
-        ingressClassName: {{ headlamp_ingress_class_name }}
-        rules:
-          - host: {{ headlamp_ingress_host }}
-            http:
-              paths:
-                - path: /
-                  pathType: Prefix
-                  backend:
-                    service:
-                      name: {{ headlamp_release_name }}
-                      port:
-                        number: {{ headlamp_service_port }}
+        secretName: {{ headlamp_tls_secret_name }}
+        issuerRef:
+          name: {{ headlamp_cluster_issuer_name }}
+          kind: ClusterIssuer
+        dnsNames:
+          - {{ headlamp_ingress_host }}
+  when: headlamp_tls_enabled | bool
+
+- name: Render Headlamp ingress manifest
+  template:
+    dest: /tmp/headlamp-ingress.yaml
+    mode: "0600"
+    src: headlamp-ingress.yaml.j2
   when: headlamp_ingress_enabled | bool
 
 - name: Apply Headlamp ingress manifest
   command: k3s kubectl apply -f /tmp/headlamp-ingress.yaml
   changed_when: false
   when: headlamp_ingress_enabled | bool
+
+- name: Apply Headlamp TLS certificate manifest
+  command: k3s kubectl apply -f /tmp/headlamp-certificate.yaml
+  changed_when: false
+  when: headlamp_tls_enabled | bool
+
+- name: Wait for Headlamp TLS certificate readiness
+  command: k3s kubectl -n {{ headlamp_namespace }} wait --for=condition=Ready certificate/{{ headlamp_certificate_name }} --timeout=600s
+  changed_when: false
+  when: headlamp_tls_enabled | bool
 
 - name: Ensure local artifact directory exists
   command: mkdir -p "{{ k3s_local_artifact_dir }}"
@@ -176,24 +288,24 @@
     content: |
       # Headlamp Access
 
-      Preferred ingress URL: `http://{{ headlamp_ingress_host }}/`
+      Preferred ingress URL: `{{ headlamp_access_scheme }}://{{ headlamp_ingress_host }}/`
       Preferred private target IP: `{{ headlamp_access_ip }}`
       Headlamp service type: `{{ headlamp_service.spec.type }}`
       Headlamp service port: `{{ headlamp_service_port }}`
       Local forwarded URL: `http://127.0.0.1:{{ headlamp_local_port }}/`
 
       ## Primary path: Tailscale + Ingress
+      Open:
 
-      Add a hosts entry on the machine where your browser runs:
+      ```text
+      {{ headlamp_access_scheme }}://{{ headlamp_ingress_host }}/
+      ```
+
+      If public DNS has not updated yet or you intentionally avoid creating the
+      Cloudflare record, add a temporary hosts entry on the browser machine:
 
       ```text
       {{ headlamp_access_ip }} {{ headlamp_ingress_host }}
-      ```
-
-      Then open:
-
-      ```text
-      http://{{ headlamp_ingress_host }}/
       ```
 
       ## Fallback path: API tunnel + port-forward
@@ -234,7 +346,8 @@
 
       - Tailscale on Windows is recommended for browser access.
       - Port-forward remains available as a fallback when direct tailnet browser access is not convenient.
-      - The current ingress hostname maps to one private `k3s` node IP; add an internal load balancer in front of Traefik later for fully HA browser access.
+      - Terraform can manage `{{ headlamp_ingress_host }}` in Cloudflare and point it at the private ingress load balancer IP.
+      - `{% if certbot_staging %}TLS is currently using Let's Encrypt staging; browsers will still warn until staging is disabled.{% else %}TLS is currently configured for the production Let's Encrypt ACME endpoint.{% endif %}`
   delegate_to: localhost
   become: false
 
@@ -245,15 +358,17 @@
     content: |
       # Headlamp Ingress Access
 
-      Primary URL: `http://{{ headlamp_ingress_host }}/`
+      Primary URL: `{{ headlamp_access_scheme }}://{{ headlamp_ingress_host }}/`
       Current private target IP: `{{ headlamp_access_ip }}`
       Ingress class: `{{ headlamp_ingress_class_name }}`
+      TLS enabled: `{{ headlamp_tls_enabled | bool }}`
 
       ## Access model
 
       - Install and sign in to Tailscale on your **Windows host**, not just inside WSL.
       - Ensure the GCP subnet route `10.20.0.0/16` is approved in the Tailscale admin console.
-      - Add a local hosts entry on the machine where your browser runs:
+      - Terraform can manage `{{ headlamp_ingress_host }}` in Cloudflare as a DNS-only `A` record pointing at `{{ headlamp_access_ip }}`.
+      - If you are not using the Terraform-managed DNS record yet, add a local hosts entry on the machine where your browser runs:
 
       ```text
       {{ headlamp_access_ip }} {{ headlamp_ingress_host }}
@@ -262,7 +377,7 @@
       - Open:
 
       ```text
-      http://{{ headlamp_ingress_host }}/
+      {{ headlamp_access_scheme }}://{{ headlamp_ingress_host }}/
       ```
 
       ## Login token
@@ -274,7 +389,8 @@
       ## Notes
 
       - This ingress path is internal-only and assumes Tailscale subnet routing into GCP.
-      - The hosts entry currently points at one `k3s` server IP. For fully HA browser access, add an internal load balancer in front of Traefik later.
+      - The preferred target IP is the internal GCP ingress load balancer when one is configured.
+      - `{% if certbot_staging %}The current ACME issuer uses Let's Encrypt staging, so browsers will not trust this certificate yet.{% else %}The current ACME issuer uses the production Let's Encrypt endpoint.{% endif %}`
       - Port-forward remains available as a fallback via `headlamp-start.sh`.
   delegate_to: localhost
   become: false

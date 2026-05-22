@@ -3,6 +3,10 @@
   hosts: localhost
   connection: local
   gather_facts: no
+  pre_tasks:
+    - name: Resolve runtime configuration for Headlamp validation
+      include_role:
+        name: runtime_config
   tasks:
     - name: Assert that a k3s control plane group exists
       assert:
@@ -16,5 +20,9 @@
   hosts: "{{ groups.get('role_k3s_server', ['localhost']) | sort | first }}"
   become: yes
   gather_facts: no
+  pre_tasks:
+    - name: Resolve runtime configuration for Headlamp deployment
+      include_role:
+        name: runtime_config
   roles:
     - k3s_headlamp

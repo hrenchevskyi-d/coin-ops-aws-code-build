@@ -29,6 +29,18 @@ variable "port" {
   default     = 6443
 }
 
+variable "ports" {
+  type        = list(number)
+  description = "Optional list of TCP ports for the forwarding rule. Defaults to [port]."
+  default     = []
+}
+
+variable "health_check_port" {
+  type        = number
+  description = "Optional TCP port used by the health check. Defaults to the first exposed port."
+  default     = 0
+}
+
 variable "allow_global_access" {
   type        = bool
   description = "Whether the internal forwarding rule allows global access."

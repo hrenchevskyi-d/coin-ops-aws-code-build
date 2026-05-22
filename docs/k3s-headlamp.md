@@ -5,7 +5,8 @@ through Traefik Ingress for private operator access.
 
 Current access model:
 - Headlamp runs as a normal Kubernetes workload
-- Traefik routes `http://headlamp.<app_domain>/` inside the cluster
+- Traefik routes `https://headlamp.<app_domain>/` inside the cluster when
+  `tls_mode=certbot`
 - a dedicated `gateway` VM advertises the GCP subnet into Tailscale
 - operators reach the private GCP subnet from their own machine through
   Tailscale
@@ -74,7 +75,8 @@ You need:
 - the GCP subnet route `10.20.0.0/16` advertised by the gateway and accepted by
   the client
 - generated artifacts under `ansible/artifacts/`
-- a local hosts entry or private DNS record for `headlamp.<app_domain>`
+- a private DNS record for `headlamp.<app_domain>` or a temporary local hosts
+  entry
 
 ### Recommended Browser Flow
 
@@ -84,30 +86,35 @@ You need:
    ACL only auto-approves the gateway's advertised route; it does **not**
    guarantee the Windows client has installed and accepted that route yet.
 
-3. Add a hosts entry on the machine where the browser runs. The generated file
+3. Preferred: let Terraform manage the `headlamp.<app_domain>` Cloudflare
+   record. The record is DNS-only and points to the private internal ingress
+   load balancer IP.
+
+4. Fallback: if you are not using the Terraform-managed DNS record yet, add a
+   hosts entry on the machine where the browser runs. The generated file
    `ansible/artifacts/headlamp-ingress-access.md` shows the current private IP
    to use.
 
    Example:
 
    ```text
-   10.20.1.7 headlamp.coinops.test
+   <private_ingress_lb_ip> headlamp.coinops.test
    ```
 
-4. Open:
+5. Open:
 
    ```text
-   http://headlamp.<app_domain>/
+   https://headlamp.<app_domain>/
    ```
 
-5. Generate a login token from WSL or any operator shell:
+6. Generate a login token from WSL or any operator shell:
 
    ```bash
    KUBECONFIG=/home/notebook/projects/coin-ops/ansible/artifacts/kubeconfig-gcp-k3s-tunneled.yaml \
    kubectl create token headlamp-admin -n kube-system
    ```
 
-6. Paste the token into the Headlamp login screen.
+7. Paste the token into the Headlamp login screen.
 
 ## WSL + Windows Browser
 
@@ -135,13 +142,40 @@ http://127.0.0.1:8080/
 
 This is a fallback, not the preferred day-to-day access path.
 
+## TLS and Certificates
+
+Headlamp TLS is managed inside the cluster through `cert-manager`.
+
+When `tls_mode=certbot`:
+- `cert-manager` is installed through Helm
+- a Cloudflare API token is written into a Kubernetes Secret in the
+  `cert-manager` namespace
+- a `ClusterIssuer` is created for Let's Encrypt DNS-01
+- a `Certificate` is created for `headlamp.<app_domain>`
+- the Headlamp `Ingress` references the resulting TLS Secret
+
+This uses the same Cloudflare token you already keep in the app secret backend,
+but the certificate lifecycle is now Kubernetes-native rather than VM-local.
+
+### Important staging note
+
+If `certbot.staging=true` in
+`/home/notebook/projects/coin-ops/terraform/config/deploy.json`, cert-manager
+will issue a **Let's Encrypt staging certificate**. That is useful for dry-runs
+but browsers will not trust it.
+
+For a normal trusted browser experience, keep `certbot.staging=false`.
+
 ## Operational Notes
 
 - Headlamp itself runs with `replicaCount: 2`.
 - Traefik is the current ingress controller.
 - The ingress hostname is `headlamp.<app_domain>`.
 - The preferred private ingress endpoint is a static internal GCP load balancer
-  IP. For this environment it is intended to be `10.20.1.77`.
+  IP. Terraform also manages the matching DNS-only Cloudflare record for that
+  hostname when DNS automation is enabled.
+- TLS certificates are handled by `cert-manager` using Cloudflare DNS-01 when
+  `tls_mode=certbot`.
 - If you change the GCP HA API load balancer in Terraform, re-run
   `ansible/k3s-cluster.yml` so `tls-san` and the local kubeconfig artifacts are
   regenerated.

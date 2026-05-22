@@ -6,6 +6,7 @@ locals {
   dns_primary_cloud = try(local.dns.primary_cloud, local.control_plane_cloud)
   dns_ttl           = try(local.cloudflare_config.ttl, 60)
   dns_proxied       = try(local.cloudflare_config.proxied, false)
+  headlamp_dns_name = "headlamp"
 
   gcp_has_ui   = local.gcp_compute_enabled && contains(keys(local.gcp_instances_base), "app-1")
   aws_has_ui   = local.aws_compute_enabled && contains(keys(local.aws_instances_base), "app-1")
@@ -23,9 +24,10 @@ locals {
     azure = local.azure_has_ui
   }
 
-  dns_has_api_token  = nonsensitive(local.effective_cloudflare_api_token) != ""
-  dns_enabled        = (local.gcp_enabled || local.aws_enabled || local.azure_enabled) && local.dns_has_api_token && local.cloudflare_zone_id != ""
-  dns_primary_has_ui = lookup(local.cloud_has_ui, local.dns_primary_cloud, false)
+  dns_has_api_token   = nonsensitive(local.effective_cloudflare_api_token) != ""
+  dns_enabled         = (local.gcp_enabled || local.aws_enabled || local.azure_enabled) && local.dns_has_api_token && local.cloudflare_zone_id != ""
+  dns_primary_has_ui  = lookup(local.cloud_has_ui, local.dns_primary_cloud, false)
+  headlamp_private_ip = local.gcp_k3s_ingress_lb_enabled ? try(module.gcp_k3s_ingress_lb[0].ip_address, "") : ""
 }
 
 # Root A record (e.g., coinops-d.pp.ua)
@@ -48,6 +50,21 @@ resource "cloudflare_record" "www_cname" {
   content         = local.app_domain
   type            = "CNAME"
   proxied         = local.dns_proxied
+  ttl             = local.dns_ttl
+  allow_overwrite = true
+}
+
+# Private operator DNS record for Headlamp ingress.
+# This intentionally resolves to an internal GCP load balancer address and is
+# therefore useful only to clients that can already reach the private subnet
+# (for example via Tailscale subnet routing).
+resource "cloudflare_record" "headlamp_private_a" {
+  count           = local.dns_enabled && local.headlamp_private_ip != "" ? 1 : 0
+  zone_id         = local.cloudflare_zone_id
+  name            = local.headlamp_dns_name
+  content         = local.headlamp_private_ip
+  type            = "A"
+  proxied         = false
   ttl             = local.dns_ttl
   allow_overwrite = true
 }

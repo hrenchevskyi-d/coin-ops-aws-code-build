@@ -106,6 +106,8 @@ module "gcp_k3s_ingress_lb" {
   subnetwork_id       = module.gcp_network[0].subnet_ids[try(local.gcp_k3s_ingress_lb_cfg.internal_subnet, "internal")]
   backend_group_id    = google_compute_instance_group.gcp_k3s_servers[0].id
   port                = try(local.gcp_k3s_ingress_lb_cfg.port, 80)
+  ports               = try(local.gcp_k3s_ingress_lb_cfg.ports, [])
+  health_check_port   = try(local.gcp_k3s_ingress_lb_cfg.health_check_port, 80)
   allow_global_access = try(local.gcp_k3s_ingress_lb_cfg.allow_global_access, false)
   address             = try(local.gcp_k3s_ingress_lb_cfg.address, "")
 }

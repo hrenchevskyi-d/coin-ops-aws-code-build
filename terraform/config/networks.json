@@ -21,7 +21,8 @@
             "k3s_ingress_load_balancer": {
                 "enabled": true,
                 "name": "coin-ops-k3s-ingress",
-                "port": 80,
+                "ports": [80, 443],
+                "health_check_port": 80,
                 "address": "10.20.1.77",
                 "internal_subnet": "internal",
                 "allow_global_access": false
