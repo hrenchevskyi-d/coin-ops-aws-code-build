@@ -1,0 +1,35 @@
+---
+- name: Install gateway routing prerequisites
+  apt:
+    name: "{{ tailscale_gateway_apt_packages }}"
+    state: present
+    lock_timeout: "{{ provisioning_apt_lock_timeout | default(900) }}"
+
+- name: Ensure Tailscale apt keyring directory exists
+  file:
+    path: /usr/share/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Install Tailscale signing key
+  get_url:
+    url: "https://pkgs.tailscale.com/stable/debian/{{ ansible_distribution_release }}.noarmor.gpg"
+    dest: /usr/share/keyrings/tailscale-archive-keyring.gpg
+    mode: "0644"
+
+- name: Install Tailscale apt repository
+  apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/debian {{ ansible_distribution_release }} main"
+    filename: tailscale
+    state: present
+
+- name: Refresh apt cache after adding Tailscale repository
+  apt:
+    update_cache: yes
+    lock_timeout: "{{ provisioning_apt_lock_timeout | default(900) }}"
+
+- name: Install Tailscale
+  apt:
+    name: tailscale
+    state: present
+    lock_timeout: "{{ provisioning_apt_lock_timeout | default(900) }}"

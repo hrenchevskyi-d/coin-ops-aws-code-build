@@ -1,0 +1,12 @@
+[Unit]
+Description=Coin-ops multicloud static routes
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/coinops-static-routes.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

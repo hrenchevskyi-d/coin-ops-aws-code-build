@@ -1,0 +1,225 @@
+---
+- name: Create shared secrets directory
+  file:
+    path: /etc/cognitor
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Remove HTTP (Port 80) from UFW
+  community.general.ufw:
+    rule: allow
+    port: "80"
+    proto: tcp
+    delete: yes
+  failed_when: false
+  notify: Reload UFW
+
+- name: Manage HTTPS UFW port
+  include_role:
+    name: ufw_managed_port
+  vars:
+    ufw_managed_port: 443
+    ufw_managed_port_enabled: true
+
+- name: Check if certificate already exists
+  stat:
+    path: "/etc/letsencrypt/live/{{ app_domain }}/fullchain.pem"
+  register: cert_file
+  when: tls_mode == 'certbot'
+
+- name: Ensure cloudflare.ini is not a directory (Docker workaround)
+  file:
+    path: "{{ ui_cloudflare_credentials_path }}"
+    state: absent
+  when: tls_mode == 'certbot' and not cert_file.stat.exists
+  ignore_errors: yes
+
+- name: Write Cloudflare credentials for Certbot
+  template:
+    src: cloudflare.ini.j2
+    dest: "{{ ui_cloudflare_credentials_path }}"
+    owner: root
+    group: root
+    mode: '0600'
+  when: tls_mode == 'certbot' and not cert_file.stat.exists
+
+- name: Request Let's Encrypt certificate (Initial - DNS)
+  block:
+    - name: Request Let's Encrypt certificate (Initial - DNS)
+      command: >-
+        docker run --rm
+        -v "/etc/letsencrypt:/etc/letsencrypt"
+        -v "/var/lib/letsencrypt:/var/lib/letsencrypt"
+        -v "{{ ui_cloudflare_credentials_path }}:/cloudflare.ini:ro"
+        certbot/dns-cloudflare certonly
+        --dns-cloudflare
+        --dns-cloudflare-credentials /cloudflare.ini
+        --dns-cloudflare-propagation-seconds 20
+        -d {{ app_domain }}
+        --email {{ certbot_email }}
+        {{ '--test-cert' if certbot_staging else '' }}
+        --agree-tos --non-interactive
+      register: certbot_initial_request
+      retries: 3
+      delay: 20
+      until: certbot_initial_request.rc == 0
+  rescue:
+    - name: Reset stale Let's Encrypt state after failed authorization
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "/etc/letsencrypt/live/{{ app_domain }}"
+        - "/etc/letsencrypt/archive/{{ app_domain }}"
+        - "/etc/letsencrypt/renewal/{{ app_domain }}.conf"
+      when:
+        - certbot_initial_request is defined
+        - "'No such authorization' in (certbot_initial_request.stderr | default(''))"
+
+    - name: Retry Let's Encrypt certificate request after cleanup
+      command: >-
+        docker run --rm
+        -v "/etc/letsencrypt:/etc/letsencrypt"
+        -v "/var/lib/letsencrypt:/var/lib/letsencrypt"
+        -v "{{ ui_cloudflare_credentials_path }}:/cloudflare.ini:ro"
+        certbot/dns-cloudflare certonly
+        --dns-cloudflare
+        --dns-cloudflare-credentials /cloudflare.ini
+        --dns-cloudflare-propagation-seconds 60
+        -d {{ app_domain }}
+        --email {{ certbot_email }}
+        {{ '--test-cert' if certbot_staging else '' }}
+        --agree-tos --non-interactive
+      register: certbot_retry_after_cleanup
+      retries: 2
+      delay: 30
+      until: certbot_retry_after_cleanup.rc == 0
+      when:
+        - certbot_initial_request is defined
+        - "'No such authorization' in (certbot_initial_request.stderr | default(''))"
+
+    - name: Re-raise non-recoverable certbot bootstrap failure
+      fail:
+        msg: >-
+          Initial Let's Encrypt request failed and was not recoverable automatically.
+          stderr={{ certbot_initial_request.stderr | default('') }}
+      when:
+        - certbot_initial_request is not defined
+          or ('No such authorization' not in (certbot_initial_request.stderr | default('')))
+  when: tls_mode == 'certbot' and not cert_file.stat.exists
+
+- name: Create secrets directory
+  file:
+    path: "{{ tls_cert_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Read internal backend CA certificate
+  slurp:
+    src: /etc/cognitor/internal-tls/ca.crt
+  delegate_to: "{{ backend_host }}"
+  register: backend_internal_ca
+  when: internal_tls_enabled
+
+- name: Install trusted internal backend CA certificate
+  copy:
+    content: "{{ backend_internal_ca.content | b64decode }}"
+    dest: "{{ tls_cert_dir }}/internal-ca.crt"
+    owner: root
+    group: root
+    mode: '0644'
+  when: internal_tls_enabled
+
+- name: Setup auto-renewal via systemd timer
+  template:
+    src: certbot-renewal.service.j2
+    dest: "{{ ui_certbot_renewal_service_path }}"
+    owner: root
+    group: root
+    mode: '0644'
+  when: tls_mode == 'certbot'
+
+- name: Setup auto-renewal timer
+  template:
+    src: certbot-renewal.timer.j2
+    dest: "{{ ui_certbot_renewal_timer_path }}"
+    owner: root
+    group: root
+    mode: '0644'
+  when: tls_mode == 'certbot'
+
+- name: Enable auto-renewal timer
+  systemd:
+    name: certbot-renewal.timer
+    enabled: yes
+    state: started
+    daemon_reload: yes
+  when: tls_mode == 'certbot'
+
+- name: Install local TLS tooling
+  apt:
+    name: openssl
+    state: present
+    update_cache: yes
+  when: tls_mode == 'selfsigned'
+
+- name: Inspect existing self-signed certificate SAN
+  command: "openssl x509 -in {{ tls_cert_path }} -noout -ext subjectAltName"
+  register: selfsigned_cert_san
+  changed_when: false
+  failed_when: false
+  when: tls_mode == 'selfsigned'
+
+- name: Remove stale self-signed certificate after domain change
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ tls_cert_path }}"
+    - "{{ tls_key_path }}"
+  when:
+    - tls_mode == 'selfsigned'
+    - selfsigned_cert_san.rc == 0
+    - ("DNS:" ~ app_domain) not in selfsigned_cert_san.stdout
+
+- name: Generate self-signed gateway certificate
+  command:
+    cmd: >-
+      openssl req -x509 -nodes -newkey rsa:2048
+      -keyout {{ tls_key_path }}
+      -out {{ tls_cert_path }}
+      -days 365
+      -subj /CN={{ app_domain }}
+      -addext subjectAltName=DNS:{{ app_domain }}
+    creates: "{{ tls_cert_path }}"
+  when: tls_mode == 'selfsigned'
+
+- name: Restrict self-signed gateway private key
+  file:
+    path: "{{ tls_key_path }}"
+    owner: root
+    group: root
+    mode: '0600'
+  when: tls_mode == 'selfsigned'
+
+- name: Check provided TLS certificate
+  stat:
+    path: "{{ tls_cert_path }}"
+  register: provided_tls_cert
+  when: tls_mode == 'provided'
+
+- name: Check provided TLS private key
+  stat:
+    path: "{{ tls_key_path }}"
+  register: provided_tls_key
+  when: tls_mode == 'provided'
+
+- name: Validate provided TLS files
+  assert:
+    that:
+      - provided_tls_cert.stat.exists
+      - provided_tls_key.stat.exists
+    fail_msg: "TLS_MODE=provided requires {{ tls_cert_path }} and {{ tls_key_path }} on the UI node."
+  when: tls_mode == 'provided'

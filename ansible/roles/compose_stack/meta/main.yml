@@ -1,0 +1,7 @@
+---
+galaxy_info:
+  author: coin-ops
+  description: Reusable Docker Compose stack lifecycle helper for Coin Ops services.
+  license: MIT
+  min_ansible_version: "2.15"
+dependencies: []

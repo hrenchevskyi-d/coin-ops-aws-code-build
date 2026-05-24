@@ -1,0 +1,14 @@
+#!/bin/bash
+set -euo pipefail
+
+GATEWAY_IP="{{ gateway_ip }}"
+ROUTE_IFACE="$(ip route get "$GATEWAY_IP" | awk '/dev/ {for (i = 1; i <= NF; i++) if ($i == "dev") { print $(i+1); exit }}')"
+
+if [[ -z "$ROUTE_IFACE" ]]; then
+  echo "Could not determine route interface for gateway $GATEWAY_IP" >&2
+  exit 1
+fi
+
+{% for cidr in tailscale_remote_route_cidrs %}
+ip route replace {{ cidr }} via "$GATEWAY_IP" dev "$ROUTE_IFACE" onlink
+{% endfor %}

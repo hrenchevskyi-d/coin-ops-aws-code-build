@@ -1,5 +1,36 @@
 ---
-# Ports to open in UFW. Each service role overrides this
-# via host_vars or group_vars. SSH (53725) is always included.
-common_allowed_ports:
-  - 53725
+common_allowed_ports_by_role:
+  jump-host:
+    - "{{ infra_general.get('ssh_port', 53725) }}"
+  gateway:
+    - "{{ infra_general.get('ssh_port', 53725) }}"
+  nat:
+    - "{{ infra_general.get('ssh_port', 53725) }}"
+  app-ui:
+    - "{{ infra_general.get('ssh_port', 53725) }}"
+    - "{{ infra_ports.get('https', 443) }}"
+  app-backend:
+    - "{{ infra_general.get('ssh_port', 53725) }}"
+    - "{{ infra_ports.get('postgres', 5432) }}"
+    - "{{ infra_ports.get('rabbitmq', 5672) }}"
+    - "{{ infra_ports.get('rabbitmq_management', 15672) }}"
+    - "{{ infra_ports.get('history', 8000) }}"
+    - "{{ infra_ports.get('proxy', 8080) }}"
+    - "{{ infra_deploy.get('internal_tls', {}).get('port', 8443) }}"
+  k3s-server:
+    - "{{ infra_general.get('ssh_port', 53725) }}"
+    - "80"
+    - "443"
+    - "6443"
+    - "9345"
+    - "2379"
+    - "2380"
+    - "10250"
+
+common_allowed_ports: >-
+  {{
+    common_allowed_ports_by_role.get(
+      host_instance_config.get('role', ''),
+      [infra_general.get('ssh_port', 53725)]
+    )
+  }}

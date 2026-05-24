@@ -1,0 +1,58 @@
+---
+- name: Configure Tailscale subnet router
+  command:
+    argv:
+      - tailscale
+      - up
+      - --authkey={{ tailscale_auth_key }}
+      - --advertise-routes={{ tailscale_advertised_routes | join(',') }}
+      - --advertise-tags={{ tailscale_tags | join(',') }}
+      - --hostname={{ my_cloud }}-{{ infra_instance_key }}
+      - --accept-routes={{ 'true' if tailscale_accept_routes else 'false' }}
+      - --snat-subnet-routes={{ 'true' if tailscale_snat_subnet_routes else 'false' }}
+      - --reset
+  no_log: true
+  changed_when: false
+
+- name: Install gateway tailscale route script
+  template:
+    src: coinops-gateway-tailscale-routes.sh.j2
+    dest: /usr/local/sbin/coinops-gateway-tailscale-routes.sh
+    mode: "0755"
+  when: tailscale_remote_route_cidrs | length > 0
+
+- name: Install gateway tailscale route unit
+  template:
+    src: coinops-gateway-tailscale-routes.service.j2
+    dest: /etc/systemd/system/coinops-gateway-tailscale-routes.service
+    mode: "0644"
+  when: tailscale_remote_route_cidrs | length > 0
+
+- name: Enable gateway tailscale route unit
+  systemd:
+    daemon_reload: yes
+    name: coinops-gateway-tailscale-routes.service
+    enabled: yes
+    state: restarted
+  when: tailscale_remote_route_cidrs | length > 0
+
+- name: Remove gateway tailscale route unit when no remote routes are needed
+  systemd:
+    daemon_reload: yes
+    name: coinops-gateway-tailscale-routes.service
+    enabled: no
+    state: stopped
+  failed_when: false
+  when: tailscale_remote_route_cidrs | length == 0
+
+- name: Delete gateway tailscale route unit file when no remote routes are needed
+  file:
+    path: /etc/systemd/system/coinops-gateway-tailscale-routes.service
+    state: absent
+  when: tailscale_remote_route_cidrs | length == 0
+
+- name: Remove gateway tailscale route script when no remote routes are needed
+  file:
+    path: /usr/local/sbin/coinops-gateway-tailscale-routes.sh
+    state: absent
+  when: tailscale_remote_route_cidrs | length == 0

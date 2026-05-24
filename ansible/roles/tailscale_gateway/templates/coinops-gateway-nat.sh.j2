@@ -1,0 +1,16 @@
+#!/bin/bash
+set -euo pipefail
+IFACE=$(ip route show default | awk '/default/ { print $5 }' | head -1)
+iptables -t nat -C POSTROUTING -o "$IFACE" -j MASQUERADE 2>/dev/null || \
+  iptables -t nat -A POSTROUTING -o "$IFACE" -j MASQUERADE
+iptables -t nat -C POSTROUTING -s {{ cloud_vpc_cidr }} -o tailscale0 -j MASQUERADE 2>/dev/null || \
+  iptables -t nat -A POSTROUTING -s {{ cloud_vpc_cidr }} -o tailscale0 -j MASQUERADE
+iptables -C FORWARD -i "$IFACE" -o tailscale0 -j ACCEPT 2>/dev/null || \
+  iptables -A FORWARD -i "$IFACE" -o tailscale0 -j ACCEPT
+iptables -C FORWARD -i tailscale0 -o "$IFACE" -j ACCEPT 2>/dev/null || \
+  iptables -A FORWARD -i tailscale0 -o "$IFACE" -j ACCEPT
+iptables -C FORWARD -i "$IFACE" -o "$IFACE" -j ACCEPT 2>/dev/null || \
+  iptables -A FORWARD -i "$IFACE" -o "$IFACE" -j ACCEPT
+iptables -C FORWARD -i "$IFACE" -o "$IFACE" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || \
+  iptables -A FORWARD -i "$IFACE" -o "$IFACE" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+netfilter-persistent save

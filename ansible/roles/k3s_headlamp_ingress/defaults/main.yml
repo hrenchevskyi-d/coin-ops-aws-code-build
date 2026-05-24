@@ -1,0 +1,8 @@
+---
+headlamp_tls_enabled: "{{ tls_mode == 'certbot' }}"
+headlamp_tls_secret_name: headlamp-tls
+headlamp_certificate_name: headlamp-tls
+headlamp_cluster_issuer_name: letsencrypt-dns-cloudflare
+headlamp_ingress_enabled: "{{ deploy_config.headlamp_ingress_enabled | default(true) | bool }}"
+headlamp_ingress_host: "{{ deploy_config.headlamp_hostname | default('headlamp.' ~ app_domain) }}"
+headlamp_ingress_class_name: "{{ deploy_config.headlamp_ingress_class_name | default('traefik') }}"

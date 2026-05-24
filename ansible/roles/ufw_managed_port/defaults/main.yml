@@ -1,0 +1,5 @@
+---
+ufw_managed_port: ""
+ufw_managed_port_enabled: true
+ufw_managed_port_proto: tcp
+ufw_managed_port_delete_when_disabled: true

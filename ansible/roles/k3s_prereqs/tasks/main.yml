@@ -1,57 +1,58 @@
 ---
 - name: Install k3s prerequisite packages
   apt:
-    name:
-      - ca-certificates
+    name: "{{ k3s_prerequisite_packages }}"
     state: present
     lock_timeout: "{{ provisioning_apt_lock_timeout | default(900) }}"
+  tags: [k3s, k3s_prereqs]
 
 - name: Ensure required kernel modules load at boot
-  copy:
+  template:
     dest: /etc/modules-load.d/k3s.conf
+    src: k3s.conf.j2
     mode: "0644"
-    content: |
-      overlay
-      br_netfilter
+  tags: [k3s, k3s_prereqs]
 
 - name: Load overlay kernel module
   community.general.modprobe:
     name: overlay
     state: present
+  tags: [k3s, k3s_prereqs]
 
 - name: Load br_netfilter kernel module
   community.general.modprobe:
     name: br_netfilter
     state: present
+  tags: [k3s, k3s_prereqs]
 
 - name: Configure sysctl settings for Kubernetes networking
-  copy:
-    dest: /etc/sysctl.d/90-k3s.conf
-    mode: "0644"
-    content: |
-      net.bridge.bridge-nf-call-iptables = 1
-      net.bridge.bridge-nf-call-ip6tables = 1
-      net.ipv4.ip_forward = 1
-
-- name: Apply sysctl settings
-  command: sysctl --system
-  changed_when: false
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_file: /etc/sysctl.d/90-k3s.conf
+    reload: true
+  loop: "{{ k3s_sysctl_settings | dict2items }}"
+  tags: [k3s, k3s_prereqs]
 
 - name: Disable active swap
   command: swapoff -a
   changed_when: false
+  tags: [k3s, k3s_prereqs]
 
 - name: Disable swap in fstab
   replace:
     path: /etc/fstab
     regexp: '^(?!#)(.*\sswap\s+.*)$'
     replace: '# \1'
+  tags: [k3s, k3s_prereqs]
 
 - name: Ensure Rancher config directory exists
   file:
     path: /etc/rancher/k3s
     state: directory
     mode: "0755"
+  tags: [k3s, k3s_prereqs]
 
 - name: Allow flannel UDP traffic through UFW when present
   community.general.ufw:
@@ -60,3 +61,4 @@
     proto: udp
   loop: "{{ k3s_udp_ports }}"
   when: ufw_binary.stat.exists
+  tags: [k3s, k3s_prereqs]

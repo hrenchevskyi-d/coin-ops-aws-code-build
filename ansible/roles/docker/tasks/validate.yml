@@ -1,0 +1,25 @@
+---
+- name: Validate baked Docker tooling on golden-image hosts
+  when: host_uses_golden_image
+  block:
+    - name: Verify Docker CLI is available
+      command: docker --version
+      changed_when: false
+
+    - name: Verify Docker Compose plugin is available
+      command:
+        argv:
+          - docker
+          - compose
+          - version
+      changed_when: false
+
+    - name: Refresh service facts after Docker startup
+      service_facts:
+
+    - name: Assert Docker service is available and running
+      assert:
+        that:
+          - "'docker.service' in ansible_facts.services"
+          - ansible_facts.services['docker.service'].state == 'running'
+        fail_msg: "Golden-image app hosts must keep Docker installed and running."

@@ -1,0 +1,19 @@
+---
+- name: Prepare compose stack
+  include_tasks: prepare.yml
+
+- name: Pull compose stack images
+  include_tasks: pull.yml
+  when: compose_stack_pull_enabled | bool
+
+- name: Start compose stack
+  include_tasks: up.yml
+  when: compose_stack_up_enabled | bool
+
+- name: Verify compose stack health
+  include_tasks: healthcheck.yml
+  when: compose_stack_healthcheck_enabled | bool
+
+- name: Prune dangling images after compose stack deployment
+  include_tasks: prune.yml
+  when: compose_stack_prune_enabled | bool

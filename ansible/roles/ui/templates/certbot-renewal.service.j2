@@ -1,0 +1,7 @@
+[Unit]
+Description=Certbot Auto Renewal
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker run --rm -v "/etc/letsencrypt:/etc/letsencrypt" -v "/var/lib/letsencrypt:/var/lib/letsencrypt" -v "{{ ui_cloudflare_credentials_path }}:/cloudflare.ini:ro" certbot/dns-cloudflare renew {% if certbot_staging %}--test-cert {% endif %}
+ExecPost=/usr/bin/docker compose -f {{ ui_compose_path }} restart ui

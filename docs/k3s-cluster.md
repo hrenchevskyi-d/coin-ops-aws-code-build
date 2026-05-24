@@ -4,6 +4,10 @@ This runbook describes the standard command sequence for a clean `k3s`
 infrastructure rollout in GCP and the shorter reconcile flows for an existing
 cluster.
 
+For the broader Ansible configuration model used by these playbooks, see:
+
+- `/home/notebook/projects/coin-ops/docs/ansible-config-model.md`
+
 ## What Each Playbook Does
 
 - `ansible/provision.yml`

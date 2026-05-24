@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+KUBECONFIG="{{ k3s_local_artifact_dir }}/kubeconfig-gcp-k3s-tunneled.yaml" \
+kubectl -n {{ headlamp_namespace }} port-forward svc/{{ headlamp_release_name }} {{ headlamp_local_port }}:{{ headlamp_service_port }}

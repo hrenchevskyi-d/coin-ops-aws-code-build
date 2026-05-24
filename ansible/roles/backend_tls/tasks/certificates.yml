@@ -1,0 +1,82 @@
+---
+- name: Generate internal CA certificate
+  command:
+    cmd: >-
+      openssl req -x509 -nodes -newkey rsa:2048
+      -keyout {{ backend_tls_ca_key_path }}
+      -out {{ backend_tls_ca_cert_path }}
+      -days 3650
+      -subj /CN=coinops-internal-ca
+    creates: "{{ backend_tls_ca_cert_path }}"
+  when: internal_tls_enabled
+
+- name: Restrict internal CA private key
+  file:
+    path: "{{ backend_tls_ca_key_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  when: internal_tls_enabled
+
+- name: Generate backend internal TLS private key
+  command:
+    cmd: "openssl genrsa -out {{ backend_tls_backend_key_path }} 2048"
+    creates: "{{ backend_tls_backend_key_path }}"
+  when: internal_tls_enabled
+
+- name: Restrict backend internal TLS private key
+  file:
+    path: "{{ backend_tls_backend_key_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  when: internal_tls_enabled
+
+- name: Render backend internal TLS certificate request config
+  template:
+    src: backend-openssl.cnf.j2
+    dest: "{{ backend_tls_openssl_config_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: internal_tls_enabled
+
+- name: Generate backend internal TLS certificate signing request
+  command:
+    argv:
+      - openssl
+      - req
+      - -new
+      - -key
+      - "{{ backend_tls_backend_key_path }}"
+      - -out
+      - "{{ backend_tls_backend_csr_path }}"
+      - -config
+      - "{{ backend_tls_openssl_config_path }}"
+  args:
+    creates: "{{ backend_tls_backend_csr_path }}"
+  when: internal_tls_enabled
+
+- name: Sign backend internal TLS certificate
+  command:
+    argv:
+      - openssl
+      - x509
+      - -req
+      - -in
+      - "{{ backend_tls_backend_csr_path }}"
+      - -CA
+      - "{{ backend_tls_ca_cert_path }}"
+      - -CAkey
+      - "{{ backend_tls_ca_key_path }}"
+      - -CAcreateserial
+      - -out
+      - "{{ backend_tls_backend_cert_path }}"
+      - -days
+      - "825"
+      - -sha256
+      - -copy_extensions
+      - copy
+  args:
+    creates: "{{ backend_tls_backend_cert_path }}"
+  when: internal_tls_enabled

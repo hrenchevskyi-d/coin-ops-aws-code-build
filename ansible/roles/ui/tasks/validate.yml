@@ -1,0 +1,13 @@
+---
+- name: Validate TLS mode
+  assert:
+    that:
+      - tls_mode in ['selfsigned', 'provided', 'certbot']
+    fail_msg: "TLS_MODE must be one of: selfsigned, provided, certbot."
+
+- name: Validate Cloudflare secret availability for Certbot
+  assert:
+    that:
+      - cloudflare_api_token | length > 0
+    fail_msg: "CLOUDFLARE_API_TOKEN must be present in the configured secret backend secret {{ app_secret_name }} when TLS_MODE=certbot."
+  when: tls_mode == 'certbot'

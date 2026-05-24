@@ -1,0 +1,64 @@
+---
+- name: Install Docker host prerequisites on non-image-based hosts
+  when: not host_uses_golden_image
+  block:
+    - name: Install dependencies for Docker
+      apt:
+        name: "{{ docker_apt_dependencies }}"
+        state: present
+        update_cache: yes
+        lock_timeout: "{{ provisioning_apt_lock_timeout | default(900) }}"
+
+    - name: Ensure Docker keyring directory exists
+      file:
+        path: "{{ docker_keyring_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Download Docker GPG key
+      get_url:
+        url: "https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg"
+        dest: "{{ docker_gpg_asc_path }}"
+        mode: "0644"
+
+    - name: Convert Docker GPG key to keyring format
+      command:
+        argv:
+          - gpg
+          - --dearmor
+          - --yes
+          - --output
+          - "{{ docker_gpg_keyring_path }}"
+          - "{{ docker_gpg_asc_path }}"
+
+    - name: Remove noncanonical Docker APT source list entries
+      shell: |
+        set -e
+        shopt -s nullglob
+        for file in /etc/apt/sources.list.d/*.list; do
+          if [ "$(basename "$file")" != "docker.list" ] && grep -q "download.docker.com/linux/{{ ansible_distribution | lower }}" "$file"; then
+            rm -f "$file"
+          fi
+        done
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Add canonical Docker APT repository
+      apt_repository:
+        filename: docker
+        repo: "deb [arch=amd64 signed-by={{ docker_gpg_keyring_path }}] https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} stable"
+        state: present
+        update_cache: yes
+
+    - name: Install Docker and Compose plugin
+      apt:
+        name: "{{ docker_packages }}"
+        state: present
+        lock_timeout: "{{ provisioning_apt_lock_timeout | default(900) }}"
+
+- name: Ensure Docker is started and enabled
+  systemd:
+    name: docker
+    state: started
+    enabled: yes

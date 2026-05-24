@@ -1,0 +1,62 @@
+---
+- name: Apply PostgreSQL runtime schema before app startup
+  shell: >-
+    {% if use_managed_db %}
+    docker run --rm -i -e PGPASSWORD="{{ db_password }}" postgres:16-alpine psql -v ON_ERROR_STOP=1 -h {{ postgres_bind_ip }} -p {{ postgres_port }} -U {{ db_user }} -d {{ db_name }} < {{ history_schema_dest_path }}
+    {% else %}
+    docker compose -f {{ history_compose_path }} exec -T postgres psql -v ON_ERROR_STOP=1 -U {{ db_user }} -d {{ db_name }} < {{ history_schema_dest_path }}
+    {% endif %}
+  args:
+    chdir: "{{ history_deploy_dir }}"
+  register: schema_result
+  changed_when: false
+
+- name: Persist runtime application role before wrapper bootstrap
+  command: >-
+    docker compose -f {{ history_compose_path }} exec -T postgres
+    psql -v ON_ERROR_STOP=1 -U {{ db_user }} -d {{ db_name }}
+    -c "ALTER DATABASE {{ db_name }} SET runtime.app_role = '{{ db_user }}';"
+  args:
+    chdir: "{{ history_deploy_dir }}"
+  register: runtime_app_role_result
+  changed_when: false
+  when: runtime_backend == "postgres"
+
+- name: Apply runtime queue and session schema
+  shell: |
+    (
+      printf "%s\n" "SET runtime.app_role = '{{ db_user }}';"
+      cat \
+      {% for runtime_schema_file in history_runtime_schema_files %}
+        {{ history_runtime_dir }}/{{ runtime_schema_file }}{% if not loop.last %} \{% endif %}
+      {% endfor %}
+    ) | docker compose -f {{ history_compose_path }} exec -T postgres psql -v ON_ERROR_STOP=1 -U {{ db_user }} -d {{ db_name }}
+  args:
+    chdir: "{{ history_deploy_dir }}"
+  register: runtime_schema_result
+  changed_when: false
+  when: runtime_backend == "postgres"
+
+- name: Verify PostgreSQL runtime extensions are installed
+  command: >-
+    docker compose -f {{ history_compose_path }} exec -T postgres
+    psql -v ON_ERROR_STOP=1 -At -U {{ db_user }} -d {{ db_name }}
+    -c "SELECT string_agg(extname, ',' ORDER BY extname) FROM pg_extension WHERE extname IN ('pg_cron', 'pgmq');"
+  args:
+    chdir: "{{ history_deploy_dir }}"
+  register: runtime_extension_check
+  changed_when: false
+  failed_when: runtime_extension_check.stdout | trim != "pg_cron,pgmq"
+  when: runtime_backend == "postgres"
+
+- name: Verify PostgreSQL runtime cron jobs are registered
+  command: >-
+    docker compose -f {{ history_compose_path }} exec -T postgres
+    psql -v ON_ERROR_STOP=1 -At -U {{ db_user }} -d {{ db_name }}
+    -c "SELECT count(*) FROM cron.job WHERE jobname IN ('runtime-cache-reap', 'runtime-session-reap', 'runtime-dlq-reap') AND active;"
+  args:
+    chdir: "{{ history_deploy_dir }}"
+  register: runtime_cron_check
+  changed_when: false
+  failed_when: runtime_cron_check.stdout | trim | int != 3
+  when: runtime_backend == "postgres"

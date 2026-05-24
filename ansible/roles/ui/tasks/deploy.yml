@@ -1,0 +1,75 @@
+---
+- name: Render nginx gateway config
+  template:
+    src: nginx.gateway.conf.j2
+    dest: "{{ ui_nginx_config_path }}"
+    owner: root
+    group: root
+    mode: '0644'
+  register: nginx_config
+
+- name: Prepare UI compose stack
+  block:
+    - name: Ensure UI deploy directory exists
+      file:
+        path: "{{ ui_deploy_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Render UI compose stack
+      template:
+        src: "{{ playbook_dir }}/../deploy/compose/ui-gateway.compose.yaml"
+        dest: "{{ ui_compose_path }}"
+        owner: root
+        group: root
+        mode: "0644"
+      register: ui_stack_render
+
+    - name: Validate UI compose stack configuration
+      command: "docker compose -f {{ ui_compose_path }} config -q"
+      args:
+        chdir: "{{ ui_deploy_dir }}"
+      changed_when: false
+
+- name: Restart UI container if config changed
+  command: "docker compose -f {{ ui_compose_path }} restart ui"
+  args:
+    chdir: "{{ ui_deploy_dir }}"
+  when: nginx_config.changed or ui_stack_render.changed
+  failed_when: false
+
+- name: Pull UI compose stack images
+  include_role:
+    name: compose_stack
+    tasks_from: pull.yml
+  vars:
+    compose_stack_project_dir: "{{ ui_deploy_dir }}"
+    compose_stack_compose_path: "{{ ui_compose_path }}"
+    compose_stack_pull_retries: "{{ ui_docker_compose_pull_retries }}"
+    compose_stack_pull_delay: "{{ ui_docker_compose_pull_delay }}"
+
+- name: Start UI compose stack
+  include_role:
+    name: compose_stack
+    tasks_from: up.yml
+  vars:
+    compose_stack_project_dir: "{{ ui_deploy_dir }}"
+    compose_stack_compose_path: "{{ ui_compose_path }}"
+
+- name: Verify UI compose stack health
+  include_role:
+    name: compose_stack
+    tasks_from: healthcheck.yml
+  vars:
+    compose_stack_healthcheck_url: "{{ ui_healthcheck_url }}"
+    compose_stack_healthcheck_status_code: 200
+    compose_stack_healthcheck_validate_certs: false
+    compose_stack_healthcheck_retries: "{{ ui_healthcheck_retries }}"
+    compose_stack_healthcheck_delay: "{{ ui_healthcheck_delay }}"
+
+- name: Prune UI compose stack dangling images
+  include_role:
+    name: compose_stack
+    tasks_from: prune.yml

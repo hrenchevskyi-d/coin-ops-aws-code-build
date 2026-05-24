@@ -1,0 +1,60 @@
+---
+- name: Add Headlamp Helm repository
+  kubernetes.core.helm_repository:
+    name: "{{ headlamp_chart_repo_name }}"
+    repo_url: "{{ headlamp_chart_repo_url }}"
+
+- name: Install or upgrade Headlamp
+  kubernetes.core.helm:
+    name: "{{ headlamp_release_name }}"
+    chart_ref: "{{ headlamp_chart_ref }}"
+    release_namespace: "{{ headlamp_namespace }}"
+    create_namespace: true
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    wait: true
+    values:
+      replicaCount: 2
+      service:
+        type: ClusterIP
+      ingress:
+        enabled: false
+
+- name: Read Headlamp deployment status
+  kubernetes.core.k8s_info:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    api_version: apps/v1
+    kind: Deployment
+    namespace: "{{ headlamp_namespace }}"
+    name: "{{ headlamp_release_name }}"
+  register: headlamp_deployment_info
+  retries: 30
+  delay: 10
+  until: >-
+    (
+      headlamp_deployment_info.resources | default([]) | length
+    ) > 0 and
+    (
+      headlamp_deployment_info.resources[0].status.availableReplicas | default(0) | int
+    ) >= 1
+
+- name: Apply Headlamp operator RBAC
+  kubernetes.core.k8s:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    state: present
+    definition: "{{ lookup('template', 'headlamp-operator-rbac.yaml.j2') | from_yaml_all | list }}"
+
+- name: Read Headlamp service definition
+  kubernetes.core.k8s_info:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    api_version: v1
+    kind: Service
+    namespace: "{{ headlamp_namespace }}"
+    name: "{{ headlamp_release_name }}"
+  register: headlamp_service_info
+
+- name: Parse Headlamp service definition
+  set_fact:
+    headlamp_service: "{{ headlamp_service_info.resources[0] }}"
+    headlamp_service_port: "{{ headlamp_service_info.resources[0].spec.ports[0].port }}"
+    headlamp_access_ip: "{{ cloud_runtime_metadata.get('headlamp_ingress_ip', '') | default(hostvars[groups['role_k3s_server'] | sort | first].ansible_host, true) }}"
+    headlamp_access_scheme: "{{ 'https' if (headlamp_tls_enabled | bool) else 'http' }}"

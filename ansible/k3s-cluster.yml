@@ -3,6 +3,12 @@
   hosts: localhost
   connection: local
   gather_facts: no
+  pre_tasks:
+    - name: Resolve runtime configuration for k3s validation
+      include_role:
+        name: runtime_config
+        public: true
+      tags: [runtime_config]
   tasks:
     - name: Assert that exactly three k3s server nodes are present
       assert:
@@ -18,6 +24,11 @@
   gather_facts: no
   serial: 3
   pre_tasks:
+    - name: Resolve runtime configuration for k3s preparation
+      include_role:
+        name: runtime_config
+        public: true
+      tags: [runtime_config, k3s]
     - name: Wait for SSH to become stable after instance boot
       wait_for_connection:
         timeout: "{{ provisioning_wait_for_connection_timeout | default(600) }}"
@@ -35,6 +46,12 @@
   hosts: "{{ groups.get('role_k3s_server', ['localhost']) | sort | first }}"
   become: yes
   gather_facts: no
+  pre_tasks:
+    - name: Resolve runtime configuration for k3s bootstrap
+      include_role:
+        name: runtime_config
+        public: true
+      tags: [runtime_config, k3s, k3s_bootstrap]
   roles:
     - k3s_server_bootstrap
 
@@ -42,15 +59,27 @@
   hosts: role_k3s_server
   become: yes
   gather_facts: no
+  pre_tasks:
+    - name: Resolve runtime configuration for k3s join
+      include_role:
+        name: runtime_config
+        public: true
+      tags: [runtime_config, k3s, k3s_join]
   tasks:
     - name: Join non-bootstrap servers to the control plane
       include_role:
         name: k3s_server_join
-      when: inventory_hostname != k3s_bootstrap_host
+      when: inventory_hostname != (groups.get('role_k3s_server', ['localhost']) | sort | first)
 
 - name: Validate the finished cluster and export kubeconfig
   hosts: "{{ groups.get('role_k3s_server', ['localhost']) | sort | first }}"
   become: yes
   gather_facts: no
+  pre_tasks:
+    - name: Resolve runtime configuration for k3s postcheck
+      include_role:
+        name: runtime_config
+        public: true
+      tags: [runtime_config, k3s, k3s_postcheck]
   roles:
     - k3s_postcheck

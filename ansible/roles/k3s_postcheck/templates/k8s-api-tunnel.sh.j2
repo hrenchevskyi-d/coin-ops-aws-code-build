@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ssh -N -L 6443:{{ k3s_operator_api_endpoint }}:6443 -F {{ repo_root }}/terraform/config/ssh_config coinops-gcp-jump-host

@@ -1,0 +1,7 @@
+---
+proxy_deploy_dir: /opt/cognitor/proxy
+proxy_compose_path: "{{ proxy_deploy_dir }}/compose.yaml"
+proxy_docker_compose_pull_retries: 3
+proxy_docker_compose_pull_delay: 15
+proxy_healthcheck_retries: 12
+proxy_healthcheck_delay: 5

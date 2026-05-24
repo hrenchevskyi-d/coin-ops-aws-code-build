@@ -26,7 +26,7 @@ keyed_groups:
   - key: tags.Role
     prefix: role
     separator: "_"
-  # → group "aws" (used by ProxyJump intersect logic in group_vars)
+  # → group "aws" (used by runtime_config/network orchestration)
   - key: "'aws'"
     prefix: ""
     separator: ""
@@ -34,5 +34,8 @@ keyed_groups:
 compose:
   # Public IP only for jump-host. All workload nodes use private IP and are reached via ProxyJump.
   ansible_host: "(public_ip_address | default('')) if tags.get('Role') == 'jump-host' and (public_ip_address | default('')) != '' else private_ip_address"
+  ansible_user: "'coinops'"
   ansible_port: "53725"
+  ansible_ssh_private_key_file: "'/home/notebook/.ssh/ssh-key-coin-ops'"
+  ansible_ssh_common_args: "'-o ProxyJump=coinops-aws-jump-host' if tags.get('Role') != 'jump-host' else ''"
   cloud: "'aws'"

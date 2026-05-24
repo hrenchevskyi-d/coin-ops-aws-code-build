@@ -23,7 +23,7 @@ keyed_groups:
   - key: labels.role
     prefix: role
     separator: "_"
-  # → group "gcp" (used by ProxyJump intersect logic in group_vars)
+  # → group "gcp" (used by runtime_config/network orchestration)
   - key: labels.cloud
     prefix: ""
     separator: ""
@@ -34,5 +34,11 @@ compose:
     networkInterfaces[0].accessConfigs[0].natIP
     if (labels.get('role') == 'jump-host' and networkInterfaces[0].get('accessConfigs', []))
     else networkInterfaces[0].networkIP
+  ansible_user: "'coinops'"
   ansible_port: "53725"
+  ansible_ssh_private_key_file: "'/home/notebook/.ssh/ssh-key-coin-ops'"
+  ansible_ssh_common_args: >-
+    '-o ProxyJump=coinops-gcp-jump-host'
+    if labels.get('role') != 'jump-host'
+    else ''
   cloud: "'gcp'"

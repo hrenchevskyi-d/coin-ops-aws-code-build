@@ -1,0 +1,16 @@
+---
+docker_apt_dependencies:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg
+  - lsb-release
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-compose-plugin
+  - python3-docker
+docker_keyring_dir: /etc/apt/keyrings
+docker_gpg_asc_path: "{{ docker_keyring_dir }}/docker.asc"
+docker_gpg_keyring_path: "{{ docker_keyring_dir }}/docker.gpg"

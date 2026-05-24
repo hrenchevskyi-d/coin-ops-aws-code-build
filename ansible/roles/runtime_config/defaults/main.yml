@@ -1,0 +1,269 @@
+---
+repo_root: >-
+  {{
+    lookup('env', 'COINOPS_REPO_ROOT')
+    if (lookup('env', 'COINOPS_REPO_ROOT') | length > 0)
+    else (
+      (playbook_dir | dirname)
+      if (playbook_dir is defined)
+      else (inventory_dir | dirname | dirname)
+    )
+  }}
+
+deploy_defaults: "{{ (lookup('file', repo_root ~ '/ansible/vars/deploy-config.yml') | from_yaml) | default({}, true) }}"
+infra_config_dir: "{{ repo_root ~ '/terraform/config' }}"
+infra_config_clouds: "{{ lookup('file', infra_config_dir ~ '/clouds.json') | from_json }}"
+infra_config_mappings_file: "{{ lookup('file', infra_config_dir ~ '/cloud_mappings.json') | from_json }}"
+infra_config_general_file: "{{ lookup('file', infra_config_dir ~ '/general.json') | from_json }}"
+infra_config_deploy_file: "{{ lookup('file', infra_config_dir ~ '/deploy.json') | from_json }}"
+infra_config_database_file: "{{ lookup('file', infra_config_dir ~ '/database.json') | from_json }}"
+infra_config_dns_file: "{{ lookup('file', infra_config_dir ~ '/dns.json') | from_json }}"
+infra_config_secrets_file: "{{ lookup('file', infra_config_dir ~ '/secrets.json') | from_json }}"
+infra_config_instances_file: "{{ lookup('file', infra_config_dir ~ '/instances.json') | from_json }}"
+infra_networks_file: "{{ lookup('file', infra_config_dir ~ '/networks.json') | from_json }}"
+infra_config: >-
+  {{
+    infra_config_clouds
+    | combine(infra_config_mappings_file, recursive=True)
+    | combine(infra_config_general_file, recursive=True)
+    | combine(infra_config_deploy_file, recursive=True)
+    | combine(infra_config_database_file, recursive=True)
+    | combine(infra_config_dns_file, recursive=True)
+    | combine(infra_config_secrets_file, recursive=True)
+    | combine(infra_config_instances_file, recursive=True)
+    | combine(infra_networks_file, recursive=True)
+  }}
+
+infra_clouds: "{{ infra_config.get('clouds', {}) }}"
+infra_cloud_providers: "{{ infra_clouds.get('providers', {}) }}"
+infra_general: "{{ infra_config.get('general', {}) }}"
+infra_deploy: "{{ infra_config.get('deploy', {}) }}"
+infra_database: "{{ infra_config.get('database', {}) }}"
+infra_images: "{{ infra_config.get('images', {}) }}"
+infra_ports: "{{ infra_config.get('ports', {}) }}"
+infra_secrets: "{{ infra_config.get('secrets', {}) }}"
+infra_ansible: "{{ infra_config.get('ansible', {}) }}"
+infra_provisioning: "{{ infra_ansible.get('provisioning', {}) }}"
+infra_instances: "{{ infra_config.get('instances', {}) }}"
+infra_networks: "{{ infra_config.get('cloud_networks', {}) }}"
+infra_tailscale: "{{ infra_config.get('tailscale', {}) }}"
+infra_region_profile: "{{ infra_general.get('region_profile', 'europe-central') }}"
+infra_regions: "{{ infra_config.get('regions', {}) }}"
+infra_aws_region: "{{ infra_regions.get('aws', {}).get(infra_region_profile, {}).get('region', lookup('env', 'AWS_REGION') | default('eu-central-1', true)) }}"
+infra_azure_location: "{{ infra_regions.get('azure', {}).get(infra_region_profile, {}).get('location', lookup('env', 'TF_VAR_azure_location') | default('swedencentral', true)) }}"
+infra_secret_names: "{{ infra_secrets.get('names', {}) }}"
+
+json_deploy_config:
+  gcp_project: "{{ infra_cloud_providers.get('gcp', {}).get('account', {}).get('project_id', '') }}"
+  aws_region: "{{ infra_aws_region }}"
+  azure_subscription_id: "{{ infra_cloud_providers.get('azure', {}).get('account', {}).get('subscription_id', lookup('env', 'AZURE_SUBSCRIPTION_ID') | default('', true)) }}"
+  azure_tenant_id: "{{ infra_cloud_providers.get('azure', {}).get('account', {}).get('tenant_id', lookup('env', 'AZURE_TENANT_ID') | default('', true)) }}"
+  azure_resource_group_name: "{{ infra_cloud_providers.get('azure', {}).get('account', {}).get('resource_group_name', lookup('env', 'AZURE_RESOURCE_GROUP') | default('coin-ops-azure-rg', true)) }}"
+  azure_key_vault_name: "{{ infra_cloud_providers.get('azure', {}).get('account', {}).get('key_vault_name', lookup('env', 'AZURE_KEYVAULT_NAME') | default('', true)) }}"
+  azure_location: "{{ infra_azure_location }}"
+  secret_backend: "{{ infra_clouds.get('secret_backend', infra_clouds.get('control_plane', 'gcp')) }}"
+  db_secret_name: "{{ infra_secret_names.get('db', 'coinops-db-secrets') }}"
+  app_secret_name: "{{ infra_secret_names.get('app', 'coinops-app-secrets') }}"
+  db_name: "{{ infra_database.get('name', 'cognitor') }}"
+  db_user: "{{ infra_database.get('username', 'cognitor') }}"
+  db_port: "{{ infra_database.get('port', 5432) }}"
+  runtime_backend: "{{ infra_deploy.get('runtime_backend', 'external') }}"
+  app_domain: "{{ infra_deploy.get('app_domain', 'coinops.test') }}"
+  tls_mode: "{{ infra_deploy.get('tls_mode', 'selfsigned') }}"
+  certbot_email_localpart: "{{ infra_deploy.get('tls', {}).get('certbot', {}).get('email_localpart', infra_deploy.get('certbot', {}).get('email_localpart', 'admin')) }}"
+  certbot_staging: "{{ infra_deploy.get('tls', {}).get('certbot', {}).get('staging', infra_deploy.get('certbot', {}).get('staging', false)) }}"
+  image_registry: "{{ infra_images.get('registry', 'ghcr.io/ua-academy-projects') }}"
+  image_tag: "{{ infra_images.get('tag', 'shabat-latest') }}"
+  registry_username: "{{ infra_deploy.get('ghcr_username', '') }}"
+  proxy_port: "{{ infra_ports.get('proxy', 8080) }}"
+  history_port: "{{ infra_ports.get('history', 8000) }}"
+  internal_tls_enabled: "{{ infra_deploy.get('internal_tls', {}).get('enabled', true) }}"
+  internal_tls_port: "{{ infra_deploy.get('internal_tls', {}).get('port', 8443) }}"
+  provisioning_wait_for_connection_timeout: "{{ infra_provisioning.get('wait_for_connection_timeout', 600) }}"
+  provisioning_wait_for_connection_delay: "{{ infra_provisioning.get('wait_for_connection_delay', 5) }}"
+  provisioning_wait_for_connection_sleep: "{{ infra_provisioning.get('wait_for_connection_sleep', 5) }}"
+  provisioning_wait_for_cloud_init: "{{ infra_provisioning.get('wait_for_cloud_init', true) }}"
+  provisioning_apt_lock_timeout: "{{ infra_provisioning.get('apt_lock_timeout', 900) }}"
+  provisioning_become_timeout: "{{ infra_provisioning.get('become_timeout', 60) }}"
+  provisioning_host_batch_size: "{{ infra_provisioning.get('host_batch_size', 4) }}"
+  provisioning_workload_batch_size: "{{ infra_provisioning.get('workload_batch_size', 4) }}"
+  provisioning_upgrade_packages: "{{ infra_provisioning.get('upgrade_packages', false) }}"
+  k3s_channel: "{{ infra_deploy.get('k3s', {}).get('channel', 'stable') }}"
+  k3s_disable_components: "{{ infra_deploy.get('k3s', {}).get('disable_components', []) }}"
+  k3s_flannel_backend: "{{ infra_deploy.get('k3s', {}).get('flannel_backend', 'vxlan') }}"
+  headlamp_enabled: "{{ infra_deploy.get('headlamp', {}).get('enabled', true) }}"
+  headlamp_hostname: "{{ infra_deploy.get('headlamp', {}).get('hostname', 'headlamp.' ~ infra_deploy.get('app_domain', 'coinops.test')) }}"
+  headlamp_ingress_enabled: "{{ infra_deploy.get('headlamp', {}).get('ingress', {}).get('enabled', true) }}"
+  headlamp_ingress_class_name: "{{ infra_deploy.get('headlamp', {}).get('ingress', {}).get('class_name', 'traefik') }}"
+
+local_generated_config_path: "{{ repo_root ~ '/ansible/vars/local.generated.json' }}"
+local_generated_config_text: "{{ lookup('file', local_generated_config_path, errors='ignore') | default('{}', true) | string }}"
+local_generated_config: >-
+  {{
+    ((local_generated_config_text | trim | length) > 0)
+    | ternary((local_generated_config_text | from_json), {})
+  }}
+deploy_config: "{{ json_deploy_config | combine(deploy_defaults, recursive=True) | combine(local_generated_config, recursive=True) }}"
+
+runtime_metadata_path: "{{ repo_root ~ '/terraform/config/ansible-runtime.json' }}"
+runtime_metadata_text: "{{ lookup('file', runtime_metadata_path, errors='ignore') | default('{}', true) | string }}"
+runtime_metadata: >-
+  {{
+    ((runtime_metadata_text | trim | length) > 0)
+    | ternary((runtime_metadata_text | from_json), {})
+  }}
+
+my_cloud: "{{ cloud | default('gcp' if 'gcp' in groups else ('aws' if 'aws' in groups else ('azure' if 'azure' in groups else ''))) }}"
+cloud_runtime_metadata: "{{ runtime_metadata.get(my_cloud, {}) }}"
+backend_hosts_for_cloud: "{{ groups.get('role_app_backend', []) | intersect(groups.get(my_cloud, [])) }}"
+gateway_hosts_for_cloud: "{{ groups.get('role_gateway', []) | intersect(groups.get(my_cloud, [])) }}"
+backend_host: >-
+  {{
+    backend_hosts_for_cloud[0]
+    if (backend_hosts_for_cloud | length > 0)
+    else (groups['role_app_backend'][0] if ('role_app_backend' in groups and (groups['role_app_backend'] | length > 0)) else '')
+  }}
+gateway_host: >-
+  {{
+    gateway_hosts_for_cloud[0]
+    if (gateway_hosts_for_cloud | length > 0)
+    else (
+      (groups.get('role_jump_host', []) | intersect(groups.get(my_cloud, [])) | first)
+      if (groups.get('role_jump_host', []) | intersect(groups.get(my_cloud, [])) | length > 0)
+      else ''
+    )
+  }}
+jump_hosts_for_cloud: "{{ groups.get('role_jump_host', []) | intersect(groups.get(my_cloud, [])) }}"
+jump_host: >-
+  {{
+    jump_hosts_for_cloud[0]
+    if (jump_hosts_for_cloud | length > 0)
+    else ''
+  }}
+
+infra_instance_key: >-
+  {{
+    (inventory_hostname | regex_replace('^aws-', ''))
+    if my_cloud == 'aws'
+    else (
+      (inventory_hostname | regex_replace('^azure-', ''))
+      if my_cloud == 'azure'
+      else inventory_hostname
+    )
+  }}
+host_instance_config: "{{ infra_instances.get(infra_instance_key, {}) }}"
+ansible_ssh_common_args: >-
+  {{
+    '-o ProxyJump=coinops-' ~ my_cloud ~ '-' ~ jump_host
+    if (
+      inventory_hostname not in ['localhost', '127.0.0.1']
+      and host_instance_config.get('role', '') != 'jump-host'
+      and my_cloud | length > 0
+      and jump_host | length > 0
+    )
+    else ''
+  }}
+cloud_network_config: "{{ infra_networks.get(my_cloud, {}) }}"
+cloud_subnets: "{{ cloud_network_config.get('subnets', {}) }}"
+cloud_vpc_cidr: "{{ cloud_network_config.get('vpc_cidr', '') }}"
+cloud_remote_routes: "{{ cloud_network_config.get('remote_routes', []) }}"
+host_image_profile: "{{ host_instance_config.get('image_profile', infra_general.get('image_profile', '')) }}"
+cloud_image_profiles: "{{ infra_images.get(my_cloud, {}) }}"
+base_image_profile_name: "{{ infra_general.get('image_profile', 'debian-12') }}"
+base_image_profile_config: "{{ cloud_image_profiles.get(base_image_profile_name, {}) }}"
+host_image_profile_config: "{{ cloud_image_profiles.get(host_image_profile, {}) }}"
+host_uses_golden_image: >-
+  {{
+    host_image_profile == 'coinops-app-host'
+    and host_image_profile_config != {}
+    and host_image_profile_config != base_image_profile_config
+  }}
+
+ansible_become_timeout: "{{ deploy_config.provisioning_become_timeout | default(60) }}"
+secret_backend: "{{ lookup('env', 'COINOPS_SECRET_BACKEND') | default(local_generated_config.get('secret_backend', deploy_defaults.get('secret_backend', infra_clouds.get('secret_backend', infra_clouds.get('control_plane', 'gcp')))), true) }}"
+gcp_project: "{{ local_generated_config.get('gcp_project', deploy_defaults.get('gcp_project', infra_cloud_providers.get('gcp', {}).get('account', {}).get('project_id', ''))) }}"
+gcp_service_account_file: "{{ repo_root ~ '/terraform/sa-key.json' }}"
+aws_region: "{{ lookup('env', 'AWS_REGION') | default(local_generated_config.get('aws_region', deploy_defaults.get('aws_region', infra_aws_region)), true) }}"
+azure_subscription_id: "{{ lookup('env', 'AZURE_SUBSCRIPTION_ID') | default(local_generated_config.get('azure_subscription_id', deploy_defaults.get('azure_subscription_id', infra_cloud_providers.get('azure', {}).get('account', {}).get('subscription_id', ''))), true) }}"
+azure_tenant_id: "{{ lookup('env', 'AZURE_TENANT_ID') | default(local_generated_config.get('azure_tenant_id', deploy_defaults.get('azure_tenant_id', infra_cloud_providers.get('azure', {}).get('account', {}).get('tenant_id', ''))), true) }}"
+azure_resource_group_name: "{{ lookup('env', 'AZURE_RESOURCE_GROUP') | default(local_generated_config.get('azure_resource_group_name', deploy_defaults.get('azure_resource_group_name', infra_cloud_providers.get('azure', {}).get('account', {}).get('resource_group_name', 'coin-ops-azure-rg'))), true) }}"
+azure_key_vault_name: "{{ lookup('env', 'AZURE_KEYVAULT_NAME') | default(local_generated_config.get('azure_key_vault_name', deploy_defaults.get('azure_key_vault_name', infra_cloud_providers.get('azure', {}).get('account', {}).get('key_vault_name', ''))), true) }}"
+azure_key_vault_url: "{{ lookup('env', 'AZURE_KEYVAULT_URL') | default(('https://' ~ azure_key_vault_name ~ '.vault.azure.net/') if (azure_key_vault_name | length > 0) else '', true) }}"
+db_secret_name: "{{ local_generated_config.get('db_secret_name', deploy_defaults.get('db_secret_name', infra_secret_names.get('db', 'coinops-db-secrets'))) }}"
+app_secret_name: "{{ local_generated_config.get('app_secret_name', deploy_defaults.get('app_secret_name', infra_secret_names.get('app', 'coinops-app-secrets'))) }}"
+
+db_secrets: {}
+app_secrets: {}
+db_password: ""
+rabbitmq_password: ""
+registry_token: ""
+cloudflare_api_token: ""
+tailscale_auth_key: ""
+
+rabbitmq_user: cognitor
+database_metadata: "{{ cloud_runtime_metadata.get('database', {}) }}"
+db_name: "{{ database_metadata.get('name', deploy_config.db_name | default('cognitor', true)) }}"
+db_user: "{{ database_metadata.get('user', deploy_config.db_user | default('cognitor', true)) }}"
+db_port: "{{ database_metadata.get('port', deploy_config.db_port | default(5432, true)) }}"
+db_user_urlencoded: "{{ db_user | urlencode }}"
+db_password_urlencoded: "{{ db_password | urlencode }}"
+rabbitmq_user_urlencoded: "{{ rabbitmq_user | urlencode }}"
+rabbitmq_password_urlencoded: "{{ rabbitmq_password | urlencode }}"
+
+runtime_backend: "{{ lookup('env', 'RUNTIME_BACKEND') | default(deploy_config.runtime_backend, true) }}"
+app_domain: "{{ lookup('env', 'APP_DOMAIN') | default(deploy_config.app_domain, true) }}"
+tls_mode: "{{ lookup('env', 'TLS_MODE') | default(deploy_config.tls_mode, true) }}"
+tls_enabled: true
+certbot_email: "{{ lookup('env', 'CERTBOT_EMAIL') | default(deploy_config.certbot_email_localpart ~ '@' ~ app_domain, true) }}"
+certbot_staging: "{{ lookup('env', 'CERTBOT_STAGING') | default(deploy_config.certbot_staging, true) | bool }}"
+
+proxy_port: "{{ deploy_config.proxy_port }}"
+history_port: "{{ deploy_config.history_port }}"
+internal_tls_enabled: "{{ lookup('env', 'INTERNAL_TLS_ENABLED') | default(deploy_config.internal_tls_enabled, true) | bool }}"
+internal_tls_port: "{{ deploy_config.internal_tls_port }}"
+backend_ip: "{{ (backend_host | length > 0) | ternary(hostvars[backend_host].ansible_host, '127.0.0.1') }}"
+gateway_ip: "{{ (gateway_host | length > 0) | ternary(hostvars[gateway_host].ansible_host, '') }}"
+postgres_bind_ip: "{{ database_metadata.get('host', cloud_runtime_metadata.get('database_ip', '')) | default(backend_ip, true) }}"
+postgres_port: "{{ database_metadata.get('port', db_port) }}"
+use_managed_db: "{{ database_metadata.get('managed', cloud_runtime_metadata.get('use_managed_db', false)) | bool }}"
+
+tls_cert_dir: /etc/cognitor/tls
+tls_cert_path: "{{ tls_cert_dir }}/coinops.crt"
+tls_key_path: "{{ tls_cert_dir }}/coinops.key"
+
+image_registry: "{{ lookup('env', 'IMAGE_REGISTRY') | default(deploy_config.image_registry, true) }}"
+image_registry_host: "{{ image_registry.split('/')[0] }}"
+image_tag: "{{ lookup('env', 'IMAGE_TAG') | default(deploy_config.image_tag, true) }}"
+proxy_image: "{{ image_registry }}/coin-ops-proxy:{{ image_tag }}"
+history_api_image: "{{ image_registry }}/coin-ops-history-api:{{ image_tag }}"
+history_consumer_image: "{{ image_registry }}/coin-ops-history-consumer:{{ image_tag }}"
+ui_image: "{{ image_registry }}/coin-ops-ui:{{ image_tag }}"
+postgres_runtime_image: "{{ image_registry }}/coin-ops-postgres-runtime:{{ image_tag }}"
+postgres_image: "{{ postgres_runtime_image if runtime_backend == 'postgres' else 'postgres:16-alpine' }}"
+registry_username: "{{ lookup('env', 'GHCR_USERNAME') | default(deploy_config.registry_username, true) }}"
+
+tailscale_enabled: "{{ infra_tailscale.get('enabled', false) | bool }}"
+tailscale_control_plane: "{{ infra_tailscale.get('control_plane', 'saas') }}"
+tailscale_auth_key_secret_name: "{{ infra_tailscale.get('auth_key_secret_name', 'TAILSCALE_AUTH_KEY') }}"
+tailscale_accept_routes: "{{ infra_tailscale.get('accept_routes', true) | bool }}"
+tailscale_snat_subnet_routes: "{{ infra_tailscale.get('snat_subnet_routes', false) | bool }}"
+tailscale_tags: "{{ infra_tailscale.get('tags', {}).get(host_instance_config.get('role', ''), []) }}"
+tailscale_advertised_routes: "{{ infra_tailscale.get('advertised_routes_per_cloud', {}).get(my_cloud, []) }}"
+tailscale_remote_route_cidrs: >-
+  {{
+    cloud_remote_routes | map(attribute='destination_cidr') | list
+    if (cloud_remote_routes | length > 0)
+    else (
+      infra_tailscale.get('advertised_routes_per_cloud', {})
+      | dict2items
+      | rejectattr('key', 'equalto', my_cloud)
+      | map(attribute='value')
+      | list
+      | flatten
+    )
+  }}
+tailscale_static_route_roles: "{{ infra_tailscale.get('static_route_roles', []) }}"
+
+rabbitmq_url: "amqp://{{ rabbitmq_user_urlencoded }}:{{ rabbitmq_password_urlencoded }}@{{ backend_ip }}:5672/"
+internal_rabbitmq_url: "amqp://{{ rabbitmq_user_urlencoded }}:{{ rabbitmq_password_urlencoded }}@rabbitmq:5672/"
+app_database_url: "postgresql://{{ db_user_urlencoded }}:{{ db_password_urlencoded }}@{{ postgres_bind_ip }}:{{ postgres_port }}/{{ db_name }}"

@@ -1,0 +1,9 @@
+---
+- name: Pull compose stack images
+  command: "docker compose -f {{ compose_stack_compose_path }} pull"
+  args:
+    chdir: "{{ compose_stack_project_dir }}"
+  register: compose_stack_pull_result
+  retries: "{{ compose_stack_pull_retries }}"
+  delay: "{{ compose_stack_pull_delay }}"
+  until: compose_stack_pull_result.rc == 0

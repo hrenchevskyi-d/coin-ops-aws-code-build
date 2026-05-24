@@ -23,7 +23,7 @@ ANSIBLE_CMD = $(ENV_PREFIX) ANSIBLE_CONFIG="$(REPO_ROOT)/ansible.cfg"
 	local-up local-down local-logs local-ps local-restart local-config \
 	tf-check-backend tf-plan tf-apply tf-destroy-compute tf-full-destroy \
 	inventory-graph inventory-host ssh-host \
-	provision deploy k3s-cluster k3s-platform headlamp-start headlamp-token
+	runtime-config provision deploy k3s-cluster k3s-platform headlamp-start headlamp-token
 
 help:
 	@echo "Local development:"
@@ -49,6 +49,7 @@ help:
 	@echo "                               - SSH using generated terraform ssh_config"
 	@echo ""
 	@echo "Ansible:"
+	@echo "  make runtime-config          - Resolve and print the materialized runtime configuration locally"
 	@echo "  make provision               - Run ansible/provision.yml"
 	@echo "  make deploy                  - Run ansible/deploy.yml"
 	@echo "  make k3s-cluster             - Run ansible/k3s-cluster.yml against GCP dynamic inventory"
@@ -116,6 +117,9 @@ inventory-host:
 ssh-host:
 	@if [ -z "$(HOST)" ]; then echo "HOST is required, for example: make ssh-host HOST=coinops-gcp-app-1"; exit 1; fi
 	$(ENV_PREFIX) ssh -F "$(TF_DIR)/config/ssh_config" "$(HOST)"
+
+runtime-config:
+	$(ANSIBLE_CMD) ansible-playbook -i localhost, -c local "$(ANSIBLE_DIR)/runtime-config.yml"
 
 provision:
 	$(ANSIBLE_CMD) ansible-playbook -i "$(INVENTORY)" "$(ANSIBLE_DIR)/provision.yml" $(if $(LIMIT),--limit "$(LIMIT)",)

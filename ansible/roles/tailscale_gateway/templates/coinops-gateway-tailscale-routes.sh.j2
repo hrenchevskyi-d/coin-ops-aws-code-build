@@ -1,0 +1,5 @@
+#!/bin/bash
+set -euo pipefail
+{% for cidr in tailscale_remote_route_cidrs %}
+ip route replace {{ cidr }} dev tailscale0
+{% endfor %}

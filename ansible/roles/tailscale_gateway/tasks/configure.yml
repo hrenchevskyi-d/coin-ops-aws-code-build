@@ -1,0 +1,15 @@
+---
+- name: Ensure gateway sysctl settings are present
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_file: /etc/sysctl.d/99-coinops-gateway.conf
+    reload: true
+  loop: "{{ tailscale_gateway_sysctl | dict2items }}"
+
+- name: Ensure tailscaled service is running
+  systemd:
+    name: tailscaled
+    enabled: yes
+    state: started

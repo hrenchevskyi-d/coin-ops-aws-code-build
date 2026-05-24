@@ -1,0 +1,24 @@
+---
+- name: Ensure compose stack project directory exists
+  file:
+    path: "{{ compose_stack_project_dir }}"
+    state: directory
+    owner: "{{ compose_stack_owner }}"
+    group: "{{ compose_stack_group }}"
+    mode: "{{ compose_stack_mode }}"
+
+- name: Render compose stack file
+  template:
+    src: "{{ compose_stack_compose_template }}"
+    dest: "{{ compose_stack_compose_path }}"
+    owner: "{{ compose_stack_owner }}"
+    group: "{{ compose_stack_group }}"
+    mode: "0644"
+  register: compose_stack_render
+
+- name: Validate compose stack configuration
+  command: "docker compose -f {{ compose_stack_compose_path }} config -q"
+  args:
+    chdir: "{{ compose_stack_project_dir }}"
+  changed_when: false
+  when: compose_stack_validate_enabled | bool

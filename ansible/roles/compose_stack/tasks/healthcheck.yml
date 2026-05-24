@@ -1,0 +1,11 @@
+---
+- name: Wait for compose stack health endpoint
+  uri:
+    url: "{{ compose_stack_healthcheck_url }}"
+    method: "{{ compose_stack_healthcheck_method }}"
+    status_code: "{{ compose_stack_healthcheck_status_code }}"
+    validate_certs: "{{ compose_stack_healthcheck_validate_certs }}"
+  retries: "{{ compose_stack_healthcheck_retries }}"
+  delay: "{{ compose_stack_healthcheck_delay }}"
+  register: compose_stack_healthcheck_result
+  until: compose_stack_healthcheck_result.status == compose_stack_healthcheck_status_code

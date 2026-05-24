@@ -1,0 +1,24 @@
+---
+- name: Start history compose stack
+  include_role:
+    name: compose_stack
+    tasks_from: up.yml
+  vars:
+    compose_stack_project_dir: "{{ history_deploy_dir }}"
+    compose_stack_compose_path: "{{ history_compose_path }}"
+
+- name: Verify history compose stack health
+  include_role:
+    name: compose_stack
+    tasks_from: healthcheck.yml
+  vars:
+    compose_stack_healthcheck_url: "http://localhost:{{ history_port }}/health"
+    compose_stack_healthcheck_status_code: 200
+    compose_stack_healthcheck_validate_certs: false
+    compose_stack_healthcheck_retries: "{{ history_healthcheck_retries }}"
+    compose_stack_healthcheck_delay: "{{ history_healthcheck_delay }}"
+
+- name: Prune history compose stack dangling images
+  include_role:
+    name: compose_stack
+    tasks_from: prune.yml

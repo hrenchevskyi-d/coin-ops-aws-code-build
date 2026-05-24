@@ -1,0 +1,27 @@
+---
+- name: Persist gateway masquerade rules
+  template:
+    src: coinops-gateway-nat.sh.j2
+    dest: /usr/local/sbin/coinops-gateway-nat.sh
+    mode: "0755"
+
+- name: Install gateway NAT persistence unit
+  template:
+    src: coinops-gateway-nat.service.j2
+    dest: /etc/systemd/system/coinops-gateway-nat.service
+    mode: "0644"
+
+- name: Enable gateway NAT persistence unit
+  systemd:
+    daemon_reload: yes
+    name: coinops-gateway-nat.service
+    enabled: yes
+    state: restarted
+
+- name: Verify gateway Tailscale masquerade rule is present
+  command: iptables -t nat -S POSTROUTING
+  register: gateway_postrouting_rules
+  changed_when: false
+  failed_when: >-
+    ('-A POSTROUTING -s ' ~ cloud_vpc_cidr ~ ' -o tailscale0 -j MASQUERADE')
+    not in gateway_postrouting_rules.stdout

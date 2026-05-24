@@ -1,0 +1,43 @@
+---
+- name: Prepare proxy compose stack
+  include_role:
+    name: compose_stack
+    tasks_from: prepare.yml
+  vars:
+    compose_stack_project_dir: "{{ proxy_deploy_dir }}"
+    compose_stack_compose_template: "{{ playbook_dir }}/../deploy/compose/backend-proxy.compose.yaml"
+    compose_stack_compose_path: "{{ proxy_compose_path }}"
+
+- name: Pull proxy compose stack images
+  include_role:
+    name: compose_stack
+    tasks_from: pull.yml
+  vars:
+    compose_stack_project_dir: "{{ proxy_deploy_dir }}"
+    compose_stack_compose_path: "{{ proxy_compose_path }}"
+    compose_stack_pull_retries: "{{ proxy_docker_compose_pull_retries }}"
+    compose_stack_pull_delay: "{{ proxy_docker_compose_pull_delay }}"
+
+- name: Start proxy compose stack
+  include_role:
+    name: compose_stack
+    tasks_from: up.yml
+  vars:
+    compose_stack_project_dir: "{{ proxy_deploy_dir }}"
+    compose_stack_compose_path: "{{ proxy_compose_path }}"
+
+- name: Verify proxy compose stack health
+  include_role:
+    name: compose_stack
+    tasks_from: healthcheck.yml
+  vars:
+    compose_stack_healthcheck_url: "http://localhost:{{ proxy_port }}/health"
+    compose_stack_healthcheck_status_code: 200
+    compose_stack_healthcheck_validate_certs: false
+    compose_stack_healthcheck_retries: "{{ proxy_healthcheck_retries }}"
+    compose_stack_healthcheck_delay: "{{ proxy_healthcheck_delay }}"
+
+- name: Prune proxy compose stack dangling images
+  include_role:
+    name: compose_stack
+    tasks_from: prune.yml

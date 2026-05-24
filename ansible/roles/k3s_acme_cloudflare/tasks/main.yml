@@ -1,0 +1,43 @@
+---
+- name: Validate Cloudflare secret availability for Headlamp TLS
+  assert:
+    that:
+      - cloudflare_api_token | length > 0
+    fail_msg: >-
+      CLOUDFLARE_API_TOKEN must be present in the configured secret backend secret
+      {{ app_secret_name }} when TLS_MODE=certbot and Headlamp TLS is enabled.
+
+- name: Apply cert-manager Cloudflare API token secret
+  kubernetes.core.k8s:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    state: present
+    definition: "{{ lookup('template', 'cert-manager-cloudflare-secret.yaml.j2') | from_yaml }}"
+  no_log: true
+
+- name: Apply Headlamp ACME ClusterIssuer
+  kubernetes.core.k8s:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    state: present
+    definition: "{{ lookup('template', 'headlamp-clusterissuer.yaml.j2') | from_yaml }}"
+
+- name: Read Headlamp ACME ClusterIssuer status
+  kubernetes.core.k8s_info:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    api_version: cert-manager.io/v1
+    kind: ClusterIssuer
+    name: "{{ headlamp_cluster_issuer_name }}"
+  register: headlamp_clusterissuer_info
+  retries: 30
+  delay: 10
+  until: >-
+    (
+      headlamp_clusterissuer_info.resources | default([]) | length
+    ) > 0 and
+    (
+      headlamp_clusterissuer_info.resources[0].status.conditions
+      | default([])
+      | selectattr('type', 'equalto', 'Ready')
+      | map(attribute='status')
+      | first
+      | default('False')
+    ) == 'True'

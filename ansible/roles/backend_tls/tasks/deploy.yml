@@ -1,0 +1,51 @@
+---
+- name: Render internal backend gateway config
+  template:
+    src: nginx.internal.conf.j2
+    dest: "{{ backend_tls_gateway_nginx_config_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: internal_tls_enabled
+
+- name: Prepare internal backend gateway compose stack
+  include_role:
+    name: compose_stack
+    tasks_from: prepare.yml
+  vars:
+    compose_stack_project_dir: "{{ backend_tls_gateway_dir }}"
+    compose_stack_compose_template: "{{ playbook_dir }}/../deploy/compose/backend-tls.compose.yaml"
+    compose_stack_compose_path: "{{ backend_tls_gateway_compose_path }}"
+  when: internal_tls_enabled
+
+- name: Pull internal backend gateway compose stack images
+  include_role:
+    name: compose_stack
+    tasks_from: pull.yml
+  vars:
+    compose_stack_project_dir: "{{ backend_tls_gateway_dir }}"
+    compose_stack_compose_path: "{{ backend_tls_gateway_compose_path }}"
+    compose_stack_pull_retries: "{{ backend_tls_pull_retries }}"
+    compose_stack_pull_delay: "{{ backend_tls_pull_delay }}"
+  when: internal_tls_enabled
+
+- name: Start internal backend gateway compose stack
+  include_role:
+    name: compose_stack
+    tasks_from: up.yml
+  vars:
+    compose_stack_project_dir: "{{ backend_tls_gateway_dir }}"
+    compose_stack_compose_path: "{{ backend_tls_gateway_compose_path }}"
+  when: internal_tls_enabled
+
+- name: Verify internal backend gateway compose stack health
+  include_role:
+    name: compose_stack
+    tasks_from: healthcheck.yml
+  vars:
+    compose_stack_healthcheck_url: "https://localhost:{{ internal_tls_port }}/health"
+    compose_stack_healthcheck_status_code: 200
+    compose_stack_healthcheck_validate_certs: false
+    compose_stack_healthcheck_retries: "{{ backend_tls_healthcheck_retries }}"
+    compose_stack_healthcheck_delay: "{{ backend_tls_healthcheck_delay }}"
+  when: internal_tls_enabled

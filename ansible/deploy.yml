@@ -8,6 +8,12 @@
   hosts: localhost
   connection: local
   gather_facts: no
+  pre_tasks:
+    - name: Resolve runtime configuration for deployment validation
+      include_role:
+        name: runtime_config
+        public: true
+      tags: [runtime_config]
   tasks:
     - name: Validate configured runtime backend
       assert:
@@ -31,6 +37,8 @@
     - name: Resolve runtime configuration for deploy
       include_role:
         name: runtime_config
+        public: true
+      tags: [runtime_config]
   tasks:
     - name: Validate configured registry credentials before login
       assert:
@@ -63,6 +71,8 @@
     - name: Resolve runtime configuration for history
       include_role:
         name: runtime_config
+        public: true
+      tags: [runtime_config]
   roles:
     - history
 
@@ -73,12 +83,20 @@
     - name: Resolve runtime configuration for proxy
       include_role:
         name: runtime_config
+        public: true
+      tags: [runtime_config]
   roles:
     - proxy
 
 - name: Deploy Internal TLS Gateway (app-2)
   hosts: "{{ target_backend_group | default('role_app_backend') }}"
   become: yes
+  pre_tasks:
+    - name: Resolve runtime configuration for backend TLS
+      include_role:
+        name: runtime_config
+        public: true
+      tags: [runtime_config]
   roles:
     - backend_tls
 
@@ -89,5 +107,7 @@
     - name: Resolve runtime configuration for UI
       include_role:
         name: runtime_config
+        public: true
+      tags: [runtime_config]
   roles:
     - ui

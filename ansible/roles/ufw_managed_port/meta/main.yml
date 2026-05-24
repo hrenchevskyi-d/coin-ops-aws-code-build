@@ -1,0 +1,7 @@
+---
+galaxy_info:
+  author: coin-ops
+  description: Manages a single UFW port allowance with enable/disable semantics.
+  license: MIT
+  min_ansible_version: "2.15"
+dependencies: []

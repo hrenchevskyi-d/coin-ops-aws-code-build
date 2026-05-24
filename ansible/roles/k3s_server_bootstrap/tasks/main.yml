@@ -1,30 +1,18 @@
 ---
 - name: Render bootstrap k3s server configuration
-  copy:
+  template:
     dest: "{{ k3s_config_file }}"
+    src: config.yaml.j2
     mode: "0600"
-    content: |
-      cluster-init: true
-      write-kubeconfig-mode: "{{ k3s_write_kubeconfig_mode }}"
-      node-name: "{{ inventory_hostname }}"
-      tls-san:
-      {% for san in k3s_tls_sans %}
-        - "{{ san }}"
-      {% endfor %}
-      flannel-backend: "{{ k3s_flannel_backend }}"
-      {% if k3s_server_disable_components | length > 0 %}
-      disable:
-      {% for component in k3s_server_disable_components %}
-        - {{ component }}
-      {% endfor %}
-      {% endif %}
   register: k3s_bootstrap_config
+  tags: [k3s, k3s_bootstrap]
 
 - name: Download k3s installation script
   get_url:
     url: "{{ k3s_install_script_url }}"
     dest: /tmp/get-k3s.sh
     mode: "0755"
+  tags: [k3s, k3s_bootstrap]
 
 - name: Install bootstrap k3s server
   command: /tmp/get-k3s.sh
@@ -33,37 +21,45 @@
     INSTALL_K3S_EXEC: server
   args:
     creates: /usr/local/bin/k3s
+  tags: [k3s, k3s_bootstrap]
 
 - name: Ensure k3s service is enabled and running on bootstrap node
   systemd:
     name: k3s
     enabled: yes
     state: started
+  tags: [k3s, k3s_bootstrap]
 
 - name: Restart bootstrap k3s service when configuration changes
   systemd:
     name: k3s
     state: restarted
   when: k3s_bootstrap_config.changed
+  tags: [k3s, k3s_bootstrap]
 
 - name: Wait for the k3s cluster token to be created
   wait_for:
     path: "{{ k3s_token_file }}"
     timeout: 300
+  tags: [k3s, k3s_bootstrap]
 
 - name: Read the k3s cluster token
   slurp:
     src: "{{ k3s_token_file }}"
   register: k3s_bootstrap_token_raw
+  tags: [k3s, k3s_bootstrap]
 
 - name: Store the k3s cluster token for join nodes
   set_fact:
     k3s_cluster_token: "{{ k3s_bootstrap_token_raw.content | b64decode | trim }}"
+  tags: [k3s, k3s_bootstrap]
 
 - name: Wait until the bootstrap API responds
-  command: k3s kubectl get nodes -o name
+  kubernetes.core.k8s_info:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    kind: Node
   register: k3s_bootstrap_nodes
-  changed_when: false
   retries: 20
   delay: 10
-  until: k3s_bootstrap_nodes.rc == 0
+  until: (k3s_bootstrap_nodes.resources | default([]) | length) > 0
+  tags: [k3s, k3s_bootstrap]

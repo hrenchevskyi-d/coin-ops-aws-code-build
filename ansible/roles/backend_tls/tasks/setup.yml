@@ -1,0 +1,26 @@
+---
+- name: Install internal TLS gateway prerequisites
+  apt:
+    name: openssl
+    state: present
+    update_cache: yes
+  when: internal_tls_enabled
+
+- name: Manage internal TLS UFW port
+  include_role:
+    name: ufw_managed_port
+  vars:
+    ufw_managed_port: "{{ internal_tls_port }}"
+    ufw_managed_port_enabled: "{{ internal_tls_enabled }}"
+
+- name: Create internal TLS directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ backend_tls_dir }}"
+    - "{{ backend_tls_gateway_dir }}"
+  when: internal_tls_enabled

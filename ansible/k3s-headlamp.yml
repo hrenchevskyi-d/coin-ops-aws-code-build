@@ -7,6 +7,8 @@
     - name: Resolve runtime configuration for Headlamp validation
       include_role:
         name: runtime_config
+        public: true
+      tags: [runtime_config, headlamp]
   tasks:
     - name: Assert that a k3s control plane group exists
       assert:
@@ -24,5 +26,7 @@
     - name: Resolve runtime configuration for Headlamp deployment
       include_role:
         name: runtime_config
+        public: true
+      tags: [runtime_config, headlamp]
   roles:
     - k3s_headlamp

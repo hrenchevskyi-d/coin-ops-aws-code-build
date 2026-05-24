@@ -1,0 +1,71 @@
+---
+- name: Copy PostgreSQL runtime schema
+  copy:
+    src: "{{ playbook_dir }}/../history/schema.sql"
+    dest: "{{ history_schema_dest_path }}"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Copy runtime SQL schema files
+  copy:
+    src: "{{ playbook_dir }}/../runtime/"
+    dest: "{{ history_runtime_dir }}/"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Prepare history compose stack
+  include_role:
+    name: compose_stack
+    tasks_from: prepare.yml
+  vars:
+    compose_stack_project_dir: "{{ history_deploy_dir }}"
+    compose_stack_compose_template: "{{ playbook_dir }}/../deploy/compose/backend-history.compose.yaml"
+    compose_stack_compose_path: "{{ history_compose_path }}"
+
+- name: Stop PostgreSQL before repairing data directory ownership
+  command: "docker compose -f {{ history_compose_path }} stop postgres"
+  args:
+    chdir: "{{ history_deploy_dir }}"
+  changed_when: false
+  failed_when: false
+  when: not use_managed_db
+
+- name: Repair PostgreSQL data directory ownership for selected Postgres image
+  file:
+    path: /var/lib/coin-ops/postgres
+    state: directory
+    owner: '70'
+    group: '70'
+    mode: '0700'
+    recurse: yes
+  when: not use_managed_db
+
+- name: Pull history compose stack images
+  include_role:
+    name: compose_stack
+    tasks_from: pull.yml
+  vars:
+    compose_stack_project_dir: "{{ history_deploy_dir }}"
+    compose_stack_compose_path: "{{ history_compose_path }}"
+    compose_stack_pull_retries: "{{ history_docker_compose_pull_retries }}"
+    compose_stack_pull_delay: "{{ history_docker_compose_pull_delay }}"
+
+- name: Start history dependencies first
+  command: >-
+    docker compose -f {{ history_compose_path }} up -d
+    {% if not use_managed_db %}postgres {% endif %}{% if runtime_backend == "external" %}rabbitmq{% endif %}
+  args:
+    chdir: "{{ history_deploy_dir }}"
+  when: not use_managed_db or runtime_backend == "external"
+
+- name: Wait for containerized PostgreSQL readiness
+  command: "docker compose -f {{ history_compose_path }} exec -T postgres pg_isready -U {{ db_user }} -d {{ db_name }}"
+  args:
+    chdir: "{{ history_deploy_dir }}"
+  retries: "{{ history_postgres_ready_retries }}"
+  delay: "{{ history_postgres_ready_delay }}"
+  register: postgres_ready
+  until: postgres_ready.rc == 0
+  when: not use_managed_db

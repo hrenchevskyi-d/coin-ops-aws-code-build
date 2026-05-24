@@ -1,0 +1,13 @@
+---
+k3s_prerequisite_packages:
+  - ca-certificates
+  - python3-kubernetes
+k3s_udp_ports:
+  - "8472"
+k3s_sysctl_settings:
+  net.bridge.bridge-nf-call-iptables: "1"
+  net.bridge.bridge-nf-call-ip6tables: "1"
+  net.ipv4.ip_forward: "1"
+k3s_kernel_modules:
+  - overlay
+  - br_netfilter

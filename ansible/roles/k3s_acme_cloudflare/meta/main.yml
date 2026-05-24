@@ -1,0 +1,7 @@
+---
+galaxy_info:
+  author: coin-ops
+  description: Configures Cloudflare-backed ACME issuance for k3s workloads.
+  license: MIT
+  min_ansible_version: "2.15"
+dependencies: []

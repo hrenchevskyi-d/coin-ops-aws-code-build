@@ -232,40 +232,17 @@
       }}
 
 - name: Install persistent multicloud static route script
-  copy:
+  template:
     dest: /usr/local/sbin/coinops-static-routes.sh
     mode: "0755"
-    content: |
-      #!/bin/bash
-      set -euo pipefail
-      GATEWAY_IP="{{ gateway_ip }}"
-      ROUTE_IFACE="$(ip route get "$GATEWAY_IP" | awk '/dev/ {for (i = 1; i <= NF; i++) if ($i == "dev") { print $(i+1); exit }}')"
-      if [[ -z "$ROUTE_IFACE" ]]; then
-        echo "Could not determine route interface for gateway $GATEWAY_IP" >&2
-        exit 1
-      fi
-      {% for cidr in tailscale_remote_route_cidrs %}
-      ip route replace {{ cidr }} via "$GATEWAY_IP" dev "$ROUTE_IFACE" onlink
-      {% endfor %}
+    src: coinops-static-routes.sh.j2
   when: common_manage_multicloud_routes
 
 - name: Install persistent multicloud static route unit
-  copy:
+  template:
     dest: /etc/systemd/system/coinops-static-routes.service
     mode: "0644"
-    content: |
-      [Unit]
-      Description=Coin-ops multicloud static routes
-      Wants=network-online.target
-      After=network-online.target
-
-      [Service]
-      Type=oneshot
-      ExecStart=/usr/local/sbin/coinops-static-routes.sh
-      RemainAfterExit=yes
-
-      [Install]
-      WantedBy=multi-user.target
+    src: coinops-static-routes.service.j2
   when: common_manage_multicloud_routes
 
 - name: Enable multicloud static route unit

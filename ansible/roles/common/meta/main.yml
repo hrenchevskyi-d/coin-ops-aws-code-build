@@ -1,0 +1,7 @@
+---
+galaxy_info:
+  author: coin-ops
+  description: Common host preparation and firewall baseline for Coin Ops nodes.
+  license: MIT
+  min_ansible_version: "2.15"
+dependencies: []

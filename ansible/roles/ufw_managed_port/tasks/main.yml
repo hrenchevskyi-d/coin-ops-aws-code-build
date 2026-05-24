@@ -1,0 +1,18 @@
+---
+- name: Allow managed UFW port
+  community.general.ufw:
+    rule: allow
+    port: "{{ ufw_managed_port | string }}"
+    proto: "{{ ufw_managed_port_proto }}"
+  when: ufw_managed_port_enabled | bool
+
+- name: Remove managed UFW port allowance when disabled
+  community.general.ufw:
+    rule: allow
+    port: "{{ ufw_managed_port | string }}"
+    proto: "{{ ufw_managed_port_proto }}"
+    delete: yes
+  failed_when: false
+  when:
+    - not (ufw_managed_port_enabled | bool)
+    - ufw_managed_port_delete_when_disabled | bool

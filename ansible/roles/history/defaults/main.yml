@@ -1,0 +1,20 @@
+---
+history_deploy_dir: /opt/cognitor/history
+history_compose_path: "{{ history_deploy_dir }}/compose.yaml"
+history_schema_dest_path: "{{ history_deploy_dir }}/schema.sql"
+history_runtime_dir: "{{ history_deploy_dir }}/runtime"
+history_runtime_schema_files:
+  - 01_schema.sql
+  - 02_wrappers.sql
+  - 03_notify.sql
+  - 04_advisory.sql
+  - 05_dlq.sql
+  - 06_cache_schema.sql
+  - 07_cache_wrappers.sql
+  - 08_cron.sql
+history_docker_compose_pull_retries: 3
+history_docker_compose_pull_delay: 15
+history_postgres_ready_retries: 12
+history_postgres_ready_delay: 5
+history_healthcheck_retries: 12
+history_healthcheck_delay: 5

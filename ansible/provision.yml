@@ -12,6 +12,8 @@
     - name: Resolve runtime configuration for provisioning validation
       include_role:
         name: runtime_config
+        public: true
+      tags: [runtime_config]
   tasks:
     - name: Validate configured runtime backend
       assert:
@@ -35,6 +37,11 @@
   serial: "{{ provisioning_host_batch_size | default(4) }}"
   strategy: free
   pre_tasks:
+    - name: Resolve runtime configuration for common setup
+      include_role:
+        name: runtime_config
+        public: true
+      tags: [runtime_config]
     - name: Wait for SSH to become stable after instance boot
       wait_for_connection:
         timeout: "{{ provisioning_wait_for_connection_timeout | default(600) }}"
@@ -67,6 +74,11 @@
   serial: "{{ provisioning_workload_batch_size | default(4) }}"
   strategy: free
   pre_tasks:
+    - name: Resolve runtime configuration for Docker setup
+      include_role:
+        name: runtime_config
+        public: true
+      tags: [runtime_config]
     - name: Reset SSH control connection before Docker setup
       meta: reset_connection
 
@@ -89,6 +101,8 @@
     - name: Resolve runtime configuration for gateway provisioning
       include_role:
         name: runtime_config
+        public: true
+      tags: [runtime_config, tailscale]
 
     - name: Validate Tailscale gateway inputs
       assert:
@@ -108,6 +122,12 @@
   become: yes
   gather_facts: no
   serial: "{{ provisioning_workload_batch_size | default(4) }}"
+  pre_tasks:
+    - name: Resolve runtime configuration for backend data directories
+      include_role:
+        name: runtime_config
+        public: true
+      tags: [runtime_config]
   tasks:
     - name: Create PostgreSQL data directory
       file:
@@ -130,6 +150,12 @@
   become: yes
   gather_facts: no
   serial: "{{ provisioning_workload_batch_size | default(4) }}"
+  pre_tasks:
+    - name: Resolve runtime configuration for backend proxy data directories
+      include_role:
+        name: runtime_config
+        public: true
+      tags: [runtime_config]
   tasks:
     - name: Create Redis data directory
       file:
@@ -144,6 +170,12 @@
   become: yes
   gather_facts: no
   serial: "{{ provisioning_workload_batch_size | default(4) }}"
+  pre_tasks:
+    - name: Resolve runtime configuration for UI provisioning
+      include_role:
+        name: runtime_config
+        public: true
+      tags: [runtime_config]
   tasks:
     - name: No host-level provisioning required for UI node
       debug:

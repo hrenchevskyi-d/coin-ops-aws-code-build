@@ -1,0 +1,10 @@
+---
+cert_manager_namespace: cert-manager
+cert_manager_cloudflare_secret_name: cloudflare-api-token-secret
+headlamp_cluster_issuer_name: letsencrypt-dns-cloudflare
+headlamp_acme_directory_url: >-
+  {{
+    'https://acme-staging-v02.api.letsencrypt.org/directory'
+    if certbot_staging else
+    'https://acme-v02.api.letsencrypt.org/directory'
+  }}

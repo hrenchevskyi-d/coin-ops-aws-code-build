@@ -1,0 +1,7 @@
+---
+- name: Start compose stack
+  command: >-
+    docker compose -f {{ compose_stack_compose_path }} up -d
+    {{ '--remove-orphans' if compose_stack_up_remove_orphans else '' }}
+  args:
+    chdir: "{{ compose_stack_project_dir }}"

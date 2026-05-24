@@ -1,0 +1,15 @@
+---
+backend_tls_dir: /etc/cognitor/internal-tls
+backend_tls_gateway_dir: /opt/cognitor/backend-gateway
+backend_tls_gateway_compose_path: "{{ backend_tls_gateway_dir }}/compose.yaml"
+backend_tls_gateway_nginx_config_path: "{{ backend_tls_gateway_dir }}/nginx.conf"
+backend_tls_openssl_config_path: "{{ backend_tls_dir }}/backend-openssl.cnf"
+backend_tls_ca_cert_path: "{{ backend_tls_dir }}/ca.crt"
+backend_tls_ca_key_path: "{{ backend_tls_dir }}/ca.key"
+backend_tls_backend_key_path: "{{ backend_tls_dir }}/backend.key"
+backend_tls_backend_csr_path: "{{ backend_tls_dir }}/backend.csr"
+backend_tls_backend_cert_path: "{{ backend_tls_dir }}/backend.crt"
+backend_tls_pull_retries: 3
+backend_tls_pull_delay: 15
+backend_tls_healthcheck_retries: 12
+backend_tls_healthcheck_delay: 5

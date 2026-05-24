@@ -2,11 +2,31 @@
     "deploy": {
         "app_domain": "coinops-d.pp.ua",
         "tls_mode": "certbot",
+        "tls": {
+            "mode": "certbot",
+            "certbot": {
+                "email_localpart": "admin",
+                "staging": true
+            }
+        },
         "certbot": {
             "email_localpart": "admin",
             "staging": true
         },
         "runtime_backend": "external",
+        "k3s": {
+            "channel": "stable",
+            "disable_components": [],
+            "flannel_backend": "vxlan"
+        },
+        "headlamp": {
+            "enabled": true,
+            "hostname": "headlamp.coinops-d.pp.ua",
+            "ingress": {
+                "enabled": true,
+                "class_name": "traefik"
+            }
+        },
         "ghcr_username": "hrenchevskyi-d",
         "internal_tls": {
             "enabled": true,

@@ -36,5 +36,8 @@ compose:
         ) | length > 0
       )
     ) else ((private_ipv4_addresses | default([])) | first)
+  ansible_user: "'coinops'"
   ansible_port: "53725"
+  ansible_ssh_private_key_file: "'/home/notebook/.ssh/ssh-key-coin-ops'"
+  ansible_ssh_common_args: "'-o ProxyJump=coinops-azure-jump-host' if (tags.role | default('')) != 'jump-host' else ''"
   cloud: "'azure'"

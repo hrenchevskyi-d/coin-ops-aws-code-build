@@ -1,0 +1,7 @@
+---
+galaxy_info:
+  author: coin-ops
+  description: Join additional k3s server nodes to the control plane.
+  license: MIT
+  min_ansible_version: "2.16"
+dependencies: []

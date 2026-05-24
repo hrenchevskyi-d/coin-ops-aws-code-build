@@ -1,0 +1,20 @@
+---
+- name: Validate proxy database secret availability
+  assert:
+    that:
+      - db_password | length > 0
+    fail_msg: "DB_PASSWORD must be present in the configured secret backend secret {{ db_secret_name }}."
+
+- name: Validate RabbitMQ secret availability
+  assert:
+    that:
+      - rabbitmq_password | length > 0
+    fail_msg: "RABBITMQ_PASSWORD must be present in the configured secret backend secret {{ db_secret_name }} when RUNTIME_BACKEND=external."
+  when: runtime_backend == 'external'
+
+- name: Manage Proxy UFW port
+  include_role:
+    name: ufw_managed_port
+  vars:
+    ufw_managed_port: "{{ proxy_port }}"
+    ufw_managed_port_enabled: "{{ not internal_tls_enabled }}"

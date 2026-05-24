@@ -1,0 +1,12 @@
+---
+ui_deploy_dir: /opt/cognitor/ui
+ui_compose_path: "{{ ui_deploy_dir }}/compose.yaml"
+ui_nginx_config_path: "{{ ui_deploy_dir }}/nginx.conf"
+ui_cloudflare_credentials_path: /etc/cognitor/cloudflare.ini
+ui_certbot_renewal_service_path: /etc/systemd/system/certbot-renewal.service
+ui_certbot_renewal_timer_path: /etc/systemd/system/certbot-renewal.timer
+ui_healthcheck_url: https://localhost/health
+ui_docker_compose_pull_retries: 3
+ui_docker_compose_pull_delay: 15
+ui_healthcheck_retries: 12
+ui_healthcheck_delay: 5

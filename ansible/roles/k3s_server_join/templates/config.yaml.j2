@@ -1,0 +1,15 @@
+server: "https://{{ hostvars[k3s_bootstrap_host].ansible_host }}:6443"
+token: "{{ hostvars[k3s_bootstrap_host].k3s_cluster_token }}"
+write-kubeconfig-mode: "{{ k3s_write_kubeconfig_mode }}"
+node-name: "{{ inventory_hostname }}"
+tls-san:
+{% for san in k3s_tls_sans %}
+  - "{{ san }}"
+{% endfor %}
+flannel-backend: "{{ k3s_flannel_backend }}"
+{% if k3s_server_disable_components | length > 0 %}
+disable:
+{% for component in k3s_server_disable_components %}
+  - {{ component }}
+{% endfor %}
+{% endif %}
