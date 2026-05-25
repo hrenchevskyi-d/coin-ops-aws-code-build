@@ -15,17 +15,17 @@ output "azure_instance_ips" {
 
 output "hosts_file" {
   description = "Path to the generated hosts.json artifact for operator/debugging use"
-  value       = local_file.hosts.filename
+  value       = module.local_operator_artifacts.hosts_filename
 }
 
 output "ssh_config_file" {
   description = "Path to generated SSH config with bastion and private hosts"
-  value       = local_file.ssh_config.filename
+  value       = module.local_operator_artifacts.ssh_config_filename
 }
 
 output "ansible_runtime_file" {
   description = "Path to the generated non-secret Terraform-to-Ansible runtime metadata"
-  value       = local_file.ansible_runtime.filename
+  value       = module.local_operator_artifacts.ansible_runtime_filename
 }
 
 output "database_endpoints" {
@@ -81,4 +81,14 @@ output "gcp_k3s_api_load_balancer_ip" {
 output "gcp_k3s_ingress_load_balancer_ip" {
   description = "Internal ingress endpoint for Traefik/Headlamp in GCP."
   value       = local.gcp_k3s_ingress_lb_enabled ? try(module.gcp_k3s_ingress_lb[0].ip_address, "") : ""
+}
+
+output "gcp_k3s_public_ingress_load_balancer_ip" {
+  description = "Public HTTPS endpoint for Homepage and future public apps in GCP."
+  value       = local.gcp_k3s_public_ingress_lb_enabled ? try(module.gcp_k3s_public_ingress_lb[0].ip_address, "") : ""
+}
+
+output "homepage_public_url" {
+  description = "Preferred public Homepage URL when the GCP public ingress load balancer is enabled."
+  value       = local.gcp_k3s_public_ingress_lb_enabled ? "https://${local.homepage_domain}" : ""
 }

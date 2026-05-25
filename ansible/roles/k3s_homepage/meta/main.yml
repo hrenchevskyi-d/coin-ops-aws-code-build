@@ -1,0 +1,7 @@
+---
+galaxy_info:
+  author: coin-ops
+  description: Orchestrates public Homepage exposure in the k3s platform.
+  license: MIT
+  min_ansible_version: "2.16"
+dependencies: []

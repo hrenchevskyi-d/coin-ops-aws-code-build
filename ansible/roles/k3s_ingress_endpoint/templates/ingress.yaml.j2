@@ -1,0 +1,30 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ ingress_endpoint_name }}
+  namespace: {{ ingress_endpoint_namespace }}
+{% if ingress_endpoint_annotations | length > 0 %}
+  annotations:
+{% for key, value in ingress_endpoint_annotations.items() %}
+    {{ key }}: {{ value | to_json }}
+{% endfor %}
+{% endif %}
+spec:
+  ingressClassName: {{ ingress_endpoint_class_name }}
+{% if ingress_endpoint_tls_enabled | bool %}
+  tls:
+    - hosts:
+        - {{ ingress_endpoint_host }}
+      secretName: {{ ingress_endpoint_tls_secret_name }}
+{% endif %}
+  rules:
+    - host: {{ ingress_endpoint_host }}
+      http:
+        paths:
+          - path: {{ ingress_endpoint_path }}
+            pathType: {{ ingress_endpoint_path_type }}
+            backend:
+              service:
+                name: {{ ingress_endpoint_service_name }}
+                port:
+                  number: {{ ingress_endpoint_service_port }}

@@ -23,7 +23,7 @@ ANSIBLE_CMD = $(ENV_PREFIX) ANSIBLE_CONFIG="$(REPO_ROOT)/ansible.cfg"
 	local-up local-down local-logs local-ps local-restart local-config \
 	tf-check-backend tf-plan tf-apply tf-destroy-compute tf-full-destroy \
 	inventory-graph inventory-host ssh-host \
-	runtime-config provision deploy k3s-cluster k3s-platform headlamp-start headlamp-token
+	runtime-config provision deploy k3s-cluster k3s-homepage k3s-platform headlamp-start headlamp-token
 
 help:
 	@echo "Local development:"
@@ -53,6 +53,7 @@ help:
 	@echo "  make provision               - Run ansible/provision.yml"
 	@echo "  make deploy                  - Run ansible/deploy.yml"
 	@echo "  make k3s-cluster             - Run ansible/k3s-cluster.yml against GCP dynamic inventory"
+	@echo "  make k3s-homepage            - Run ansible/k3s-homepage.yml against GCP dynamic inventory"
 	@echo "  make k3s-platform            - Run ansible/k3s-platform.yml against GCP dynamic inventory"
 	@echo "  make headlamp-start          - Run generated Headlamp access helper"
 	@echo "  make headlamp-token          - Print a Headlamp login token"
@@ -98,10 +99,7 @@ tf-destroy-compute:
 		-target=module.aws_nat_route \
 		-target=module.azure_instances \
 		-target=module.azure_nat_route \
-		-target=local_file.hosts \
-		-target=local_file.ssh_config \
-		-target=local_file.ansible_runtime \
-		-target=null_resource.sync_ssh_config \
+		-target=module.local_operator_artifacts \
 		$(TF_DESTROY_ARGS)
 
 tf-full-destroy:
@@ -129,6 +127,9 @@ deploy:
 
 k3s-cluster:
 	$(ANSIBLE_CMD) ansible-playbook -i "$(GCP_INVENTORY)" "$(ANSIBLE_DIR)/k3s-cluster.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
+
+k3s-homepage:
+	$(ANSIBLE_CMD) ansible-playbook -i "$(GCP_INVENTORY)" "$(ANSIBLE_DIR)/k3s-homepage.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
 
 k3s-platform:
 	$(ANSIBLE_CMD) ansible-playbook -i "$(GCP_INVENTORY)" "$(ANSIBLE_DIR)/k3s-platform.yml" $(if $(LIMIT),--limit "$(LIMIT)",)

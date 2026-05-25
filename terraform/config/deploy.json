@@ -19,9 +19,23 @@
             "disable_components": [],
             "flannel_backend": "vxlan"
         },
+        "public_ingress": {
+            "enabled": true,
+            "class_name": "traefik",
+            "http_nodeport": 32080,
+            "https_nodeport": 32443
+        },
         "headlamp": {
             "enabled": true,
             "hostname": "headlamp.coinops-d.pp.ua",
+            "ingress": {
+                "enabled": true,
+                "class_name": "traefik"
+            }
+        },
+        "homepage": {
+            "enabled": true,
+            "hostname": "home.coinops-d.pp.ua",
             "ingress": {
                 "enabled": true,
                 "class_name": "traefik"

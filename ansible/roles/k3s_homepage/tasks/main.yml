@@ -1,0 +1,38 @@
+---
+- name: Install Helm client
+  include_role:
+    name: k3s_helm_client
+  tags: [homepage, k3s, helm]
+
+- name: Install cert-manager
+  include_role:
+    name: k3s_cert_manager
+  when: homepage_tls_enabled | bool
+  tags: [homepage, k3s, cert_manager, tls]
+
+- name: Configure ACME DNS-01 issuer
+  include_role:
+    name: k3s_acme_cloudflare
+  when: homepage_tls_enabled | bool
+  tags: [homepage, k3s, cert_manager, tls]
+
+- name: Deploy Homepage workload
+  include_role:
+    name: k3s_homepage_app
+  tags: [homepage, k3s]
+
+- name: Configure Homepage ingress endpoint
+  include_role:
+    name: k3s_ingress_endpoint
+  vars:
+    ingress_endpoint_name: "{{ homepage_app_name }}"
+    ingress_endpoint_namespace: "{{ homepage_namespace }}"
+    ingress_endpoint_class_name: "{{ homepage_ingress_class_name }}"
+    ingress_endpoint_host: "{{ homepage_hostname }}"
+    ingress_endpoint_service_name: "{{ homepage_app_name }}"
+    ingress_endpoint_service_port: "{{ homepage_service_port }}"
+    ingress_endpoint_tls_enabled: "{{ homepage_tls_enabled | bool }}"
+    ingress_endpoint_tls_secret_name: homepage-tls
+    ingress_endpoint_certificate_name: homepage-tls
+    ingress_endpoint_cluster_issuer_name: "{{ acme_cluster_issuer_name | default('letsencrypt-dns-cloudflare') }}"
+  tags: [homepage, k3s]

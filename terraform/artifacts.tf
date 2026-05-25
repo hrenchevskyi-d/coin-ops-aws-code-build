@@ -1,6 +1,8 @@
-resource "local_file" "hosts" {
-  filename = "${path.module}/config/hosts.json"
-  content = jsonencode(merge(
+module "local_operator_artifacts" {
+  source = "./modules/support/local_operator_artifacts"
+
+  hosts_filename = "${path.module}/config/hosts.json"
+  hosts_content = jsonencode(merge(
     local.gcp_enabled ? {
       gcp = {
         ssh_user    = local.username
@@ -47,11 +49,9 @@ resource "local_file" "hosts" {
       }
     } : {}
   ))
-}
 
-resource "local_file" "ssh_config" {
-  filename = "${path.module}/config/ssh_config"
-  content = trimspace(join("\n\n", concat(
+  ssh_config_filename = "${path.module}/config/ssh_config"
+  ssh_config_content = trimspace(join("\n\n", concat(
     local.gcp_compute_enabled ? [
       for name, inst in local.gcp_hosts : trimspace(<<-EOT
         Host coinops-gcp-${name}
@@ -110,17 +110,17 @@ resource "local_file" "ssh_config" {
       )
     ] : []
   )))
-}
 
-resource "local_file" "ansible_runtime" {
-  filename = "${path.module}/config/ansible-runtime.json"
-  content = jsonencode(merge(
+  ansible_runtime_filename = "${path.module}/config/ansible-runtime.json"
+  ansible_runtime_content = jsonencode(merge(
     local.gcp_enabled ? {
       gcp = {
-        k3s_api_endpoint    = local.gcp_k3s_api_lb_enabled ? try(module.gcp_k3s_api_lb[0].ip_address, "") : ""
-        headlamp_ingress_ip = local.gcp_k3s_ingress_lb_enabled ? try(module.gcp_k3s_ingress_lb[0].ip_address, "") : ""
-        database_ip         = try(module.gcp_database[0].private_ip, "")
-        use_managed_db      = try(module.gcp_database[0].private_ip, "") != ""
+        k3s_api_endpoint     = local.gcp_k3s_api_lb_enabled ? try(module.gcp_k3s_api_lb[0].ip_address, "") : ""
+        headlamp_ingress_ip  = local.gcp_k3s_ingress_lb_enabled ? try(module.gcp_k3s_ingress_lb[0].ip_address, "") : ""
+        homepage_public_ip   = local.gcp_k3s_public_ingress_lb_enabled ? try(module.gcp_k3s_public_ingress_lb[0].ip_address, "") : ""
+        homepage_public_host = local.homepage_domain
+        database_ip          = try(module.gcp_database[0].private_ip, "")
+        use_managed_db       = try(module.gcp_database[0].private_ip, "") != ""
         database = {
           host    = try(module.gcp_database[0].private_ip, "")
           port    = local.db_port
@@ -157,18 +157,6 @@ resource "local_file" "ansible_runtime" {
       }
     } : {}
   ))
-}
 
-resource "null_resource" "sync_ssh_config" {
-  triggers = {
-    config_content = local_file.ssh_config.content
-  }
-
-  provisioner "local-exec" {
-    command = <<EOT
-      mkdir -p ~/.ssh/extra_configs
-      cp ${local_file.ssh_config.filename} ~/.ssh/extra_configs/coin-ops-ssh-config
-      chmod 600 ~/.ssh/extra_configs/coin-ops-ssh-config
-    EOT
-  }
+  ssh_sync_target_path = pathexpand("~/.ssh/extra_configs/coin-ops-ssh-config")
 }

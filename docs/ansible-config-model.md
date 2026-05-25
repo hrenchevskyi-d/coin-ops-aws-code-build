@@ -55,6 +55,7 @@ Typical values coming from generated metadata:
 - private IPs
 - HA API endpoint
 - Headlamp ingress IP
+- Homepage public IP / hostname
 - managed database connection metadata
 - secret backend selection overrides
 
@@ -122,6 +123,8 @@ This role exports values such as:
 - `tailscale_auth_key`
 - `k3s_api_endpoint`
 - `headlamp_ingress_ip`
+- `homepage_public_ip`
+- `homepage_public_host`
 
 ## Playbook Pattern
 
@@ -191,8 +194,14 @@ is now an orchestration role. It delegates work to narrow roles:
 - `/home/notebook/projects/coin-ops/ansible/roles/k3s_cert_manager`
 - `/home/notebook/projects/coin-ops/ansible/roles/k3s_acme_cloudflare`
 - `/home/notebook/projects/coin-ops/ansible/roles/k3s_headlamp_app`
-- `/home/notebook/projects/coin-ops/ansible/roles/k3s_headlamp_ingress`
+- `/home/notebook/projects/coin-ops/ansible/roles/k3s_ingress_endpoint`
 - `/home/notebook/projects/coin-ops/ansible/roles/k3s_operator_artifacts`
+
+The same pattern is now reused for public app exposure:
+
+- `/home/notebook/projects/coin-ops/ansible/roles/k3s_public_ingress_controller`
+- `/home/notebook/projects/coin-ops/ansible/roles/k3s_homepage_app`
+- `/home/notebook/projects/coin-ops/ansible/roles/k3s_homepage`
 
 This is the preferred direction for new work: one role should own one coherent
 responsibility whenever that remains practical.
@@ -310,6 +319,7 @@ KUBECONFIG=/home/notebook/projects/coin-ops/ansible/artifacts/kubeconfig-gcp-k3s
 KUBECONFIG=/home/notebook/projects/coin-ops/ansible/artifacts/kubeconfig-gcp-k3s-tunneled.yaml kubectl get pods -A
 KUBECONFIG=/home/notebook/projects/coin-ops/ansible/artifacts/kubeconfig-gcp-k3s-tunneled.yaml kubectl get clusterissuer,certificate -A
 curl -vk https://headlamp.coinops-d.pp.ua/
+curl -vk https://home.coinops-d.pp.ua/
 ```
 
 For static checks:
@@ -319,6 +329,7 @@ ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote an
 ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ansible-playbook --syntax-check -i localhost, -c local ansible/provision.yml
 ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ansible-playbook --syntax-check -i localhost, -c local ansible/k3s-cluster.yml
 ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ansible-playbook --syntax-check -i localhost, -c local ansible/k3s-headlamp.yml
+ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ansible-playbook --syntax-check -i localhost, -c local ansible/k3s-homepage.yml
 ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ansible-playbook --syntax-check -i localhost, -c local ansible/k3s-platform.yml
 ```
 

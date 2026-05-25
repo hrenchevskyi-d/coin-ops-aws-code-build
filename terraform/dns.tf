@@ -3,10 +3,13 @@
 # Non-primary cloud deployments are intentionally tested by direct public IP.
 
 locals {
-  dns_primary_cloud = try(local.dns.primary_cloud, local.control_plane_cloud)
-  dns_ttl           = try(local.cloudflare_config.ttl, 60)
-  dns_proxied       = try(local.cloudflare_config.proxied, false)
-  headlamp_dns_name = "headlamp"
+  dns_primary_cloud       = try(local.dns.primary_cloud, local.control_plane_cloud)
+  dns_ttl                 = try(local.cloudflare_config.ttl, 60)
+  dns_proxied             = try(local.cloudflare_config.proxied, false)
+  headlamp_domain         = try(local.deploy.headlamp.hostname, "headlamp.${local.app_domain}")
+  homepage_domain_for_dns = try(local.deploy.homepage.hostname, "home.${local.app_domain}")
+  headlamp_dns_name       = local.headlamp_domain == local.app_domain ? "@" : trimsuffix(local.headlamp_domain, ".${local.app_domain}")
+  homepage_dns_name       = local.homepage_domain_for_dns == local.app_domain ? "@" : trimsuffix(local.homepage_domain_for_dns, ".${local.app_domain}")
 
   gcp_has_ui   = local.gcp_compute_enabled && contains(keys(local.gcp_instances_base), "app-1")
   aws_has_ui   = local.aws_compute_enabled && contains(keys(local.aws_instances_base), "app-1")
@@ -28,43 +31,50 @@ locals {
   dns_enabled         = (local.gcp_enabled || local.aws_enabled || local.azure_enabled) && local.dns_has_api_token && local.cloudflare_zone_id != ""
   dns_primary_has_ui  = lookup(local.cloud_has_ui, local.dns_primary_cloud, false)
   headlamp_private_ip = local.gcp_k3s_ingress_lb_enabled ? try(module.gcp_k3s_ingress_lb[0].ip_address, "") : ""
+  homepage_public_ip  = local.gcp_k3s_public_ingress_lb_enabled ? try(module.gcp_k3s_public_ingress_lb[0].ip_address, "") : ""
+  cloudflare_dns_records = {
+    root_a = {
+      enabled         = local.dns_enabled && local.dns_primary_has_ui
+      name            = "@"
+      content         = local.ui_public_ips[local.dns_primary_cloud]
+      type            = "A"
+      proxied         = local.dns_proxied
+      ttl             = local.dns_ttl
+      allow_overwrite = true
+    }
+    www_cname = {
+      enabled         = local.dns_enabled && local.dns_primary_has_ui
+      name            = "www"
+      content         = local.app_domain
+      type            = "CNAME"
+      proxied         = local.dns_proxied
+      ttl             = local.dns_ttl
+      allow_overwrite = true
+    }
+    headlamp_private_a = {
+      enabled         = local.dns_enabled && local.gcp_k3s_ingress_lb_enabled
+      name            = local.headlamp_dns_name
+      content         = local.headlamp_private_ip
+      type            = "A"
+      proxied         = false
+      ttl             = local.dns_ttl
+      allow_overwrite = true
+    }
+    homepage_public_a = {
+      enabled         = local.dns_enabled && local.gcp_k3s_public_ingress_lb_enabled
+      name            = local.homepage_dns_name
+      content         = local.homepage_public_ip
+      type            = "A"
+      proxied         = false
+      ttl             = local.dns_ttl
+      allow_overwrite = true
+    }
+  }
 }
 
-# Root A record (e.g., coinops-d.pp.ua)
-resource "cloudflare_record" "root_a" {
-  count           = local.dns_enabled && local.dns_primary_has_ui ? 1 : 0
-  zone_id         = local.cloudflare_zone_id
-  name            = "@"
-  content         = local.ui_public_ips[local.dns_primary_cloud]
-  type            = "A"
-  proxied         = local.dns_proxied
-  ttl             = local.dns_ttl
-  allow_overwrite = true
-}
-
-# WWW CNAME record (e.g., www.coinops-d.pp.ua)
-resource "cloudflare_record" "www_cname" {
-  count           = local.dns_enabled && local.dns_primary_has_ui ? 1 : 0
-  zone_id         = local.cloudflare_zone_id
-  name            = "www"
-  content         = local.app_domain
-  type            = "CNAME"
-  proxied         = local.dns_proxied
-  ttl             = local.dns_ttl
-  allow_overwrite = true
-}
-
-# Private operator DNS record for Headlamp ingress.
-# This intentionally resolves to an internal GCP load balancer address and is
-# therefore useful only to clients that can already reach the private subnet
-# (for example via Tailscale subnet routing).
-resource "cloudflare_record" "headlamp_private_a" {
-  count           = local.dns_enabled && local.headlamp_private_ip != "" ? 1 : 0
-  zone_id         = local.cloudflare_zone_id
-  name            = local.headlamp_dns_name
-  content         = local.headlamp_private_ip
-  type            = "A"
-  proxied         = false
-  ttl             = local.dns_ttl
-  allow_overwrite = true
+module "cloudflare_dns_records" {
+  count   = local.dns_enabled ? 1 : 0
+  source  = "./modules/cloudflare/records"
+  zone_id = local.cloudflare_zone_id
+  records = local.cloudflare_dns_records
 }

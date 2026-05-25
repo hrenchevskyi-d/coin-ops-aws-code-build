@@ -1,0 +1,31 @@
+---
+- name: Apply Homepage namespace and workload resources
+  kubernetes.core.k8s:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    state: present
+    definition: "{{ lookup('template', 'homepage-resources.yaml.j2') | from_yaml_all | list }}"
+  when: homepage_enabled | bool
+
+- name: Read Homepage deployment status
+  kubernetes.core.k8s_info:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    api_version: apps/v1
+    kind: Deployment
+    namespace: "{{ homepage_namespace }}"
+    name: "{{ homepage_app_name }}"
+  register: homepage_deployment_info
+  retries: 30
+  delay: 10
+  until: >-
+    (
+      homepage_deployment_info.resources | default([]) | length
+    ) > 0 and
+    (
+      homepage_deployment_info.resources[0].status.availableReplicas | default(0) | int
+    ) >= 1
+  when: homepage_enabled | bool
+
+- name: Set Homepage access facts
+  set_fact:
+    homepage_access_scheme: https
+  when: homepage_enabled | bool

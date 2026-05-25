@@ -1,0 +1,39 @@
+---
+- name: Add public Traefik Helm repository
+  kubernetes.core.helm_repository:
+    name: "{{ public_ingress_chart_repo_name }}"
+    repo_url: "{{ public_ingress_chart_repo_url }}"
+  when: public_ingress_enabled | bool
+
+- name: Build public Traefik Helm values
+  set_fact:
+    public_ingress_helm_values: >-
+      {{ lookup('template', 'traefik-values.yaml.j2') | from_yaml }}
+  when: public_ingress_enabled | bool
+
+- name: Install or upgrade public Traefik ingress controller
+  kubernetes.core.helm:
+    name: "{{ public_ingress_release_name }}"
+    chart_ref: "{{ public_ingress_chart_ref }}"
+    release_namespace: "{{ public_ingress_namespace }}"
+    create_namespace: true
+    chart_version: "{{ public_ingress_chart_version if (public_ingress_chart_version | length > 0) else omit }}"
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    wait: true
+    values: "{{ public_ingress_helm_values }}"
+  when: public_ingress_enabled | bool
+
+- name: Read public Traefik service definition
+  kubernetes.core.k8s_info:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    api_version: v1
+    kind: Service
+    namespace: "{{ public_ingress_namespace }}"
+    name: "{{ public_ingress_release_name }}"
+  register: public_ingress_service_info
+  when: public_ingress_enabled | bool
+
+- name: Parse public Traefik service definition
+  set_fact:
+    public_ingress_service: "{{ public_ingress_service_info.resources[0] }}"
+  when: public_ingress_enabled | bool

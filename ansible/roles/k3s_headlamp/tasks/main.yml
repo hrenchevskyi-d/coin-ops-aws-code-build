@@ -23,7 +23,18 @@
 
 - name: Configure Headlamp ingress and certificate
   include_role:
-    name: k3s_headlamp_ingress
+    name: k3s_ingress_endpoint
+  vars:
+    ingress_endpoint_name: "{{ headlamp_release_name }}"
+    ingress_endpoint_namespace: "{{ headlamp_namespace }}"
+    ingress_endpoint_class_name: "{{ headlamp_ingress_class_name }}"
+    ingress_endpoint_host: "{{ headlamp_ingress_host }}"
+    ingress_endpoint_service_name: "{{ headlamp_release_name }}"
+    ingress_endpoint_service_port: "{{ headlamp_service_port }}"
+    ingress_endpoint_tls_enabled: "{{ headlamp_tls_enabled | bool }}"
+    ingress_endpoint_tls_secret_name: "{{ headlamp_tls_secret_name }}"
+    ingress_endpoint_certificate_name: "{{ headlamp_certificate_name }}"
+    ingress_endpoint_cluster_issuer_name: "{{ acme_cluster_issuer_name }}"
   tags: [headlamp, k3s]
 
 - name: Render local operator artifacts

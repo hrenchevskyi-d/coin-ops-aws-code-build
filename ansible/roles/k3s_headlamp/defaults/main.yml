@@ -5,12 +5,12 @@ cert_manager_namespace: cert-manager
 cert_manager_chart_ref: oci://quay.io/jetstack/charts/cert-manager
 cert_manager_chart_version: v1.20.2
 cert_manager_values_file: /tmp/cert-manager-values.yaml
-cert_manager_cloudflare_secret_name: cloudflare-api-token-secret
+acme_cloudflare_secret_name: cloudflare-api-token-secret
 headlamp_tls_enabled: "{{ tls_mode == 'certbot' }}"
 headlamp_tls_secret_name: headlamp-tls
 headlamp_certificate_name: headlamp-tls
-headlamp_cluster_issuer_name: letsencrypt-dns-cloudflare
-headlamp_acme_directory_url: >-
+acme_cluster_issuer_name: letsencrypt-dns-cloudflare
+acme_directory_url: >-
   {{
     'https://acme-staging-v02.api.letsencrypt.org/directory'
     if certbot_staging else

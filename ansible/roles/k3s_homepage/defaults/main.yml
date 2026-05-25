@@ -1,0 +1,19 @@
+---
+homepage_enabled: "{{ deploy_config.homepage_enabled | default(true) | bool }}"
+homepage_namespace: homepage
+homepage_app_name: homepage
+homepage_image: ghcr.io/gethomepage/homepage:latest
+homepage_service_port: 3000
+homepage_hostname: "{{ deploy_config.homepage_hostname | default('home.' ~ app_domain) }}"
+homepage_ingress_class_name: "{{ deploy_config.homepage_ingress_class_name | default('traefik') }}"
+homepage_tls_enabled: "{{ tls_mode == 'certbot' }}"
+homepage_bookmarks:
+  - Quick Links:
+      - Google:
+          - abbr: G
+            href: https://www.google.com/
+      - YouTube:
+          - abbr: YT
+            href: https://www.youtube.com/
+homepage_services: []
+homepage_widgets: []

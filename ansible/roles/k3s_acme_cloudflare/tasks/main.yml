@@ -14,27 +14,27 @@
     definition: "{{ lookup('template', 'cert-manager-cloudflare-secret.yaml.j2') | from_yaml }}"
   no_log: true
 
-- name: Apply Headlamp ACME ClusterIssuer
+- name: Apply ACME ClusterIssuer
   kubernetes.core.k8s:
     kubeconfig: /etc/rancher/k3s/k3s.yaml
     state: present
-    definition: "{{ lookup('template', 'headlamp-clusterissuer.yaml.j2') | from_yaml }}"
+    definition: "{{ lookup('template', 'clusterissuer.yaml.j2') | from_yaml }}"
 
-- name: Read Headlamp ACME ClusterIssuer status
+- name: Read ACME ClusterIssuer status
   kubernetes.core.k8s_info:
     kubeconfig: /etc/rancher/k3s/k3s.yaml
     api_version: cert-manager.io/v1
     kind: ClusterIssuer
-    name: "{{ headlamp_cluster_issuer_name }}"
-  register: headlamp_clusterissuer_info
+    name: "{{ acme_cluster_issuer_name }}"
+  register: acme_clusterissuer_info
   retries: 30
   delay: 10
   until: >-
     (
-      headlamp_clusterissuer_info.resources | default([]) | length
+      acme_clusterissuer_info.resources | default([]) | length
     ) > 0 and
     (
-      headlamp_clusterissuer_info.resources[0].status.conditions
+      acme_clusterissuer_info.resources[0].status.conditions
       | default([])
       | selectattr('type', 'equalto', 'Ready')
       | map(attribute='status')

@@ -1,0 +1,32 @@
+---
+- name: Validate Homepage deployment contract
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  pre_tasks:
+    - name: Resolve runtime configuration for Homepage validation
+      include_role:
+        name: runtime_config
+        public: true
+      tags: [runtime_config, homepage]
+  tasks:
+    - name: Assert that a k3s control plane group exists
+      assert:
+        that:
+          - "'role_k3s_server' in groups"
+          - (groups['role_k3s_server'] | length) > 0
+        fail_msg: >-
+          Homepage deployment requires at least one host in role_k3s_server.
+
+- name: Install Homepage and public ingress routing
+  hosts: "{{ groups.get('role_k3s_server', ['localhost']) | sort | first }}"
+  become: true
+  gather_facts: false
+  pre_tasks:
+    - name: Resolve runtime configuration for Homepage deployment
+      include_role:
+        name: runtime_config
+        public: true
+      tags: [runtime_config, homepage]
+  roles:
+    - k3s_homepage

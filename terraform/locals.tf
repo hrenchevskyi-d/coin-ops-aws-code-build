@@ -204,6 +204,20 @@ locals {
   gcp_k3s_ingress_lb_backends = local.gcp_k3s_ingress_lb_enabled ? {
     for name in local.gcp_k3s_server_names : name => local.gcp_host_details[name]
   } : {}
+  gcp_k3s_public_ingress_lb_cfg = merge(
+    {
+      enabled           = false
+      name              = "${local.project_name}-k3s-public-ingress"
+      health_check_port = 443
+      frontend_ports    = [443]
+    },
+    try(local.gcp_network_cfg.k3s_public_ingress_load_balancer, {})
+  )
+  gcp_k3s_public_ingress_lb_enabled = (
+    local.gcp_compute_enabled
+    && try(local.gcp_k3s_public_ingress_lb_cfg.enabled, false)
+    && length(local.gcp_k3s_server_names) > 0
+  )
 
   gcp_jump_host_name = local.gcp_compute_enabled ? try([
     for name, cfg in local.gcp_instances_base : name
@@ -373,6 +387,7 @@ locals {
   azure_key_vault_name      = try(local.azure_account.key_vault_name, "${replace(local.project_name, "-", "")}kv")
 
   app_domain         = try(local.deploy.app_domain, var.app_domain)
+  homepage_domain    = try(local.deploy.homepage.hostname, "home.${local.app_domain}")
   cloudflare_config  = lookup(local.dns, "cloudflare", {})
   cloudflare_zone_id = try(local.cloudflare_config.zone_id, var.cloudflare_zone_id)
 

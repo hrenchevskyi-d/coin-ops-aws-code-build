@@ -19,6 +19,8 @@ For the broader Ansible configuration model used by these playbooks, see:
   artifact generation.
 - `ansible/k3s-headlamp.yml`
   Installs or updates Headlamp in the cluster.
+- `ansible/k3s-homepage.yml`
+  Installs or updates Homepage and the public ingress controller path.
 - `ansible/k3s-platform.yml`
   Convenience entrypoint that runs `k3s-cluster.yml` and then
   `k3s-headlamp.yml`.
@@ -60,6 +62,12 @@ Use this when the VMs are new or were just recreated by Terraform.
    ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-platform.yml
    ```
 
+6. Optionally install Homepage and the public ingress path:
+
+   ```bash
+   ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-homepage.yml
+   ```
+
 ## Existing Cluster Reconcile Flow
 
 Use this when the VMs already exist and you only changed cluster-level
@@ -84,6 +92,13 @@ ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-head
 ```bash
 cd /home/notebook/projects/coin-ops
 ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-platform.yml
+```
+
+### Reconcile Homepage and the public ingress path
+
+```bash
+cd /home/notebook/projects/coin-ops
+ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-homepage.yml
 ```
 
 ## When `provision.yml` Is Required Again

@@ -1,0 +1,2 @@
+---
+homepage_enabled: "{{ deploy_config.homepage_enabled | default(true) | bool }}"

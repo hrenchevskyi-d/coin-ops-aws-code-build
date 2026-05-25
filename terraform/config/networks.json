@@ -27,6 +27,12 @@
                 "internal_subnet": "internal",
                 "allow_global_access": false
             },
+            "k3s_public_ingress_load_balancer": {
+                "enabled": true,
+                "name": "coin-ops-k3s-public-ingress",
+                "health_check_port": 443,
+                "frontend_ports": [443]
+            },
             "subnets": {
                 "internal": {
                     "cidr": "10.20.1.0/24",
@@ -142,6 +148,11 @@
             "source_cidrs": ["100.64.0.0/10"],
             "target_role": "k3s-server"
         },
+        "allow-k3s-public-ingress-https": {
+            "protocols": [{ "protocol": "tcp", "ports": ["443"] }],
+            "source_cidrs": ["0.0.0.0/0"],
+            "target_role": "k3s-server"
+        },
         "allow-k3s-api-lb-health-checks": {
             "protocols": [{ "protocol": "tcp", "ports": ["6443"] }],
             "source_cidrs": ["35.191.0.0/16", "130.211.0.0/22"],
@@ -149,6 +160,11 @@
         },
         "allow-k3s-ingress-lb-health-checks": {
             "protocols": [{ "protocol": "tcp", "ports": ["80"] }],
+            "source_cidrs": ["35.191.0.0/16", "130.211.0.0/22"],
+            "target_role": "k3s-server"
+        },
+        "allow-k3s-public-ingress-lb-health-checks": {
+            "protocols": [{ "protocol": "tcp", "ports": ["443"] }],
             "source_cidrs": ["35.191.0.0/16", "130.211.0.0/22"],
             "target_role": "k3s-server"
         }

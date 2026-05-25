@@ -1,0 +1,51 @@
+---
+- name: Check for node-local k3s kubeconfig
+  stat:
+    path: "{{ k3s_remote_kubeconfig_path }}"
+  register: k3s_remote_kubeconfig_stat
+
+- name: Check for operator kubeconfig artifact on controller
+  delegate_to: localhost
+  become: false
+  stat:
+    path: "{{ k3s_local_cluster_kubeconfig_path }}"
+  register: k3s_local_cluster_kubeconfig_stat
+  when: not k3s_remote_kubeconfig_stat.stat.exists
+
+- name: Read operator kubeconfig artifact from controller
+  delegate_to: localhost
+  become: false
+  slurp:
+    src: "{{ k3s_local_cluster_kubeconfig_path }}"
+  register: k3s_local_cluster_kubeconfig_raw
+  when:
+    - not k3s_remote_kubeconfig_stat.stat.exists
+    - k3s_local_cluster_kubeconfig_stat.stat.exists | default(false)
+
+- name: Render remote fallback kubeconfig
+  template:
+    src: remote-fallback-kubeconfig.yaml.j2
+    dest: "{{ k3s_remote_fallback_kubeconfig_path }}"
+    mode: "0600"
+  when:
+    - not k3s_remote_kubeconfig_stat.stat.exists
+    - k3s_local_cluster_kubeconfig_stat.stat.exists | default(false)
+
+- name: Fail when no usable kubeconfig is available
+  fail:
+    msg: >-
+      No kubeconfig is available for k3s automation. Expected either
+      {{ k3s_remote_kubeconfig_path }} on the target host or
+      {{ k3s_local_cluster_kubeconfig_path }} on the controller.
+  when:
+    - not k3s_remote_kubeconfig_stat.stat.exists
+    - not (k3s_local_cluster_kubeconfig_stat.stat.exists | default(false))
+
+- name: Set effective k3s kubeconfig path
+  set_fact:
+    k3s_effective_kubeconfig_path: >-
+      {{
+        k3s_remote_kubeconfig_path
+        if k3s_remote_kubeconfig_stat.stat.exists
+        else k3s_remote_fallback_kubeconfig_path
+      }}
