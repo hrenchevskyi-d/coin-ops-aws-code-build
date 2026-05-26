@@ -1,0 +1,27 @@
+# Headlamp Access Summary
+
+Preferred ingress URL: `{{ headlamp_access_scheme }}://{{ k3s_headlamp_ingress_host }}/`
+
+Port-forward URL: `http://127.0.0.1:{{ k3s_headlamp_local_port }}/`
+
+Ingress load balancer IP: `{{ headlamp_access_ip }}`
+
+Kubeconfig for tunneled CLI access:
+
+`{{ k3s_headlamp_local_artifact_dir }}/kubeconfig-gcp-k3s-tunneled.yaml`
+
+Port-forward helper:
+
+`{{ k3s_headlamp_local_artifact_dir }}/headlamp-port-forward.sh`
+
+Full access helper:
+
+`{{ k3s_headlamp_local_artifact_dir }}/headlamp-start.sh`
+
+Manual fallback host mapping:
+
+`{{ headlamp_access_ip }} {{ k3s_headlamp_ingress_host }}`
+
+TLS enabled: `{{ k3s_headlamp_tls_enabled | bool }}`
+
+Terraform can manage `{{ k3s_headlamp_ingress_host }}` in Cloudflare and point it at the private ingress load balancer IP.

@@ -6,15 +6,14 @@ platform.
 ## Architecture
 
 - Homepage runs as a normal Kubernetes workload in its own namespace.
-- A dedicated public Traefik ingress controller serves only public apps.
-- Public HTTPS is terminated by a dedicated GCP public load balancer.
-- Headlamp remains on the private ingress path and is not part of this public
-  exposure model.
+- Existing `k3s` Traefik serves Homepage using a dedicated host rule.
+- Public HTTPS is exposed through a dedicated GCP public load balancer that
+  targets the existing ingress path.
+- Headlamp remains on its own host rule and DNS path.
 
 ## Main Components
 
-- `/home/notebook/projects/coin-ops/ansible/roles/k3s_public_ingress_controller`
-- `/home/notebook/projects/coin-ops/ansible/roles/k3s_homepage_app`
+- `/home/notebook/projects/coin-ops/ansible/roles/k3s_homepage`
 - `/home/notebook/projects/coin-ops/ansible/roles/k3s_ingress_endpoint`
 - `/home/notebook/projects/coin-ops/ansible/k3s-homepage.yml`
 
@@ -36,7 +35,7 @@ platform.
    terraform apply
    ```
 
-3. Deploy Homepage and the public ingress controller:
+3. Deploy Homepage:
 
    ```bash
    cd /home/notebook/projects/coin-ops

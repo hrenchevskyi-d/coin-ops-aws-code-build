@@ -1,8 +1,0 @@
----
-headlamp_release_name: headlamp
-headlamp_namespace: kube-system
-headlamp_chart_repo_name: headlamp
-headlamp_chart_repo_url: https://kubernetes-sigs.github.io/headlamp/
-headlamp_chart_ref: headlamp/headlamp
-headlamp_admin_service_account: headlamp-admin
-headlamp_admin_cluster_role: cluster-admin

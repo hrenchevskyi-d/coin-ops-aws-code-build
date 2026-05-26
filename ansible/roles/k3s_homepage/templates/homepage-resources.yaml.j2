@@ -1,49 +1,49 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: {{ homepage_namespace }}
+  name: {{ k3s_homepage_namespace }}
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ homepage_app_name }}-config
-  namespace: {{ homepage_namespace }}
+  name: {{ k3s_homepage_app_name }}-config
+  namespace: {{ k3s_homepage_namespace }}
 data:
   settings.yaml: |
     title: Homepage
   bookmarks.yaml: |
-{{ homepage_bookmarks | to_nice_yaml(indent=2) | indent(4, true) }}
+{{ k3s_homepage_bookmarks | to_nice_yaml(indent=2) | indent(4, true) }}
   services.yaml: |
-{{ homepage_services | to_nice_yaml(indent=2) | indent(4, true) }}
+{{ k3s_homepage_services | to_nice_yaml(indent=2) | indent(4, true) }}
   widgets.yaml: |
-{{ homepage_widgets | to_nice_yaml(indent=2) | indent(4, true) }}
+{{ k3s_homepage_widgets | to_nice_yaml(indent=2) | indent(4, true) }}
   kubernetes.yaml: |
     mode: cluster
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ homepage_app_name }}
-  namespace: {{ homepage_namespace }}
+  name: {{ k3s_homepage_app_name }}
+  namespace: {{ k3s_homepage_namespace }}
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ homepage_app_name }}
+      app.kubernetes.io/name: {{ k3s_homepage_app_name }}
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: {{ homepage_app_name }}
+        app.kubernetes.io/name: {{ k3s_homepage_app_name }}
     spec:
       containers:
-        - name: {{ homepage_app_name }}
-          image: {{ homepage_image }}
+        - name: {{ k3s_homepage_app_name }}
+          image: {{ k3s_homepage_image }}
           imagePullPolicy: IfNotPresent
           env:
             - name: HOMEPAGE_ALLOWED_HOSTS
-              value: {{ homepage_hostname }}
+              value: {{ k3s_homepage_hostname }}
           ports:
-            - containerPort: {{ homepage_service_port }}
+            - containerPort: {{ k3s_homepage_service_port }}
               name: http
           volumeMounts:
             - name: homepage-config-data
@@ -78,20 +78,20 @@ spec:
       volumes:
         - name: homepage-config
           configMap:
-            name: {{ homepage_app_name }}-config
+            name: {{ k3s_homepage_app_name }}-config
         - name: homepage-config-data
           emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ homepage_app_name }}
-  namespace: {{ homepage_namespace }}
+  name: {{ k3s_homepage_app_name }}
+  namespace: {{ k3s_homepage_namespace }}
 spec:
   selector:
-    app.kubernetes.io/name: {{ homepage_app_name }}
+    app.kubernetes.io/name: {{ k3s_homepage_app_name }}
   ports:
     - name: http
-      port: {{ homepage_service_port }}
+      port: {{ k3s_homepage_service_port }}
       targetPort: http
   type: ClusterIP

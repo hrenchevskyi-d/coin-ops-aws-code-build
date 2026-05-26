@@ -1,7 +1,7 @@
 ---
 - name: Download Helm installation script
   get_url:
-    url: "{{ helm_install_script_url }}"
+    url: "{{ k3s_helm_client_install_script_url }}"
     dest: /tmp/get-helm-3.sh
     mode: "0755"
 

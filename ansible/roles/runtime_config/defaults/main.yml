@@ -93,8 +93,6 @@ json_deploy_config:
   k3s_flannel_backend: "{{ infra_deploy.get('k3s', {}).get('flannel_backend', 'vxlan') }}"
   public_ingress_enabled: "{{ infra_deploy.get('public_ingress', {}).get('enabled', true) }}"
   public_ingress_class_name: "{{ infra_deploy.get('public_ingress', {}).get('class_name', 'traefik') }}"
-  public_ingress_http_nodeport: "{{ infra_deploy.get('public_ingress', {}).get('http_nodeport', 32080) }}"
-  public_ingress_https_nodeport: "{{ infra_deploy.get('public_ingress', {}).get('https_nodeport', 32443) }}"
   headlamp_enabled: "{{ infra_deploy.get('headlamp', {}).get('enabled', true) }}"
   headlamp_hostname: "{{ infra_deploy.get('headlamp', {}).get('hostname', 'headlamp.' ~ infra_deploy.get('app_domain', 'coinops.test')) }}"
   headlamp_ingress_enabled: "{{ infra_deploy.get('headlamp', {}).get('ingress', {}).get('enabled', true) }}"

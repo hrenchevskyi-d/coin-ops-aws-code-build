@@ -1,38 +1,64 @@
----
-- name: Install Helm client
-  include_role:
-    name: k3s_helm_client
-  tags: [homepage, k3s, helm]
-
-- name: Install cert-manager
+- name: k3s-homepage-install-cert-manager
   include_role:
     name: k3s_cert_manager
-  when: homepage_tls_enabled | bool
+  when: k3s_homepage_tls_enabled | bool
   tags: [homepage, k3s, cert_manager, tls]
 
-- name: Configure ACME DNS-01 issuer
+- name: k3s-homepage-configure-acme-cloudflare-issuer
   include_role:
     name: k3s_acme_cloudflare
-  when: homepage_tls_enabled | bool
+  when: k3s_homepage_tls_enabled | bool
   tags: [homepage, k3s, cert_manager, tls]
 
-- name: Deploy Homepage workload
-  include_role:
-    name: k3s_homepage_app
+- name: k3s-homepage-apply-namespace-and-workload-resources
+  kubernetes.core.k8s:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    state: present
+    definition: "{{ lookup('template', 'homepage-resources.yaml.j2') | from_yaml_all | list }}"
+  when: k3s_homepage_enabled | bool
   tags: [homepage, k3s]
 
-- name: Configure Homepage ingress endpoint
+- name: k3s-homepage-read-deployment-status
+  kubernetes.core.k8s_info:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    api_version: apps/v1
+    kind: Deployment
+    namespace: "{{ k3s_homepage_namespace }}"
+    name: "{{ k3s_homepage_app_name }}"
+  register: homepage_deployment_info
+  retries: 30
+  delay: 10
+  until: >-
+    (
+      homepage_deployment_info.resources | default([]) | length
+    ) > 0 and
+    (
+      homepage_deployment_info.resources[0].status.availableReplicas | default(0) | int
+    ) >= 1
+  when: k3s_homepage_enabled | bool
+  tags: [homepage, k3s]
+
+- name: k3s-homepage-set-access-facts
+  set_fact:
+    homepage_access_scheme: "{{ 'https' if (k3s_homepage_tls_enabled | bool) else 'http' }}"
+  when: k3s_homepage_enabled | bool
+  tags: [homepage, k3s]
+
+- name: k3s-homepage-configure-ingress-and-certificate
   include_role:
     name: k3s_ingress_endpoint
   vars:
-    ingress_endpoint_name: "{{ homepage_app_name }}"
-    ingress_endpoint_namespace: "{{ homepage_namespace }}"
-    ingress_endpoint_class_name: "{{ homepage_ingress_class_name }}"
-    ingress_endpoint_host: "{{ homepage_hostname }}"
-    ingress_endpoint_service_name: "{{ homepage_app_name }}"
-    ingress_endpoint_service_port: "{{ homepage_service_port }}"
-    ingress_endpoint_tls_enabled: "{{ homepage_tls_enabled | bool }}"
-    ingress_endpoint_tls_secret_name: homepage-tls
-    ingress_endpoint_certificate_name: homepage-tls
-    ingress_endpoint_cluster_issuer_name: "{{ acme_cluster_issuer_name | default('letsencrypt-dns-cloudflare') }}"
+    k3s_ingress_endpoint_name: "{{ k3s_homepage_app_name }}"
+    k3s_ingress_endpoint_namespace: "{{ k3s_homepage_namespace }}"
+    k3s_ingress_endpoint_class_name: "{{ k3s_homepage_ingress_class_name }}"
+    k3s_ingress_endpoint_host: "{{ k3s_homepage_hostname }}"
+    k3s_ingress_endpoint_service_name: "{{ k3s_homepage_app_name }}"
+    k3s_ingress_endpoint_service_port: "{{ k3s_homepage_service_port }}"
+    k3s_ingress_endpoint_tls_enabled: "{{ k3s_homepage_tls_enabled | bool }}"
+    k3s_ingress_endpoint_tls_secret_name: "{{ k3s_homepage_tls_secret_name }}"
+    k3s_ingress_endpoint_certificate_name: "{{ k3s_homepage_certificate_name }}"
+    k3s_ingress_endpoint_cluster_issuer_name: "{{ k3s_acme_cloudflare_cluster_issuer_name | default('letsencrypt-dns-cloudflare') }}"
+  when:
+    - k3s_homepage_enabled | bool
+    - k3s_homepage_ingress_enabled | bool
   tags: [homepage, k3s]

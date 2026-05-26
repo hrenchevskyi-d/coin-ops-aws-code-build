@@ -20,7 +20,7 @@ For the broader Ansible configuration model used by these playbooks, see:
 - `ansible/k3s-headlamp.yml`
   Installs or updates Headlamp in the cluster.
 - `ansible/k3s-homepage.yml`
-  Installs or updates Homepage and the public ingress controller path.
+  Installs or updates Homepage on the existing ingress path.
 - `ansible/k3s-platform.yml`
   Convenience entrypoint that runs `k3s-cluster.yml` and then
   `k3s-headlamp.yml`.
@@ -62,7 +62,7 @@ Use this when the VMs are new or were just recreated by Terraform.
    ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-platform.yml
    ```
 
-6. Optionally install Homepage and the public ingress path:
+6. Optionally install Homepage:
 
    ```bash
    ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-homepage.yml
@@ -94,7 +94,7 @@ cd /home/notebook/projects/coin-ops
 ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-platform.yml
 ```
 
-### Reconcile Homepage and the public ingress path
+### Reconcile Homepage
 
 ```bash
 cd /home/notebook/projects/coin-ops

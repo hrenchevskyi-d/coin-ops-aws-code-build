@@ -180,28 +180,24 @@ including `ProxyJump` where needed.
 
 ## Role Composition Pattern
 
-The repository is moving toward composable roles and meta-role orchestration.
+The repository is moving toward composable roles with orchestration kept in
+playbooks where possible.
 
 ### `k3s` example
 
-The parent role:
-
-- `/home/notebook/projects/coin-ops/ansible/roles/k3s_headlamp`
-
-is now an orchestration role. It delegates work to narrow roles:
+The `k3s-headlamp.yml` playbook drives a functional Headlamp role that reuses
+shared cluster roles where that is actually worthwhile:
 
 - `/home/notebook/projects/coin-ops/ansible/roles/k3s_helm_client`
 - `/home/notebook/projects/coin-ops/ansible/roles/k3s_cert_manager`
 - `/home/notebook/projects/coin-ops/ansible/roles/k3s_acme_cloudflare`
-- `/home/notebook/projects/coin-ops/ansible/roles/k3s_headlamp_app`
+- `/home/notebook/projects/coin-ops/ansible/roles/k3s_headlamp`
 - `/home/notebook/projects/coin-ops/ansible/roles/k3s_ingress_endpoint`
-- `/home/notebook/projects/coin-ops/ansible/roles/k3s_operator_artifacts`
 
 The same pattern is now reused for public app exposure:
 
-- `/home/notebook/projects/coin-ops/ansible/roles/k3s_public_ingress_controller`
-- `/home/notebook/projects/coin-ops/ansible/roles/k3s_homepage_app`
 - `/home/notebook/projects/coin-ops/ansible/roles/k3s_homepage`
+- `/home/notebook/projects/coin-ops/ansible/roles/k3s_ingress_endpoint`
 
 This is the preferred direction for new work: one role should own one coherent
 responsibility whenever that remains practical.

@@ -1,11 +1,11 @@
 ---
-- name: Validate Cloudflare secret availability for Headlamp TLS
+- name: Validate Cloudflare secret availability for ACME TLS
   assert:
     that:
       - cloudflare_api_token | length > 0
     fail_msg: >-
       CLOUDFLARE_API_TOKEN must be present in the configured secret backend secret
-      {{ app_secret_name }} when TLS_MODE=certbot and Headlamp TLS is enabled.
+      {{ app_secret_name }} when TLS_MODE=certbot and ACME-backed ingress TLS is enabled.
 
 - name: Apply cert-manager Cloudflare API token secret
   kubernetes.core.k8s:
@@ -25,7 +25,7 @@
     kubeconfig: /etc/rancher/k3s/k3s.yaml
     api_version: cert-manager.io/v1
     kind: ClusterIssuer
-    name: "{{ acme_cluster_issuer_name }}"
+    name: "{{ k3s_acme_cloudflare_cluster_issuer_name }}"
   register: acme_clusterissuer_info
   retries: 30
   delay: 10

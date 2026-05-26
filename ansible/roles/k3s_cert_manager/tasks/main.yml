@@ -1,11 +1,15 @@
 ---
+- name: k3s-cert-manager-install-helm-client
+  include_role:
+    name: k3s_helm_client
+
 - name: Install or upgrade cert-manager
   kubernetes.core.helm:
-    name: "{{ cert_manager_release_name }}"
-    chart_ref: "{{ cert_manager_chart_ref }}"
-    release_namespace: "{{ cert_manager_namespace }}"
+    name: "{{ k3s_cert_manager_release_name }}"
+    chart_ref: "{{ k3s_cert_manager_chart_ref }}"
+    release_namespace: "{{ k3s_cert_manager_namespace }}"
     create_namespace: true
-    chart_version: "{{ cert_manager_chart_version }}"
+    chart_version: "{{ k3s_cert_manager_chart_version }}"
     kubeconfig: /etc/rancher/k3s/k3s.yaml
     wait: true
     values:

@@ -1,12 +1,12 @@
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: {{ ingress_endpoint_certificate_name }}
-  namespace: {{ ingress_endpoint_namespace }}
+  name: {{ k3s_ingress_endpoint_certificate_name }}
+  namespace: {{ k3s_ingress_endpoint_namespace }}
 spec:
-  secretName: {{ ingress_endpoint_tls_secret_name }}
+  secretName: {{ k3s_ingress_endpoint_tls_secret_name }}
   issuerRef:
-    name: {{ ingress_endpoint_cluster_issuer_name }}
+    name: {{ k3s_ingress_endpoint_cluster_issuer_name }}
     kind: ClusterIssuer
   dnsNames:
-    - {{ ingress_endpoint_host }}
+    - {{ k3s_ingress_endpoint_host }}

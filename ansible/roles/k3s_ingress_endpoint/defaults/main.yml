@@ -1,15 +1,15 @@
 ---
-ingress_endpoint_name: app
-ingress_endpoint_namespace: default
-ingress_endpoint_class_name: traefik
-ingress_endpoint_host: ""
-ingress_endpoint_service_name: ""
-ingress_endpoint_service_port: 80
-ingress_endpoint_path: /
-ingress_endpoint_path_type: Prefix
-ingress_endpoint_annotations: {}
-ingress_endpoint_tls_enabled: false
-ingress_endpoint_tls_secret_name: ""
-ingress_endpoint_certificate_name: ""
-ingress_endpoint_cluster_issuer_name: "{{ acme_cluster_issuer_name | default('letsencrypt-dns-cloudflare') }}"
-ingress_endpoint_wait_for_certificate: true
+k3s_ingress_endpoint_name: app
+k3s_ingress_endpoint_namespace: default
+k3s_ingress_endpoint_class_name: traefik
+k3s_ingress_endpoint_host: ""
+k3s_ingress_endpoint_service_name: ""
+k3s_ingress_endpoint_service_port: 80
+k3s_ingress_endpoint_path: /
+k3s_ingress_endpoint_path_type: Prefix
+k3s_ingress_endpoint_annotations: {}
+k3s_ingress_endpoint_tls_enabled: false
+k3s_ingress_endpoint_tls_secret_name: ""
+k3s_ingress_endpoint_certificate_name: ""
+k3s_ingress_endpoint_cluster_issuer_name: letsencrypt-dns-cloudflare
+k3s_ingress_endpoint_wait_for_certificate: true

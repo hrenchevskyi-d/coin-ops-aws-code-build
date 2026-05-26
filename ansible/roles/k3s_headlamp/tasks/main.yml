@@ -1,43 +1,153 @@
 ---
-- name: Install Helm client
+- name: k3s-headlamp-install-helm-client
   include_role:
     name: k3s_helm_client
   tags: [headlamp, k3s, helm]
 
-- name: Install cert-manager
+- name: k3s-headlamp-install-cert-manager
   include_role:
     name: k3s_cert_manager
-  when: headlamp_tls_enabled | bool
+  when: k3s_headlamp_tls_enabled | bool
   tags: [headlamp, k3s, cert_manager, tls]
 
-- name: Configure ACME Cloudflare issuer
+- name: k3s-headlamp-configure-acme-cloudflare-issuer
   include_role:
     name: k3s_acme_cloudflare
-  when: headlamp_tls_enabled | bool
+  when: k3s_headlamp_tls_enabled | bool
   tags: [headlamp, k3s, cert_manager, tls]
 
-- name: Deploy Headlamp workload
-  include_role:
-    name: k3s_headlamp_app
+- name: k3s-headlamp-add-helm-repository
+  kubernetes.core.helm_repository:
+    name: "{{ k3s_headlamp_chart_repo_name }}"
+    repo_url: "{{ k3s_headlamp_chart_repo_url }}"
   tags: [headlamp, k3s]
 
-- name: Configure Headlamp ingress and certificate
+- name: k3s-headlamp-install-or-upgrade-release
+  kubernetes.core.helm:
+    name: "{{ k3s_headlamp_release_name }}"
+    chart_ref: "{{ k3s_headlamp_chart_ref }}"
+    release_namespace: "{{ k3s_headlamp_namespace }}"
+    create_namespace: true
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    wait: true
+    values:
+      replicaCount: 2
+      service:
+        type: ClusterIP
+      ingress:
+        enabled: false
+  tags: [headlamp, k3s]
+
+- name: k3s-headlamp-read-deployment-status
+  kubernetes.core.k8s_info:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    api_version: apps/v1
+    kind: Deployment
+    namespace: "{{ k3s_headlamp_namespace }}"
+    name: "{{ k3s_headlamp_release_name }}"
+  register: headlamp_deployment_info
+  retries: 30
+  delay: 10
+  until: >-
+    (
+      headlamp_deployment_info.resources | default([]) | length
+    ) > 0 and
+    (
+      headlamp_deployment_info.resources[0].status.availableReplicas | default(0) | int
+    ) >= 1
+  tags: [headlamp, k3s]
+
+- name: k3s-headlamp-apply-operator-rbac
+  kubernetes.core.k8s:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    state: present
+    definition: "{{ lookup('template', 'headlamp-operator-rbac.yaml.j2') | from_yaml_all | list }}"
+  tags: [headlamp, k3s]
+
+- name: k3s-headlamp-read-service-definition
+  kubernetes.core.k8s_info:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    api_version: v1
+    kind: Service
+    namespace: "{{ k3s_headlamp_namespace }}"
+    name: "{{ k3s_headlamp_release_name }}"
+  register: headlamp_service_info
+  tags: [headlamp, k3s]
+
+- name: k3s-headlamp-parse-service-definition
+  set_fact:
+    headlamp_service: "{{ headlamp_service_info.resources[0] }}"
+    headlamp_service_port: "{{ headlamp_service_info.resources[0].spec.ports[0].port }}"
+    headlamp_access_ip: "{{ cloud_runtime_metadata.get('headlamp_ingress_ip', '') | default(hostvars[groups['role_k3s_server'] | sort | first].ansible_host, true) }}"
+    headlamp_access_scheme: "{{ 'https' if (k3s_headlamp_tls_enabled | bool) else 'http' }}"
+  tags: [headlamp, k3s]
+
+- name: k3s-headlamp-configure-ingress-and-certificate
   include_role:
     name: k3s_ingress_endpoint
   vars:
-    ingress_endpoint_name: "{{ headlamp_release_name }}"
-    ingress_endpoint_namespace: "{{ headlamp_namespace }}"
-    ingress_endpoint_class_name: "{{ headlamp_ingress_class_name }}"
-    ingress_endpoint_host: "{{ headlamp_ingress_host }}"
-    ingress_endpoint_service_name: "{{ headlamp_release_name }}"
-    ingress_endpoint_service_port: "{{ headlamp_service_port }}"
-    ingress_endpoint_tls_enabled: "{{ headlamp_tls_enabled | bool }}"
-    ingress_endpoint_tls_secret_name: "{{ headlamp_tls_secret_name }}"
-    ingress_endpoint_certificate_name: "{{ headlamp_certificate_name }}"
-    ingress_endpoint_cluster_issuer_name: "{{ acme_cluster_issuer_name }}"
+    k3s_ingress_endpoint_name: "{{ k3s_headlamp_release_name }}"
+    k3s_ingress_endpoint_namespace: "{{ k3s_headlamp_namespace }}"
+    k3s_ingress_endpoint_class_name: "{{ k3s_headlamp_ingress_class_name }}"
+    k3s_ingress_endpoint_host: "{{ k3s_headlamp_ingress_host }}"
+    k3s_ingress_endpoint_service_name: "{{ k3s_headlamp_release_name }}"
+    k3s_ingress_endpoint_service_port: "{{ headlamp_service_port }}"
+    k3s_ingress_endpoint_tls_enabled: "{{ k3s_headlamp_tls_enabled | bool }}"
+    k3s_ingress_endpoint_tls_secret_name: "{{ k3s_headlamp_tls_secret_name }}"
+    k3s_ingress_endpoint_certificate_name: "{{ k3s_headlamp_certificate_name }}"
+    k3s_ingress_endpoint_cluster_issuer_name: "{{ k3s_acme_cloudflare_cluster_issuer_name | default('letsencrypt-dns-cloudflare') }}"
+  when: k3s_headlamp_ingress_enabled | bool
   tags: [headlamp, k3s]
 
-- name: Render local operator artifacts
-  include_role:
-    name: k3s_operator_artifacts
+- name: k3s-headlamp-ensure-local-artifact-directory
+  file:
+    path: "{{ k3s_headlamp_local_artifact_dir }}"
+    state: directory
+    mode: "0755"
+  delegate_to: localhost
+  become: false
+  tags: [headlamp, k3s, artifacts]
+
+- name: k3s-headlamp-remove-obsolete-pac-helper
+  file:
+    path: "{{ k3s_headlamp_local_artifact_dir }}/headlamp-socks-proxy.pac"
+    state: absent
+  delegate_to: localhost
+  become: false
+  tags: [headlamp, k3s, artifacts]
+
+- name: k3s-headlamp-write-port-forward-helper
+  template:
+    src: headlamp-port-forward.sh.j2
+    dest: "{{ k3s_headlamp_local_artifact_dir }}/headlamp-port-forward.sh"
+    mode: "0755"
+  delegate_to: localhost
+  become: false
+  tags: [headlamp, k3s, artifacts]
+
+- name: k3s-headlamp-write-start-helper
+  template:
+    src: headlamp-start.sh.j2
+    dest: "{{ k3s_headlamp_local_artifact_dir }}/headlamp-start.sh"
+    mode: "0755"
+  delegate_to: localhost
+  become: false
+  tags: [headlamp, k3s, artifacts]
+
+- name: k3s-headlamp-write-access-summary
+  template:
+    src: headlamp-access-summary.md.j2
+    dest: "{{ k3s_headlamp_local_artifact_dir }}/headlamp-access-summary.md"
+    mode: "0644"
+  delegate_to: localhost
+  become: false
+  tags: [headlamp, k3s, artifacts]
+
+- name: k3s-headlamp-write-ingress-access-summary
+  template:
+    src: headlamp-ingress-access.md.j2
+    dest: "{{ k3s_headlamp_local_artifact_dir }}/headlamp-ingress-access.md"
+    mode: "0644"
+  delegate_to: localhost
+  become: false
   tags: [headlamp, k3s, artifacts]

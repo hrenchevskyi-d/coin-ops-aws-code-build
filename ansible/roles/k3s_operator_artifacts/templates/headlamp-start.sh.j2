@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-"{{ k3s_local_artifact_dir }}/k8s-api-tunnel.sh"
-exec "{{ k3s_local_artifact_dir }}/headlamp-port-forward.sh"

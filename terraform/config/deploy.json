@@ -21,9 +21,7 @@
         },
         "public_ingress": {
             "enabled": true,
-            "class_name": "traefik",
-            "http_nodeport": 32080,
-            "https_nodeport": 32443
+            "class_name": "traefik"
         },
         "headlamp": {
             "enabled": true,

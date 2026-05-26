@@ -1,13 +1,16 @@
 ---
-homepage_enabled: "{{ deploy_config.homepage_enabled | default(true) | bool }}"
-homepage_namespace: homepage
-homepage_app_name: homepage
-homepage_image: ghcr.io/gethomepage/homepage:latest
-homepage_service_port: 3000
-homepage_hostname: "{{ deploy_config.homepage_hostname | default('home.' ~ app_domain) }}"
-homepage_ingress_class_name: "{{ deploy_config.homepage_ingress_class_name | default('traefik') }}"
-homepage_tls_enabled: "{{ tls_mode == 'certbot' }}"
-homepage_bookmarks:
+k3s_homepage_enabled: "{{ deploy_config.homepage_enabled | default(true) | bool }}"
+k3s_homepage_namespace: homepage
+k3s_homepage_app_name: homepage
+k3s_homepage_image: ghcr.io/gethomepage/homepage:latest
+k3s_homepage_service_port: 3000
+k3s_homepage_hostname: "{{ deploy_config.homepage_hostname | default('home.' ~ app_domain) }}"
+k3s_homepage_ingress_enabled: "{{ deploy_config.homepage_ingress_enabled | default(true) | bool }}"
+k3s_homepage_ingress_class_name: "{{ deploy_config.homepage_ingress_class_name | default('traefik') }}"
+k3s_homepage_tls_enabled: "{{ tls_mode == 'certbot' }}"
+k3s_homepage_tls_secret_name: homepage-tls
+k3s_homepage_certificate_name: homepage-tls
+k3s_homepage_bookmarks:
   - Quick Links:
       - Google:
           - abbr: G
@@ -15,5 +18,5 @@ homepage_bookmarks:
       - YouTube:
           - abbr: YT
             href: https://www.youtube.com/
-homepage_services: []
-homepage_widgets: []
+k3s_homepage_services: []
+k3s_homepage_widgets: []

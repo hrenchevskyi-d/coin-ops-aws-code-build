@@ -1,8 +1,8 @@
 ---
-cert_manager_namespace: cert-manager
-acme_cloudflare_secret_name: cloudflare-api-token-secret
-acme_cluster_issuer_name: letsencrypt-dns-cloudflare
-acme_directory_url: >-
+k3s_acme_cloudflare_cert_manager_namespace: cert-manager
+k3s_acme_cloudflare_secret_name: cloudflare-api-token-secret
+k3s_acme_cloudflare_cluster_issuer_name: letsencrypt-dns-cloudflare
+k3s_acme_cloudflare_directory_url: >-
   {{
     'https://acme-staging-v02.api.letsencrypt.org/directory'
     if certbot_staging else

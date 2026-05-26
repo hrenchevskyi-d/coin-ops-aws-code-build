@@ -4,7 +4,7 @@
     kubeconfig: /etc/rancher/k3s/k3s.yaml
     state: present
     definition: "{{ lookup('template', 'certificate.yaml.j2') | from_yaml }}"
-  when: ingress_endpoint_tls_enabled | bool
+  when: k3s_ingress_endpoint_tls_enabled | bool
 
 - name: Apply ingress endpoint manifest
   kubernetes.core.k8s:
@@ -17,8 +17,8 @@
     kubeconfig: /etc/rancher/k3s/k3s.yaml
     api_version: cert-manager.io/v1
     kind: Certificate
-    namespace: "{{ ingress_endpoint_namespace }}"
-    name: "{{ ingress_endpoint_certificate_name }}"
+    namespace: "{{ k3s_ingress_endpoint_namespace }}"
+    name: "{{ k3s_ingress_endpoint_certificate_name }}"
   register: ingress_endpoint_certificate_info
   retries: 60
   delay: 10
@@ -35,5 +35,5 @@
       | default('False')
     ) == 'True'
   when:
-    - ingress_endpoint_tls_enabled | bool
-    - ingress_endpoint_wait_for_certificate | bool
+    - k3s_ingress_endpoint_tls_enabled | bool
+    - k3s_ingress_endpoint_wait_for_certificate | bool

@@ -1,2 +1,2 @@
 ---
-k3s_local_artifact_dir: "{{ repo_root ~ '/ansible/artifacts' }}"
+k3s_postcheck_local_artifact_dir: "{{ repo_root ~ '/ansible/artifacts' }}"

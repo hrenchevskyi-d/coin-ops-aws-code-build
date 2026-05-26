@@ -1,2 +1,2 @@
 ---
-helm_install_script_url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+k3s_helm_client_install_script_url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3

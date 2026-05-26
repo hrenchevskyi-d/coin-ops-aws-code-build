@@ -1,3 +1,0 @@
----
-headlamp_local_port: 8080
-k3s_local_artifact_dir: "{{ repo_root ~ '/ansible/artifacts' }}"
