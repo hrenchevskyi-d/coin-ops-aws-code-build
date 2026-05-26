@@ -1,0 +1,6 @@
+apiVersion: v2
+name: homepage
+description: CoinOps Homepage deployment chart
+type: application
+version: 0.1.0
+appVersion: "latest"

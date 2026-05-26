@@ -1,0 +1,19 @@
+replicaCount: 2
+
+image: ghcr.io/gethomepage/homepage:latest
+imagePullPolicy: IfNotPresent
+
+app:
+  name: homepage
+  namespace: homepage
+
+config:
+  title: Homepage
+  allowedHosts: home.coinops.test
+  bookmarks: []
+  services: []
+  widgets: []
+
+service:
+  type: ClusterIP
+  port: 3000

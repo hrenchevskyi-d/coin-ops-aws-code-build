@@ -199,6 +199,9 @@ The same pattern is now reused for public app exposure:
 - `/home/notebook/projects/coin-ops/ansible/roles/k3s_homepage`
 - `/home/notebook/projects/coin-ops/ansible/roles/k3s_ingress_endpoint`
 
+The current Homepage role installs the workload from a local Helm chart and
+keeps ingress/TLS as separate reusable cluster concerns.
+
 This is the preferred direction for new work: one role should own one coherent
 responsibility whenever that remains practical.
 

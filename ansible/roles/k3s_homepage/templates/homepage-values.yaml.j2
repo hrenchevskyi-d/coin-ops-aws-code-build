@@ -1,0 +1,22 @@
+replicaCount: 2
+
+image: {{ k3s_homepage_image }}
+imagePullPolicy: IfNotPresent
+
+app:
+  name: {{ k3s_homepage_app_name }}
+  namespace: {{ k3s_homepage_namespace }}
+
+config:
+  title: Homepage
+  allowedHosts: {{ k3s_homepage_hostname }}
+  bookmarks:
+{{ k3s_homepage_bookmarks | to_nice_yaml(indent=2) | indent(4, true) }}
+  services:
+{{ k3s_homepage_services | to_nice_yaml(indent=2) | indent(4, true) }}
+  widgets:
+{{ k3s_homepage_widgets | to_nice_yaml(indent=2) | indent(4, true) }}
+
+service:
+  type: ClusterIP
+  port: {{ k3s_homepage_service_port }}

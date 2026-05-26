@@ -1,6 +1,7 @@
 ---
 k3s_homepage_enabled: "{{ deploy_config.homepage_enabled | default(true) | bool }}"
 k3s_homepage_namespace: homepage
+k3s_homepage_release_name: homepage
 k3s_homepage_app_name: homepage
 k3s_homepage_image: ghcr.io/gethomepage/homepage:latest
 k3s_homepage_service_port: 3000
@@ -10,6 +11,9 @@ k3s_homepage_ingress_class_name: "{{ deploy_config.homepage_ingress_class_name |
 k3s_homepage_tls_enabled: "{{ tls_mode == 'certbot' }}"
 k3s_homepage_tls_secret_name: homepage-tls
 k3s_homepage_certificate_name: homepage-tls
+k3s_homepage_chart_source_dir: "{{ role_path }}/files/chart"
+k3s_homepage_chart_staging_dir: /tmp/coinops-homepage-chart
+k3s_homepage_chart_values_path: "{{ k3s_homepage_chart_staging_dir }}/values.coinops.yaml"
 k3s_homepage_bookmarks:
   - Quick Links:
       - Google:

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.app.name }}-config
+  namespace: {{ .Release.Namespace }}
+data:
+  settings.yaml: |
+    title: {{ .Values.config.title }}
+  bookmarks.yaml: |
+{{ toYaml .Values.config.bookmarks | indent 4 }}
+  services.yaml: |
+{{ toYaml .Values.config.services | indent 4 }}
+  widgets.yaml: |
+{{ toYaml .Values.config.widgets | indent 4 }}
+  kubernetes.yaml: |
+    mode: cluster
