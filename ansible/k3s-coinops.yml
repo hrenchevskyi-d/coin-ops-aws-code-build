@@ -33,9 +33,10 @@
           secret backend, and a postgres_runtime_image whose tag starts with a
           PostgreSQL major version such as 16-shabat-latest.
 
-- name: Install Coin-Ops on k3s
-  hosts: "{{ groups.get('role_k3s_server', ['localhost']) | sort | first }}"
-  become: true
+- name: Install Coin-Ops on k3s from the local operator machine
+  hosts: localhost
+  connection: local
+  become: false
   gather_facts: false
   pre_tasks:
     - name: Resolve runtime configuration for Coin-Ops deployment
@@ -43,23 +44,20 @@
         name: runtime_config
         public: true
       tags: [runtime_config, coinops]
-
-    - name: Wait for k3s service to report active
-      command: systemctl is-active k3s
-      register: k3s_coinops_service_status
-      changed_when: false
+    - name: Resolve effective kubeconfig for Coin-Ops deployment
+      include_role:
+        name: k3s_kubeconfig_access
+      tags: [runtime_config, coinops, kubeconfig]
+    - name: Confirm Kubernetes API is reachable from the operator machine
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
+        api_version: v1
+        kind: Namespace
+        name: kube-system
+      register: k3s_coinops_kube_system
       retries: 30
       delay: 5
-      until: (k3s_coinops_service_status.stdout | trim) == "active"
-      tags: [coinops, k3s]
-
-    - name: Wait for local Kubernetes API port on bootstrap node
-      wait_for:
-        host: 127.0.0.1
-        port: 6443
-        timeout: 180
-        delay: 0
-        sleep: 5
+      until: (k3s_coinops_kube_system.resources | default([]) | length) > 0
       tags: [coinops, k3s]
   roles:
     - k3s_coinops_data

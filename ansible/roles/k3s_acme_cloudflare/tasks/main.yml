@@ -9,20 +9,20 @@
 
 - name: Apply cert-manager Cloudflare API token secret
   kubernetes.core.k8s:
-    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     state: present
     definition: "{{ lookup('template', 'cert-manager-cloudflare-secret.yaml.j2') | from_yaml }}"
-  no_log: true
+  no_log: "{{ k3s_acme_cloudflare_hide_secret_task_output | bool }}"
 
 - name: Apply ACME ClusterIssuer
   kubernetes.core.k8s:
-    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     state: present
     definition: "{{ lookup('template', 'clusterissuer.yaml.j2') | from_yaml }}"
 
 - name: Read ACME ClusterIssuer status
   kubernetes.core.k8s_info:
-    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     api_version: cert-manager.io/v1
     kind: ClusterIssuer
     name: "{{ k3s_acme_cloudflare_cluster_issuer_name }}"

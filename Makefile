@@ -5,11 +5,13 @@ TF_DIR := $(REPO_ROOT)/terraform
 ANSIBLE_DIR := $(REPO_ROOT)/ansible
 INVENTORY := $(ANSIBLE_DIR)/inventory
 GCP_INVENTORY := $(ANSIBLE_DIR)/inventory/inventory.gcp_compute.yml
+LOCALHOST_INVENTORY := $(ANSIBLE_DIR)/inventory/localhost.yml
 ENV_FILE := $(REPO_ROOT)/local/generated-env.sh
 COMPOSE := docker compose
 K8S_ARTIFACTS_DIR := $(ANSIBLE_DIR)/artifacts
 K8S_TUNNELED_KUBECONFIG := $(K8S_ARTIFACTS_DIR)/kubeconfig-gcp-k3s-tunneled.yaml
 HEADLAMP_START_SCRIPT := $(K8S_ARTIFACTS_DIR)/headlamp-start.sh
+VENV_PYTHON := $(REPO_ROOT)/.venv/bin/python
 
 HOST ?=
 LIMIT ?=
@@ -17,7 +19,11 @@ TF_APPLY_ARGS ?=
 TF_DESTROY_ARGS ?=
 
 ENV_PREFIX = source "$(ENV_FILE)" &&
-ANSIBLE_CMD = $(ENV_PREFIX) ANSIBLE_CONFIG="$(REPO_ROOT)/ansible.cfg"
+# Run Ansible from the project-local virtualenv when it exists so localhost
+# Kubernetes tasks use the same Python environment that holds the kubernetes
+# client dependency.
+ANSIBLE_ENV = $(ENV_PREFIX) ANSIBLE_CONFIG="$(REPO_ROOT)/ansible.cfg" ANSIBLE_PYTHON_INTERPRETER="$(VENV_PYTHON)"
+ANSIBLE_CMD = $(ANSIBLE_ENV)
 
 .PHONY: help \
 	local-up local-down local-logs local-ps local-restart local-config \
@@ -123,13 +129,13 @@ runtime-config:
 	$(ANSIBLE_CMD) ansible-playbook -i localhost, -c local "$(ANSIBLE_DIR)/runtime-config.yml"
 
 ansible-check:
-	$(ENV_PREFIX) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ANSIBLE_CONFIG="$(REPO_ROOT)/ansible.cfg" ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/runtime-config.yml"
-	$(ENV_PREFIX) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ANSIBLE_CONFIG="$(REPO_ROOT)/ansible.cfg" ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/provision.yml"
-	$(ENV_PREFIX) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ANSIBLE_CONFIG="$(REPO_ROOT)/ansible.cfg" ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/k3s-cluster.yml"
-	$(ENV_PREFIX) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ANSIBLE_CONFIG="$(REPO_ROOT)/ansible.cfg" ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/k3s-headlamp.yml"
-	$(ENV_PREFIX) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ANSIBLE_CONFIG="$(REPO_ROOT)/ansible.cfg" ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/k3s-homepage.yml"
-	$(ENV_PREFIX) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ANSIBLE_CONFIG="$(REPO_ROOT)/ansible.cfg" ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/k3s-coinops.yml"
-	$(ENV_PREFIX) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ANSIBLE_CONFIG="$(REPO_ROOT)/ansible.cfg" ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/k3s-platform.yml"
+	$(ANSIBLE_ENV) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/runtime-config.yml"
+	$(ANSIBLE_ENV) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/provision.yml"
+	$(ANSIBLE_ENV) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/k3s-cluster.yml"
+	$(ANSIBLE_ENV) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/k3s-headlamp.yml"
+	$(ANSIBLE_ENV) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/k3s-homepage.yml"
+	$(ANSIBLE_ENV) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/k3s-coinops.yml"
+	$(ANSIBLE_ENV) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/k3s-platform.yml"
 
 provision:
 	$(ANSIBLE_CMD) ansible-playbook -i "$(INVENTORY)" "$(ANSIBLE_DIR)/provision.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
@@ -138,19 +144,19 @@ deploy:
 	$(ANSIBLE_CMD) ansible-playbook -i "$(INVENTORY)" "$(ANSIBLE_DIR)/deploy.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
 
 k3s-cluster:
-	$(ANSIBLE_CMD) ansible-playbook -i "$(GCP_INVENTORY)" "$(ANSIBLE_DIR)/k3s-cluster.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
+	$(ANSIBLE_CMD) ansible-playbook -i "$(LOCALHOST_INVENTORY)" -i "$(GCP_INVENTORY)" "$(ANSIBLE_DIR)/k3s-cluster.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
 
 k3s-headlamp:
-	$(ANSIBLE_CMD) ansible-playbook -i "$(GCP_INVENTORY)" "$(ANSIBLE_DIR)/k3s-headlamp.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
+	$(ANSIBLE_CMD) ansible-playbook -i "$(LOCALHOST_INVENTORY)" -i "$(GCP_INVENTORY)" "$(ANSIBLE_DIR)/k3s-headlamp.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
 
 k3s-homepage:
-	$(ANSIBLE_CMD) ansible-playbook -i "$(GCP_INVENTORY)" "$(ANSIBLE_DIR)/k3s-homepage.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
+	$(ANSIBLE_CMD) ansible-playbook -i "$(LOCALHOST_INVENTORY)" -i "$(GCP_INVENTORY)" "$(ANSIBLE_DIR)/k3s-homepage.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
 
 k3s-coinops:
-	$(ANSIBLE_CMD) ansible-playbook -i "$(GCP_INVENTORY)" "$(ANSIBLE_DIR)/k3s-coinops.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
+	$(ANSIBLE_CMD) ansible-playbook -i "$(LOCALHOST_INVENTORY)" -i "$(GCP_INVENTORY)" "$(ANSIBLE_DIR)/k3s-coinops.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
 
 k3s-platform:
-	$(ANSIBLE_CMD) ansible-playbook -i "$(GCP_INVENTORY)" "$(ANSIBLE_DIR)/k3s-platform.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
+	$(ANSIBLE_CMD) ansible-playbook -i "$(LOCALHOST_INVENTORY)" -i "$(GCP_INVENTORY)" "$(ANSIBLE_DIR)/k3s-platform.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
 
 headlamp-start:
 	@test -x "$(HEADLAMP_START_SCRIPT)" || (echo "Missing $(HEADLAMP_START_SCRIPT). Run 'make k3s-platform' first."; exit 1)

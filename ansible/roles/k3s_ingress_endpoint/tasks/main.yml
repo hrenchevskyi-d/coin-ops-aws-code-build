@@ -1,20 +1,20 @@
 ---
 - name: Apply ingress endpoint certificate
   kubernetes.core.k8s:
-    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     state: present
     definition: "{{ lookup('template', 'certificate.yaml.j2') | from_yaml }}"
   when: k3s_ingress_endpoint_tls_enabled | bool
 
 - name: Apply ingress endpoint manifest
   kubernetes.core.k8s:
-    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     state: present
     definition: "{{ lookup('template', 'ingress.yaml.j2') | from_yaml }}"
 
 - name: Read ingress endpoint TLS certificate status
   kubernetes.core.k8s_info:
-    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     api_version: cert-manager.io/v1
     kind: Certificate
     namespace: "{{ k3s_ingress_endpoint_namespace }}"

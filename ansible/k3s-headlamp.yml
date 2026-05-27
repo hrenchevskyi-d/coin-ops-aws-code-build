@@ -18,9 +18,10 @@
         fail_msg: >-
           Headlamp deployment requires at least one host in role_k3s_server.
 
-- name: Install Headlamp and prepare operator access artifacts
-  hosts: "{{ groups.get('role_k3s_server', ['localhost']) | sort | first }}"
-  become: yes
+- name: Install Headlamp and prepare operator access artifacts from the local operator machine
+  hosts: localhost
+  connection: local
+  become: false
   gather_facts: no
   pre_tasks:
     - name: Resolve runtime configuration for Headlamp deployment
@@ -28,5 +29,9 @@
         name: runtime_config
         public: true
       tags: [runtime_config, headlamp]
+    - name: Resolve effective kubeconfig for Headlamp deployment
+      include_role:
+        name: k3s_kubeconfig_access
+      tags: [runtime_config, headlamp, kubeconfig]
   roles:
     - k3s_headlamp

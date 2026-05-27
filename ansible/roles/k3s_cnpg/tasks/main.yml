@@ -18,7 +18,7 @@
     chart_ref: "{{ k3s_cnpg_chart_ref }}"
     release_namespace: "{{ k3s_cnpg_namespace }}"
     create_namespace: true
-    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     values: "{{ k3s_cnpg_values }}"
     wait: true
   when: k3s_cnpg_enabled | bool

@@ -1,7 +1,7 @@
 ---
 - name: k3s-coinops-data-ensure-cnpg-namespace
   kubernetes.core.k8s:
-    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     state: present
     definition:
       apiVersion: v1
@@ -13,7 +13,7 @@
 
 - name: k3s-coinops-data-apply-cnpg-operator-config
   kubernetes.core.k8s:
-    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     state: present
     definition: "{{ lookup('template', 'cnpg-operator-config.yaml.j2') | from_yaml_all | list }}"
   when: k3s_coinops_data_enabled | bool
@@ -21,7 +21,7 @@
 
 - name: k3s-coinops-data-remove-legacy-cnpg-operator-configmap
   kubernetes.core.k8s:
-    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     state: absent
     api_version: v1
     kind: ConfigMap
@@ -48,7 +48,7 @@
 
 - name: k3s-coinops-data-ensure-namespace
   kubernetes.core.k8s:
-    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     state: present
     definition:
       apiVersion: v1
@@ -60,7 +60,7 @@
 
 - name: k3s-coinops-data-apply-cluster-resources
   kubernetes.core.k8s:
-    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     state: present
     definition: "{{ lookup('template', 'coinops-postgres-resources.yaml.j2') | from_yaml_all | list }}"
   when: k3s_coinops_data_enabled | bool
@@ -68,7 +68,7 @@
 
 - name: k3s-coinops-data-wait-for-read-write-service
   kubernetes.core.k8s_info:
-    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     api_version: v1
     kind: Service
     namespace: "{{ k3s_coinops_data_namespace }}"
@@ -82,7 +82,7 @@
 
 - name: k3s-coinops-data-delete-previous-bootstrap-job
   kubernetes.core.k8s:
-    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     state: absent
     api_version: batch/v1
     kind: Job
@@ -93,7 +93,7 @@
 
 - name: k3s-coinops-data-apply-bootstrap-job
   kubernetes.core.k8s:
-    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     state: present
     definition: "{{ lookup('template', 'coinops-postgres-bootstrap-job.yaml.j2') | from_yaml }}"
   when: k3s_coinops_data_enabled | bool
@@ -101,7 +101,7 @@
 
 - name: k3s-coinops-data-wait-for-bootstrap-job
   kubernetes.core.k8s_info:
-    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     api_version: batch/v1
     kind: Job
     namespace: "{{ k3s_coinops_data_namespace }}"

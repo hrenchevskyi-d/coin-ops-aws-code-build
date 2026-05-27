@@ -144,6 +144,33 @@ This is intentional. We do not want the default `LoadBalancer` Traefik service
 to allocate `NodePort`s. The external GCP public ingress load balancer is
 expected to send traffic directly to ports `80/443` on the `k3s` server nodes.
 
+## Local Operator Model
+
+Cluster application playbooks such as `ansible/k3s-homepage.yml`,
+`ansible/k3s-headlamp.yml`, and `ansible/k3s-coinops.yml` are intended to run
+from the operator machine, not from a shell on `k3s-server-1`.
+
+That model works as follows:
+
+- `ansible/k3s-cluster.yml` still bootstraps the nodes remotely
+- `k3s_postcheck` exports local kubeconfig artifacts after the cluster is ready
+- follow-up platform/application roles talk to the Kubernetes API through those
+  local kubeconfig artifacts
+- node SSH is still needed for host-level work, but ordinary Kubernetes changes
+  are meant to be driven from localhost
+
+The preferred operator kubeconfig artifact is:
+
+- `/home/notebook/projects/coin-ops/ansible/artifacts/kubeconfig-gcp-k3s.yaml`
+
+The tunneled variant remains available as a fallback when you explicitly want
+local port-forwarded API access:
+
+- `/home/notebook/projects/coin-ops/ansible/artifacts/kubeconfig-gcp-k3s-tunneled.yaml`
+
+If that artifact is missing, re-run `ansible/k3s-cluster.yml` before trying to
+reconcile cluster applications.
+
 ## Generated Local Artifacts
 
 After `ansible/k3s-cluster.yml`, expect operator-local artifacts under:

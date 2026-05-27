@@ -18,9 +18,10 @@
         fail_msg: >-
           Homepage deployment requires at least one host in role_k3s_server.
 
-- name: Install Homepage and public ingress routing
-  hosts: "{{ groups.get('role_k3s_server', ['localhost']) | sort | first }}"
-  become: true
+- name: Install Homepage and public ingress routing from the local operator machine
+  hosts: localhost
+  connection: local
+  become: false
   gather_facts: false
   pre_tasks:
     - name: Resolve runtime configuration for Homepage deployment
@@ -28,5 +29,9 @@
         name: runtime_config
         public: true
       tags: [runtime_config, homepage]
+    - name: Resolve effective kubeconfig for Homepage deployment
+      include_role:
+        name: k3s_kubeconfig_access
+      tags: [runtime_config, homepage, kubeconfig]
   roles:
     - k3s_homepage

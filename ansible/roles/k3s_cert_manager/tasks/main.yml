@@ -10,7 +10,7 @@
     release_namespace: "{{ k3s_cert_manager_namespace }}"
     create_namespace: true
     chart_version: "{{ k3s_cert_manager_chart_version }}"
-    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     wait: true
     values:
       crds:

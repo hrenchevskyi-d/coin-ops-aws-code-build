@@ -1,5 +1,13 @@
 ---
+# `kubernetes.core` roles in this repo can run in two modes:
+# 1. Remote node mode: use the native kubeconfig on a k3s server.
+# 2. Local operator mode: use the kubeconfig artifact rendered by k3s_postcheck.
+# The second mode is now the preferred way to manage cluster resources because
+# it keeps day-to-day Kubernetes operations on the operator machine.
+k3s_kubeconfig_access_controller_hosts:
+  - localhost
+  - 127.0.0.1
 k3s_kubeconfig_access_local_artifact_dir: "{{ repo_root ~ '/ansible/artifacts' }}"
-k3s_kubeconfig_access_local_cluster_kubeconfig_path: "{{ k3s_kubeconfig_access_local_artifact_dir }}/kubeconfig-gcp-k3s-tunneled.yaml"
+k3s_kubeconfig_access_local_cluster_kubeconfig_path: "{{ k3s_kubeconfig_access_local_artifact_dir }}/kubeconfig-gcp-k3s.yaml"
 k3s_kubeconfig_access_remote_kubeconfig_path: /etc/rancher/k3s/k3s.yaml
 k3s_kubeconfig_access_remote_fallback_kubeconfig_path: /tmp/coinops-k3s-kubeconfig.yaml

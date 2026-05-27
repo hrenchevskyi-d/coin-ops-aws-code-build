@@ -2,8 +2,8 @@
 k3s_coinops_data_enabled: "{{ deploy_config.coinops_enabled | default(true) | bool }}"
 k3s_coinops_data_namespace: coinops-data
 k3s_coinops_data_cluster_name: coinops-postgres
-k3s_coinops_data_instances: 1
-k3s_coinops_data_storage_size: 20Gi
+k3s_coinops_data_instances: 2
+k3s_coinops_data_storage_size: 2Gi
 k3s_coinops_data_postgres_image: "{{ postgres_runtime_image }}"
 k3s_coinops_data_postgres_uid: 70
 k3s_coinops_data_postgres_gid: 70

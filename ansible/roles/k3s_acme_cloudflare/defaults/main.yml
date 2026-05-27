@@ -8,3 +8,8 @@ k3s_acme_cloudflare_directory_url: >-
     if certbot_staging else
     'https://acme-v02.api.letsencrypt.org/directory'
   }}
+
+# Keep Cloudflare token task output hidden by default, but allow a temporary
+# opt-in debug mode via COINOPS_DEBUG_ACME=true when diagnosing localhost
+# execution issues.
+k3s_acme_cloudflare_hide_secret_task_output: "{{ not ((lookup('env', 'COINOPS_DEBUG_ACME') | default('false', true)) | bool) }}"

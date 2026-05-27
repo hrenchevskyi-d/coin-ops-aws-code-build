@@ -38,7 +38,7 @@
     chart_ref: "{{ k3s_coinops_ui_chart_staging_dir }}"
     release_namespace: "{{ k3s_coinops_ui_namespace }}"
     create_namespace: true
-    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     wait: true
     values_files:
       - "{{ k3s_coinops_ui_chart_values_path }}"
@@ -47,7 +47,7 @@
 
 - name: k3s-coinops-ui-read-deployment-status
   kubernetes.core.k8s_info:
-    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     api_version: apps/v1
     kind: Deployment
     namespace: "{{ k3s_coinops_ui_namespace }}"
