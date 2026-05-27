@@ -65,7 +65,7 @@ Use this when the VMs are new or were just recreated by Terraform.
 6. Optionally install Homepage:
 
    ```bash
-   ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-homepage.yml
+   make k3s-homepage
    ```
 
 ## Existing Cluster Reconcile Flow
@@ -98,7 +98,7 @@ ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-plat
 
 ```bash
 cd /home/notebook/projects/coin-ops
-ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-homepage.yml
+make k3s-homepage
 ```
 
 ## When `provision.yml` Is Required Again

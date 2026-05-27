@@ -7,6 +7,17 @@ app:
   name: {{ k3s_homepage_app_name }}
   namespace: {{ k3s_homepage_namespace }}
 
+serviceAccount:
+  create: true
+  name: {{ k3s_homepage_service_account_name }}
+
+rbac:
+  create: true
+  clusterRoleName: {{ k3s_homepage_cluster_role_name }}
+
+resources:
+{{ k3s_homepage_resources | to_nice_yaml(indent=2) | indent(2, true) }}
+
 config:
   title: Homepage
   allowedHosts: {{ k3s_homepage_hostname }}

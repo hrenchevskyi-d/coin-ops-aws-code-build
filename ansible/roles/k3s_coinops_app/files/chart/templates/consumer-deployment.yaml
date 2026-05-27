@@ -40,3 +40,5 @@ spec:
             {{- end }}
           securityContext:
             allowPrivilegeEscalation: false
+          resources:
+{{ toYaml .Values.consumer.resources | indent 12 }}

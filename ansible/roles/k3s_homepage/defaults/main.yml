@@ -23,4 +23,27 @@ k3s_homepage_bookmarks:
           - abbr: YT
             href: https://www.youtube.com/
 k3s_homepage_services: []
-k3s_homepage_widgets: []
+# Homepage can talk to the in-cluster API via its own ServiceAccount.
+# The default widget exposes read-only cluster and node CPU/memory summaries.
+k3s_homepage_widgets:
+  - kubernetes:
+      cluster:
+        show: true
+        cpu: true
+        memory: true
+        showLabel: true
+        label: cluster
+      nodes:
+        show: true
+        cpu: true
+        memory: true
+        showLabel: true
+k3s_homepage_service_account_name: homepage
+k3s_homepage_cluster_role_name: homepage
+k3s_homepage_resources:
+  requests:
+    cpu: 25m
+    memory: 128Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi

@@ -13,6 +13,8 @@ spec:
       labels:
         {{- include "homepage.labels" . | nindent 8 }}
     spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      automountServiceAccountToken: true
       containers:
         - name: {{ .Values.app.name }}
           image: {{ .Values.image }}
@@ -23,6 +25,8 @@ spec:
           ports:
             - containerPort: {{ .Values.service.port }}
               name: http
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
           volumeMounts:
             - name: homepage-config-data
               mountPath: /app/config

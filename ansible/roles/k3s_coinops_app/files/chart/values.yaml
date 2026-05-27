@@ -12,14 +12,35 @@ proxy:
   image: ""
   servicePort: 8080
   replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
 historyApi:
   name: coinops-history-api
   serviceAccountName: coinops-history-api
   image: ""
   servicePort: 8000
   replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
 consumer:
   name: coinops-history-consumer
   serviceAccountName: coinops-history-consumer
   image: ""
   replicas: 1
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 150m
+      memory: 128Mi

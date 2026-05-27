@@ -7,6 +7,22 @@ app:
   name: homepage
   namespace: homepage
 
+serviceAccount:
+  create: true
+  name: homepage
+
+rbac:
+  create: true
+  clusterRoleName: homepage
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 128Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+
 config:
   title: Homepage
   allowedHosts: home.coinops.test

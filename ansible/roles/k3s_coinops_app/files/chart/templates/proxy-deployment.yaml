@@ -62,3 +62,5 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
+          resources:
+{{ toYaml .Values.proxy.resources | indent 12 }}

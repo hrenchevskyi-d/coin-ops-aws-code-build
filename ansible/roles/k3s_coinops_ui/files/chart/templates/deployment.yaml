@@ -28,6 +28,8 @@ spec:
               value: /api
             - name: HISTORY_URL
               value: /history-api
+          resources:
+{{ toYaml .Values.ui.resources | indent 12 }}
           ports:
             - name: http
               containerPort: 80

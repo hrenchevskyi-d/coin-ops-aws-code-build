@@ -17,10 +17,33 @@ k3s_coinops_app_proxy_name: coinops-proxy
 k3s_coinops_app_proxy_image: "{{ proxy_image }}"
 k3s_coinops_app_proxy_service_port: 8080
 k3s_coinops_app_proxy_replicas: 1
+# Conservative starting budget based on current kubectl top output.
+# These are intentionally modest so the small lab cluster keeps plenty of headroom.
+k3s_coinops_app_proxy_resources:
+  requests:
+    cpu: 25m
+    memory: 32Mi
+  limits:
+    cpu: 250m
+    memory: 128Mi
 k3s_coinops_app_history_api_name: coinops-history-api
 k3s_coinops_app_history_api_image: "{{ history_api_image }}"
 k3s_coinops_app_history_api_service_port: 8000
 k3s_coinops_app_history_api_replicas: 1
+k3s_coinops_app_history_api_resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
 k3s_coinops_app_consumer_name: coinops-history-consumer
 k3s_coinops_app_consumer_image: "{{ history_consumer_image }}"
 k3s_coinops_app_consumer_replicas: 1
+k3s_coinops_app_consumer_resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    cpu: 150m
+    memory: 128Mi

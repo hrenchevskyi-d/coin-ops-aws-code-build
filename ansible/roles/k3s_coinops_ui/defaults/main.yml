@@ -21,3 +21,11 @@ k3s_coinops_ui_proxy_service_port: 8080
 k3s_coinops_ui_history_service_name: coinops-history-api
 k3s_coinops_ui_history_service_namespace: coinops-app
 k3s_coinops_ui_history_service_port: 8000
+# UI nginx is tiny, so we keep its guaranteed footprint very small.
+k3s_coinops_ui_resources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi

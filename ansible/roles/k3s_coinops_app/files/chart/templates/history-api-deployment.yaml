@@ -47,3 +47,5 @@ spec:
             periodSeconds: 20
           securityContext:
             allowPrivilegeEscalation: false
+          resources:
+{{ toYaml .Values.historyApi.resources | indent 12 }}
