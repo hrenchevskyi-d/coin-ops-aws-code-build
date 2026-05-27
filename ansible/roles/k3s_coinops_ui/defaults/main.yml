@@ -1,0 +1,23 @@
+---
+k3s_coinops_ui_enabled: "{{ deploy_config.coinops_enabled | default(true) | bool }}"
+k3s_coinops_ui_namespace: coinops-ui
+k3s_coinops_ui_release_name: coinops-ui
+k3s_coinops_ui_chart_source_dir: "{{ role_path }}/files/chart"
+k3s_coinops_ui_chart_staging_dir: /tmp/coinops-ui-chart
+k3s_coinops_ui_chart_values_path: "{{ k3s_coinops_ui_chart_staging_dir }}/values.coinops.yaml"
+k3s_coinops_ui_app_name: coinops-ui
+k3s_coinops_ui_registry_pull_secret_name: ghcr-pull-secret
+k3s_coinops_ui_image: "{{ ui_image }}"
+k3s_coinops_ui_service_port: 80
+k3s_coinops_ui_hostname: "{{ deploy_config.coinops_hostname | default(app_domain) }}"
+k3s_coinops_ui_ingress_enabled: "{{ deploy_config.coinops_ingress_enabled | default(true) | bool }}"
+k3s_coinops_ui_ingress_class_name: "{{ deploy_config.coinops_ingress_class_name | default('traefik') }}"
+k3s_coinops_ui_tls_enabled: "{{ tls_mode == 'certbot' }}"
+k3s_coinops_ui_tls_secret_name: coinops-ui-tls
+k3s_coinops_ui_certificate_name: coinops-ui-tls
+k3s_coinops_ui_proxy_service_name: coinops-proxy
+k3s_coinops_ui_proxy_service_namespace: coinops-app
+k3s_coinops_ui_proxy_service_port: 8080
+k3s_coinops_ui_history_service_name: coinops-history-api
+k3s_coinops_ui_history_service_namespace: coinops-app
+k3s_coinops_ui_history_service_port: 8000

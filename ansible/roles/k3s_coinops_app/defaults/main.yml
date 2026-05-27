@@ -1,0 +1,26 @@
+---
+k3s_coinops_app_enabled: "{{ deploy_config.coinops_enabled | default(true) | bool }}"
+k3s_coinops_app_namespace: coinops-app
+k3s_coinops_app_release_name: coinops-app
+k3s_coinops_app_chart_source_dir: "{{ role_path }}/files/chart"
+k3s_coinops_app_chart_staging_dir: /tmp/coinops-app-chart
+k3s_coinops_app_chart_values_path: "{{ k3s_coinops_app_chart_staging_dir }}/values.coinops.yaml"
+k3s_coinops_app_runtime_backend: "{{ deploy_config.coinops_runtime_backend | default('postgres') }}"
+k3s_coinops_app_registry_pull_secret_name: ghcr-pull-secret
+k3s_coinops_app_database_secret_name: coinops-app-secrets
+k3s_coinops_app_database_name: "{{ db_name }}"
+k3s_coinops_app_database_host: "coinops-postgres-rw.coinops-data.svc.cluster.local"
+k3s_coinops_app_database_url: "postgresql://{{ db_user_urlencoded }}:{{ db_password_urlencoded }}@{{ k3s_coinops_app_database_host }}:5432/{{ k3s_coinops_app_database_name }}"
+k3s_coinops_app_rabbitmq_url: ""
+k3s_coinops_app_redis_url: ""
+k3s_coinops_app_proxy_name: coinops-proxy
+k3s_coinops_app_proxy_image: "{{ proxy_image }}"
+k3s_coinops_app_proxy_service_port: 8080
+k3s_coinops_app_proxy_replicas: 1
+k3s_coinops_app_history_api_name: coinops-history-api
+k3s_coinops_app_history_api_image: "{{ history_api_image }}"
+k3s_coinops_app_history_api_service_port: 8000
+k3s_coinops_app_history_api_replicas: 1
+k3s_coinops_app_consumer_name: coinops-history-consumer
+k3s_coinops_app_consumer_image: "{{ history_consumer_image }}"
+k3s_coinops_app_consumer_replicas: 1

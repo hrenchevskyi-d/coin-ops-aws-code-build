@@ -6,6 +6,9 @@ tls-san:
   - "{{ san }}"
 {% endfor %}
 flannel-backend: "{{ k3s_flannel_backend }}"
+{% if k3s_disable_cloud_controller %}
+disable-cloud-controller: true
+{% endif %}
 {% if k3s_server_disable_components | length > 0 %}
 disable:
 {% for component in k3s_server_disable_components %}

@@ -1,0 +1,13 @@
+ui:
+  name: coinops-ui
+  serviceAccountName: coinops-ui
+  imagePullSecretName: ghcr-pull-secret
+  imagePullSecretDockerConfigJson: ""
+  image: ""
+  servicePort: 80
+  proxyServiceName: coinops-proxy
+  proxyServiceNamespace: coinops-app
+  proxyServicePort: 8080
+  historyServiceName: coinops-history-api
+  historyServiceNamespace: coinops-app
+  historyServicePort: 8000

@@ -1,0 +1,67 @@
+---
+- name: Validate Coin-Ops k3s deployment contract
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  pre_tasks:
+    - name: Resolve runtime configuration for Coin-Ops deployment validation
+      include_role:
+        name: runtime_config
+        public: true
+      tags: [runtime_config, coinops]
+  tasks:
+    - name: Assert that a k3s control plane group exists
+      assert:
+        that:
+          - "'role_k3s_server' in groups"
+          - (groups['role_k3s_server'] | length) > 0
+        fail_msg: >-
+          Coin-Ops k3s deployment requires at least one host in role_k3s_server.
+
+    - name: Assert Coin-Ops k3s runtime prerequisites
+      assert:
+        that:
+          - deploy_config.coinops_runtime_backend | default('postgres') == 'postgres'
+          - registry_username | length > 0
+          - registry_token | length > 0
+          - db_password | length > 0
+          - postgres_runtime_image | length > 0
+          - postgres_runtime_image is regex('.+:[0-9]+([._-].+)?$')
+        fail_msg: >-
+          Coin-Ops k3s deployment currently expects runtime_backend=postgres,
+          private registry credentials, a DB password resolved from the configured
+          secret backend, and a postgres_runtime_image whose tag starts with a
+          PostgreSQL major version such as 16-shabat-latest.
+
+- name: Install Coin-Ops on k3s
+  hosts: "{{ groups.get('role_k3s_server', ['localhost']) | sort | first }}"
+  become: true
+  gather_facts: false
+  pre_tasks:
+    - name: Resolve runtime configuration for Coin-Ops deployment
+      include_role:
+        name: runtime_config
+        public: true
+      tags: [runtime_config, coinops]
+
+    - name: Wait for k3s service to report active
+      command: systemctl is-active k3s
+      register: k3s_coinops_service_status
+      changed_when: false
+      retries: 30
+      delay: 5
+      until: (k3s_coinops_service_status.stdout | trim) == "active"
+      tags: [coinops, k3s]
+
+    - name: Wait for local Kubernetes API port on bootstrap node
+      wait_for:
+        host: 127.0.0.1
+        port: 6443
+        timeout: 180
+        delay: 0
+        sleep: 5
+      tags: [coinops, k3s]
+  roles:
+    - k3s_coinops_data
+    - k3s_coinops_app
+    - k3s_coinops_ui

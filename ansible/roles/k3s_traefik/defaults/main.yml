@@ -1,0 +1,9 @@
+---
+k3s_traefik_enabled: true
+k3s_traefik_manifest_path: /var/lib/rancher/k3s/server/manifests/k3s-traefik-config.yaml
+k3s_traefik_chart_name: traefik
+k3s_traefik_chart_namespace: kube-system
+k3s_traefik_deployment_kind: DaemonSet
+k3s_traefik_service_type: ClusterIP
+k3s_traefik_web_host_port: 80
+k3s_traefik_websecure_host_port: 443

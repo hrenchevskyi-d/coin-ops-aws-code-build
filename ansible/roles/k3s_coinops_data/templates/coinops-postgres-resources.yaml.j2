@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ k3s_coinops_data_registry_pull_secret_name }}
+  namespace: {{ k3s_coinops_data_namespace }}
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: "{{ {'auths': {image_registry_host: {'username': registry_username, 'password': registry_token, 'auth': ((registry_username ~ ':' ~ registry_token) | b64encode)}}} | to_json | b64encode }}"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ k3s_coinops_data_superuser_secret_name }}
+  namespace: {{ k3s_coinops_data_namespace }}
+type: kubernetes.io/basic-auth
+stringData:
+  username: postgres
+  password: "{{ db_password }}"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ k3s_coinops_data_app_secret_name }}
+  namespace: {{ k3s_coinops_data_namespace }}
+type: kubernetes.io/basic-auth
+stringData:
+  username: "{{ k3s_coinops_data_app_user }}"
+  password: "{{ db_password }}"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ k3s_coinops_data_runtime_configmap_name }}
+  namespace: {{ k3s_coinops_data_namespace }}
+data:
+{% for filename in k3s_coinops_data_runtime_sql_files %}
+  {{ filename }}: |
+{{ lookup('file', repo_root ~ '/runtime/' ~ filename) | indent(4, true) }}
+{% endfor %}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ k3s_coinops_data_cluster_name }}
+  namespace: {{ k3s_coinops_data_namespace }}
+spec:
+  instances: {{ k3s_coinops_data_instances }}
+  enableSuperuserAccess: true
+  imageName: {{ k3s_coinops_data_postgres_image }}
+  postgresUID: {{ k3s_coinops_data_postgres_uid }}
+  postgresGID: {{ k3s_coinops_data_postgres_gid }}
+  imagePullSecrets:
+    - name: {{ k3s_coinops_data_registry_pull_secret_name }}
+  superuserSecret:
+    name: {{ k3s_coinops_data_superuser_secret_name }}
+  bootstrap:
+    initdb:
+      database: {{ k3s_coinops_data_database_name }}
+      owner: {{ k3s_coinops_data_app_user }}
+      secret:
+        name: {{ k3s_coinops_data_app_secret_name }}
+  storage:
+    size: {{ k3s_coinops_data_storage_size }}
+  postgresql:
+    shared_preload_libraries:
+      - pg_cron
+    parameters:
+      cron.database_name: "{{ k3s_coinops_data_database_name }}"

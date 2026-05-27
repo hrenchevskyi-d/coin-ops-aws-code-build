@@ -186,3 +186,38 @@ $$;
 COMMENT ON FUNCTION runtime.fail_event(BIGINT, TEXT, INT) IS
   'Record a processing failure. Re-schedules the message with exponential back-off '
   'until p_max_tries is reached, then promotes to events_dlq.';
+
+-- ── Privilege hardening / grants ────────────────────────────────────────────
+-- Application roles need USAGE on the runtime schema to resolve function names
+-- and EXECUTE on the queue wrapper functions. The actual table/pgmq access
+-- stays encapsulated inside SECURITY DEFINER functions.
+REVOKE EXECUTE ON FUNCTION
+    runtime.enqueue_event(JSONB),
+    runtime.claim_events(INT, INT),
+    runtime.ack_event(BIGINT),
+    runtime.fail_event(BIGINT, TEXT, INT)
+FROM PUBLIC;
+
+DO $$
+DECLARE
+    v_role TEXT := current_setting('runtime.app_role', true);
+BEGIN
+    IF v_role IS NULL OR v_role = '' THEN
+        RAISE NOTICE
+          'runtime.app_role not set — skipping queue wrapper grants. '
+          'Re-run with: SET runtime.app_role = ''<role>''; '
+          '\i runtime/02_wrappers.sql (or set persistently via '
+          'ALTER DATABASE <db> SET runtime.app_role = ''<role>'';).';
+        RETURN;
+    END IF;
+
+    EXECUTE format('GRANT USAGE ON SCHEMA runtime TO %I', v_role);
+    EXECUTE format(
+      'GRANT EXECUTE ON FUNCTION '
+      'runtime.enqueue_event(JSONB), '
+      'runtime.claim_events(INT, INT), '
+      'runtime.ack_event(BIGINT), '
+      'runtime.fail_event(BIGINT, TEXT, INT) '
+      'TO %I', v_role);
+END;
+$$;

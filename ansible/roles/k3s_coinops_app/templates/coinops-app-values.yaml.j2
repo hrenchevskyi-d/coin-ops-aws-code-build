@@ -1,0 +1,25 @@
+runtimeBackend: {{ k3s_coinops_app_runtime_backend | to_json }}
+imagePullSecretName: {{ k3s_coinops_app_registry_pull_secret_name | to_json }}
+imagePullSecretDockerConfigJson: {{ {'auths': {image_registry_host: {'username': registry_username, 'password': registry_token, 'auth': ((registry_username ~ ':' ~ registry_token) | b64encode)}}} | to_json | b64encode | to_json }}
+secret:
+  name: {{ k3s_coinops_app_database_secret_name | to_json }}
+  databaseUrl: {{ k3s_coinops_app_database_url | to_json }}
+  rabbitmqUrl: {{ k3s_coinops_app_rabbitmq_url | to_json }}
+  redisUrl: {{ k3s_coinops_app_redis_url | to_json }}
+proxy:
+  name: {{ k3s_coinops_app_proxy_name | to_json }}
+  serviceAccountName: "coinops-proxy"
+  image: {{ k3s_coinops_app_proxy_image | to_json }}
+  servicePort: {{ k3s_coinops_app_proxy_service_port }}
+  replicas: {{ k3s_coinops_app_proxy_replicas }}
+historyApi:
+  name: {{ k3s_coinops_app_history_api_name | to_json }}
+  serviceAccountName: "coinops-history-api"
+  image: {{ k3s_coinops_app_history_api_image | to_json }}
+  servicePort: {{ k3s_coinops_app_history_api_service_port }}
+  replicas: {{ k3s_coinops_app_history_api_replicas }}
+consumer:
+  name: {{ k3s_coinops_app_consumer_name | to_json }}
+  serviceAccountName: "coinops-history-consumer"
+  image: {{ k3s_coinops_app_consumer_image | to_json }}
+  replicas: {{ k3s_coinops_app_consumer_replicas }}

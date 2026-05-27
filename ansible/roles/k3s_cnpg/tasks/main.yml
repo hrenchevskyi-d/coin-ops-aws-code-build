@@ -1,0 +1,25 @@
+---
+- name: k3s-cnpg-install-helm-client
+  include_role:
+    name: k3s_helm_client
+  when: k3s_cnpg_enabled | bool
+  tags: [coinops, k3s, cnpg, helm]
+
+- name: k3s-cnpg-add-helm-repository
+  kubernetes.core.helm_repository:
+    name: "{{ k3s_cnpg_chart_repo_name }}"
+    repo_url: "{{ k3s_cnpg_chart_repo_url }}"
+  when: k3s_cnpg_enabled | bool
+  tags: [coinops, k3s, cnpg, helm]
+
+- name: k3s-cnpg-install-or-upgrade-operator
+  kubernetes.core.helm:
+    name: "{{ k3s_cnpg_release_name }}"
+    chart_ref: "{{ k3s_cnpg_chart_ref }}"
+    release_namespace: "{{ k3s_cnpg_namespace }}"
+    create_namespace: true
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    values: "{{ k3s_cnpg_values }}"
+    wait: true
+  when: k3s_cnpg_enabled | bool
+  tags: [coinops, k3s, cnpg, helm]

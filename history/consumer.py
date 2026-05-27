@@ -261,6 +261,10 @@ def run_postgres_worker(db_ref: dict) -> None:
             time.sleep(5)
             db_ref["conn"] = reconnect_postgres(db_ref.get("conn"))
         except Exception as exc:
+            try:
+                db_ref["conn"].rollback()
+            except Exception:
+                pass
             log.error("postgres worker loop error: %s - retrying in 5 sec", exc)
             time.sleep(5)
 

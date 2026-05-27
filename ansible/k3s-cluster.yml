@@ -71,6 +71,19 @@
         name: k3s_server_join
       when: inventory_hostname != (groups.get('role_k3s_server', ['localhost']) | sort | first)
 
+- name: Configure packaged Traefik on all k3s servers
+  hosts: role_k3s_server
+  become: yes
+  gather_facts: no
+  pre_tasks:
+    - name: Resolve runtime configuration for Traefik customization
+      include_role:
+        name: runtime_config
+        public: true
+      tags: [runtime_config, k3s, traefik]
+  roles:
+    - k3s_traefik
+
 - name: Validate the finished cluster and export kubeconfig
   hosts: "{{ groups.get('role_k3s_server', ['localhost']) | sort | first }}"
   become: yes

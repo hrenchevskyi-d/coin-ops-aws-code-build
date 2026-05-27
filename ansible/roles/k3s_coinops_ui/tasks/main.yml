@@ -1,0 +1,86 @@
+---
+- name: k3s-coinops-ui-install-helm-client
+  include_role:
+    name: k3s_helm_client
+  when: k3s_coinops_ui_enabled | bool
+  tags: [coinops, k3s, ui, helm]
+
+- name: k3s-coinops-ui-install-cert-manager
+  include_role:
+    name: k3s_cert_manager
+  when: k3s_coinops_ui_tls_enabled | bool
+  tags: [coinops, k3s, ui, cert_manager, tls]
+
+- name: k3s-coinops-ui-configure-acme-cloudflare-issuer
+  include_role:
+    name: k3s_acme_cloudflare
+  when: k3s_coinops_ui_tls_enabled | bool
+  tags: [coinops, k3s, ui, cert_manager, tls]
+
+- name: k3s-coinops-ui-stage-helm-chart
+  copy:
+    src: "{{ k3s_coinops_ui_chart_source_dir }}/"
+    dest: "{{ k3s_coinops_ui_chart_staging_dir }}/"
+  when: k3s_coinops_ui_enabled | bool
+  tags: [coinops, k3s, ui, helm]
+
+- name: k3s-coinops-ui-render-helm-values
+  template:
+    src: coinops-ui-values.yaml.j2
+    dest: "{{ k3s_coinops_ui_chart_values_path }}"
+    mode: "0644"
+  when: k3s_coinops_ui_enabled | bool
+  tags: [coinops, k3s, ui, helm]
+
+- name: k3s-coinops-ui-install-or-upgrade-release
+  kubernetes.core.helm:
+    name: "{{ k3s_coinops_ui_release_name }}"
+    chart_ref: "{{ k3s_coinops_ui_chart_staging_dir }}"
+    release_namespace: "{{ k3s_coinops_ui_namespace }}"
+    create_namespace: true
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    wait: true
+    values_files:
+      - "{{ k3s_coinops_ui_chart_values_path }}"
+  when: k3s_coinops_ui_enabled | bool
+  tags: [coinops, k3s, ui, helm]
+
+- name: k3s-coinops-ui-read-deployment-status
+  kubernetes.core.k8s_info:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    api_version: apps/v1
+    kind: Deployment
+    namespace: "{{ k3s_coinops_ui_namespace }}"
+    name: "{{ k3s_coinops_ui_app_name }}"
+  register: k3s_coinops_ui_deployment_info
+  retries: 30
+  delay: 10
+  until: >-
+    (
+      k3s_coinops_ui_deployment_info.resources | default([]) | length
+    ) > 0 and
+    (
+      k3s_coinops_ui_deployment_info.resources[0].status.availableReplicas | default(0) | int
+    ) >= 1
+  when: k3s_coinops_ui_enabled | bool
+  tags: [coinops, k3s, ui]
+
+- name: k3s-coinops-ui-configure-ingress-and-certificate
+  include_role:
+    name: k3s_ingress_endpoint
+  vars:
+    k3s_ingress_endpoint_name: "{{ k3s_coinops_ui_app_name }}"
+    k3s_ingress_endpoint_namespace: "{{ k3s_coinops_ui_namespace }}"
+    k3s_ingress_endpoint_class_name: "{{ k3s_coinops_ui_ingress_class_name }}"
+    k3s_ingress_endpoint_host: "{{ k3s_coinops_ui_hostname }}"
+    k3s_ingress_endpoint_service_name: "{{ k3s_coinops_ui_app_name }}"
+    k3s_ingress_endpoint_service_port: "{{ k3s_coinops_ui_service_port }}"
+    k3s_ingress_endpoint_tls_enabled: "{{ k3s_coinops_ui_tls_enabled | bool }}"
+    k3s_ingress_endpoint_tls_secret_name: "{{ k3s_coinops_ui_tls_secret_name }}"
+    k3s_ingress_endpoint_certificate_name: "{{ k3s_coinops_ui_certificate_name }}"
+    k3s_ingress_endpoint_cluster_issuer_name: "{{ k3s_acme_cloudflare_cluster_issuer_name | default('letsencrypt-dns-cloudflare') }}"
+  when:
+    - k3s_coinops_ui_enabled | bool
+    - k3s_coinops_ui_ingress_enabled | bool
+  tags: [coinops, k3s, ui]
+

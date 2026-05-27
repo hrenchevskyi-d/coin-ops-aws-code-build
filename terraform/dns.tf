@@ -6,8 +6,10 @@ locals {
   dns_primary_cloud       = try(local.dns.primary_cloud, local.control_plane_cloud)
   dns_ttl                 = try(local.cloudflare_config.ttl, 60)
   dns_proxied             = try(local.cloudflare_config.proxied, false)
+  coinops_domain          = try(local.deploy.coinops.hostname, local.app_domain)
   headlamp_domain         = try(local.deploy.headlamp.hostname, "headlamp.${local.app_domain}")
   homepage_domain_for_dns = try(local.deploy.homepage.hostname, "home.${local.app_domain}")
+  coinops_dns_name        = local.coinops_domain == local.app_domain ? "@" : trimsuffix(local.coinops_domain, ".${local.app_domain}")
   headlamp_dns_name       = local.headlamp_domain == local.app_domain ? "@" : trimsuffix(local.headlamp_domain, ".${local.app_domain}")
   homepage_dns_name       = local.homepage_domain_for_dns == local.app_domain ? "@" : trimsuffix(local.homepage_domain_for_dns, ".${local.app_domain}")
 
@@ -30,13 +32,14 @@ locals {
   dns_has_api_token   = nonsensitive(local.effective_cloudflare_api_token) != ""
   dns_enabled         = (local.gcp_enabled || local.aws_enabled || local.azure_enabled) && local.dns_has_api_token && local.cloudflare_zone_id != ""
   dns_primary_has_ui  = lookup(local.cloud_has_ui, local.dns_primary_cloud, false)
+  coinops_public_ip   = local.gcp_k3s_public_ingress_lb_enabled ? try(module.gcp_k3s_public_ingress_lb[0].ip_address, "") : ""
   headlamp_private_ip = local.gcp_k3s_ingress_lb_enabled ? try(module.gcp_k3s_ingress_lb[0].ip_address, "") : ""
   homepage_public_ip  = local.gcp_k3s_public_ingress_lb_enabled ? try(module.gcp_k3s_public_ingress_lb[0].ip_address, "") : ""
   cloudflare_dns_records = {
     root_a = {
-      enabled         = local.dns_enabled && local.dns_primary_has_ui
-      name            = "@"
-      content         = local.ui_public_ips[local.dns_primary_cloud]
+      enabled         = local.dns_enabled && local.gcp_k3s_public_ingress_lb_enabled
+      name            = local.coinops_dns_name
+      content         = local.coinops_public_ip
       type            = "A"
       proxied         = local.dns_proxied
       ttl             = local.dns_ttl

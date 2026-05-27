@@ -1,0 +1,7 @@
+apiVersion: v2
+name: coinops-ui
+description: Coin-Ops browser-facing UI
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+

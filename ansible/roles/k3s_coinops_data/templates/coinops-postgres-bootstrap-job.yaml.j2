@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ k3s_coinops_data_bootstrap_job_name }}
+  namespace: {{ k3s_coinops_data_namespace }}
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ k3s_coinops_data_bootstrap_job_name }}
+    spec:
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: {{ k3s_coinops_data_registry_pull_secret_name }}
+      containers:
+        - name: bootstrap
+          image: {{ k3s_coinops_data_postgres_image }}
+          command:
+            - /bin/bash
+            - -ec
+            - |
+              export PGPASSWORD="$(cat /secrets/superuser/password)"
+              PGHOST="{{ k3s_coinops_data_cluster_name }}-rw.{{ k3s_coinops_data_namespace }}.svc.cluster.local"
+              PGPORT="5432"
+              PGUSER="$(cat /secrets/superuser/username)"
+              until psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d postgres -c "SELECT 1" >/dev/null 2>&1; do
+                echo "Waiting for PostgreSQL cluster to accept connections..."
+                sleep 5
+              done
+              psql -v ON_ERROR_STOP=1 -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d postgres \
+                -c "ALTER DATABASE {{ k3s_coinops_data_database_name }} SET runtime.app_role = '{{ k3s_coinops_data_app_role }}';"
+              cd /bootstrap
+              psql -v ON_ERROR_STOP=1 -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d {{ k3s_coinops_data_database_name }} \
+                -f runtime/00_run_all.sql
+          volumeMounts:
+            - name: superuser-secret
+              mountPath: /secrets/superuser
+              readOnly: true
+            - name: runtime-bootstrap
+              mountPath: /bootstrap
+              readOnly: true
+      volumes:
+        - name: superuser-secret
+          secret:
+            secretName: {{ k3s_coinops_data_superuser_secret_name }}
+        - name: runtime-bootstrap
+          configMap:
+            name: {{ k3s_coinops_data_runtime_configmap_name }}
+            items:
+{% for filename in k3s_coinops_data_runtime_sql_files %}
+              - key: {{ filename }}
+                path: runtime/{{ filename }}
+{% endfor %}

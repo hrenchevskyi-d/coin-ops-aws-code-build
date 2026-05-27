@@ -108,6 +108,7 @@ materializes values in this order:
    - `APP_DOMAIN`
    - `TLS_MODE`
    - `IMAGE_TAG`
+   - `POSTGRES_RUNTIME_IMAGE`
    - `COINOPS_SECRET_BACKEND`
 5. Secret payloads from the selected backend
 
@@ -119,6 +120,7 @@ This role exports values such as:
 - `certbot_staging`
 - `image_registry`
 - `image_tag`
+- `postgres_runtime_image`
 - `cloudflare_api_token`
 - `tailscale_auth_key`
 - `k3s_api_endpoint`

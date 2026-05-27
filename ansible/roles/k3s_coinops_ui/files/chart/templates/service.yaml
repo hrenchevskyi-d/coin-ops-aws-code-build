@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.ui.name }}
+  labels:
+{{ include "coinops-ui.labels" . | indent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: {{ .Values.ui.name }}
+  ports:
+    - name: http
+      port: {{ .Values.ui.servicePort }}
+      targetPort: http
+      protocol: TCP

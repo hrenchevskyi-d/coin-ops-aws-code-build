@@ -1,0 +1,29 @@
+---
+k3s_coinops_data_enabled: "{{ deploy_config.coinops_enabled | default(true) | bool }}"
+k3s_coinops_data_namespace: coinops-data
+k3s_coinops_data_cluster_name: coinops-postgres
+k3s_coinops_data_instances: 1
+k3s_coinops_data_storage_size: 20Gi
+k3s_coinops_data_postgres_image: "{{ postgres_runtime_image }}"
+k3s_coinops_data_postgres_uid: 70
+k3s_coinops_data_postgres_gid: 70
+k3s_coinops_data_database_name: "{{ db_name }}"
+k3s_coinops_data_app_user: "{{ db_user }}"
+k3s_coinops_data_app_role: "{{ k3s_coinops_data_app_user }}"
+k3s_coinops_data_superuser_secret_name: coinops-postgres-superuser
+k3s_coinops_data_app_secret_name: coinops-postgres-app
+k3s_coinops_data_runtime_configmap_name: coinops-postgres-runtime
+k3s_coinops_data_bootstrap_job_name: coinops-postgres-runtime-bootstrap
+k3s_coinops_data_registry_pull_secret_name: ghcr-pull-secret
+k3s_coinops_data_cnpg_operator_config_name: cnpg-controller-manager-config
+k3s_coinops_data_cnpg_namespace: cnpg-system
+k3s_coinops_data_runtime_sql_files:
+  - 00_run_all.sql
+  - 01_schema.sql
+  - 02_wrappers.sql
+  - 03_notify.sql
+  - 04_advisory.sql
+  - 05_dlq.sql
+  - 06_cache_schema.sql
+  - 07_cache_wrappers.sql
+  - 08_cron.sql

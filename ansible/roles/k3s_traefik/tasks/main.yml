@@ -1,0 +1,8 @@
+---
+- name: k3s-traefik-render-packaged-traefik-helmchartconfig
+  template:
+    src: traefik-config.yaml.j2
+    dest: "{{ k3s_traefik_manifest_path }}"
+    mode: "0644"
+  when: k3s_traefik_enabled | bool
+  tags: [k3s, traefik]

@@ -17,7 +17,7 @@
 --     the pg_cron launcher bgworker binds to exactly one DB, so jobs
 --     registered anywhere else are inert. See docs/runtime.md.
 --   • Before running, set the application role via the GUC,
---     e.g. ALTER DATABASE <db> SET runtime.app_role = 'cognitor_app';
+--     e.g. ALTER DATABASE <db> SET runtime.app_role = 'cognitor';
 --     otherwise [7/8] runs the REVOKE, skips the GRANT, and the proxy will
 --     get permission-denied at runtime.
 -- =============================================================================

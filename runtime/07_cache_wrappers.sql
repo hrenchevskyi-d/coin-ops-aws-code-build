@@ -239,6 +239,7 @@ BEGIN
         RETURN;
     END IF;
 
+    EXECUTE format('GRANT USAGE ON SCHEMA runtime TO %I', v_role);
     EXECUTE format(
       'GRANT EXECUTE ON FUNCTION '
       'runtime.cache_set(TEXT, JSONB, INTERVAL), '

@@ -16,7 +16,9 @@
         "runtime_backend": "external",
         "k3s": {
             "channel": "stable",
-            "disable_components": [],
+            "version": "v1.35.4+k3s1",
+            "disable_cloud_controller": true,
+            "disable_components": ["servicelb"],
             "flannel_backend": "vxlan"
         },
         "public_ingress": {
@@ -39,6 +41,15 @@
                 "class_name": "traefik"
             }
         },
+        "coinops": {
+            "enabled": true,
+            "hostname": "coinops-d.pp.ua",
+            "runtime_backend": "postgres",
+            "ingress": {
+                "enabled": true,
+                "class_name": "traefik"
+            }
+        },
         "ghcr_username": "hrenchevskyi-d",
         "internal_tls": {
             "enabled": true,
@@ -47,7 +58,8 @@
     },
     "images": {
         "registry": "ghcr.io/ua-academy-projects",
-        "tag": "shabat-latest"
+        "tag": "dev-latest",
+        "postgres_runtime_image": "ghcr.io/ua-academy-projects/coin-ops-postgres-runtime:16-dev-latest"
     },
     "ports": {
         "https": 443,

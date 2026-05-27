@@ -1,0 +1,125 @@
+---
+- name: k3s-coinops-data-ensure-cnpg-namespace
+  kubernetes.core.k8s:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ k3s_coinops_data_cnpg_namespace }}"
+  when: k3s_coinops_data_enabled | bool
+  tags: [coinops, k3s, cnpg, data]
+
+- name: k3s-coinops-data-apply-cnpg-operator-config
+  kubernetes.core.k8s:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    state: present
+    definition: "{{ lookup('template', 'cnpg-operator-config.yaml.j2') | from_yaml_all | list }}"
+  when: k3s_coinops_data_enabled | bool
+  tags: [coinops, k3s, cnpg, data]
+
+- name: k3s-coinops-data-remove-legacy-cnpg-operator-configmap
+  kubernetes.core.k8s:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    state: absent
+    api_version: v1
+    kind: ConfigMap
+    namespace: "{{ k3s_coinops_data_cnpg_namespace }}"
+    name: "{{ k3s_coinops_data_cnpg_operator_config_name }}"
+  when: k3s_coinops_data_enabled | bool
+  tags: [coinops, k3s, cnpg, data]
+
+- name: k3s-coinops-data-install-cnpg-operator
+  include_role:
+    name: k3s_cnpg
+  vars:
+    k3s_cnpg_namespace: "{{ k3s_coinops_data_cnpg_namespace }}"
+    k3s_cnpg_values:
+      imagePullSecrets:
+        - name: "{{ k3s_coinops_data_registry_pull_secret_name }}"
+      config:
+        create: true
+        name: "{{ k3s_coinops_data_cnpg_operator_config_name }}"
+        data:
+          PULL_SECRET_NAME: "{{ k3s_coinops_data_registry_pull_secret_name }}"
+  when: k3s_coinops_data_enabled | bool
+  tags: [coinops, k3s, cnpg, data]
+
+- name: k3s-coinops-data-ensure-namespace
+  kubernetes.core.k8s:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ k3s_coinops_data_namespace }}"
+  when: k3s_coinops_data_enabled | bool
+  tags: [coinops, k3s, data]
+
+- name: k3s-coinops-data-apply-cluster-resources
+  kubernetes.core.k8s:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    state: present
+    definition: "{{ lookup('template', 'coinops-postgres-resources.yaml.j2') | from_yaml_all | list }}"
+  when: k3s_coinops_data_enabled | bool
+  tags: [coinops, k3s, data]
+
+- name: k3s-coinops-data-wait-for-read-write-service
+  kubernetes.core.k8s_info:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    api_version: v1
+    kind: Service
+    namespace: "{{ k3s_coinops_data_namespace }}"
+    name: "{{ k3s_coinops_data_cluster_name }}-rw"
+  register: k3s_coinops_data_rw_service
+  retries: 60
+  delay: 10
+  until: (k3s_coinops_data_rw_service.resources | default([]) | length) > 0
+  when: k3s_coinops_data_enabled | bool
+  tags: [coinops, k3s, data]
+
+- name: k3s-coinops-data-delete-previous-bootstrap-job
+  kubernetes.core.k8s:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    state: absent
+    api_version: batch/v1
+    kind: Job
+    namespace: "{{ k3s_coinops_data_namespace }}"
+    name: "{{ k3s_coinops_data_bootstrap_job_name }}"
+  when: k3s_coinops_data_enabled | bool
+  tags: [coinops, k3s, data]
+
+- name: k3s-coinops-data-apply-bootstrap-job
+  kubernetes.core.k8s:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    state: present
+    definition: "{{ lookup('template', 'coinops-postgres-bootstrap-job.yaml.j2') | from_yaml }}"
+  when: k3s_coinops_data_enabled | bool
+  tags: [coinops, k3s, data]
+
+- name: k3s-coinops-data-wait-for-bootstrap-job
+  kubernetes.core.k8s_info:
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+    api_version: batch/v1
+    kind: Job
+    namespace: "{{ k3s_coinops_data_namespace }}"
+    name: "{{ k3s_coinops_data_bootstrap_job_name }}"
+  register: k3s_coinops_data_bootstrap_job
+  retries: 5
+  delay: 10
+  until: >-
+    (
+      k3s_coinops_data_bootstrap_job.resources | default([]) | length
+    ) > 0 and
+    (
+      k3s_coinops_data_bootstrap_job.resources[0].status.conditions
+      | default([])
+      | selectattr('type', 'equalto', 'Complete')
+      | map(attribute='status')
+      | first
+      | default('False')
+    ) == 'True'
+  when: k3s_coinops_data_enabled | bool
+  tags: [coinops, k3s, data]

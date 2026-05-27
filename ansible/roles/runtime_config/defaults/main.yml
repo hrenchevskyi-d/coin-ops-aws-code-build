@@ -74,6 +74,7 @@ json_deploy_config:
   certbot_staging: "{{ infra_deploy.get('tls', {}).get('certbot', {}).get('staging', infra_deploy.get('certbot', {}).get('staging', false)) }}"
   image_registry: "{{ infra_images.get('registry', 'ghcr.io/ua-academy-projects') }}"
   image_tag: "{{ infra_images.get('tag', 'shabat-latest') }}"
+  postgres_runtime_image: "{{ infra_images.get('postgres_runtime_image', '') }}"
   registry_username: "{{ infra_deploy.get('ghcr_username', '') }}"
   proxy_port: "{{ infra_ports.get('proxy', 8080) }}"
   history_port: "{{ infra_ports.get('history', 8000) }}"
@@ -89,6 +90,8 @@ json_deploy_config:
   provisioning_workload_batch_size: "{{ infra_provisioning.get('workload_batch_size', 4) }}"
   provisioning_upgrade_packages: "{{ infra_provisioning.get('upgrade_packages', false) }}"
   k3s_channel: "{{ infra_deploy.get('k3s', {}).get('channel', 'stable') }}"
+  k3s_version: "{{ infra_deploy.get('k3s', {}).get('version', '') }}"
+  k3s_disable_cloud_controller: "{{ infra_deploy.get('k3s', {}).get('disable_cloud_controller', false) }}"
   k3s_disable_components: "{{ infra_deploy.get('k3s', {}).get('disable_components', []) }}"
   k3s_flannel_backend: "{{ infra_deploy.get('k3s', {}).get('flannel_backend', 'vxlan') }}"
   public_ingress_enabled: "{{ infra_deploy.get('public_ingress', {}).get('enabled', true) }}"
@@ -101,6 +104,11 @@ json_deploy_config:
   homepage_hostname: "{{ infra_deploy.get('homepage', {}).get('hostname', 'home.' ~ infra_deploy.get('app_domain', 'coinops.test')) }}"
   homepage_ingress_enabled: "{{ infra_deploy.get('homepage', {}).get('ingress', {}).get('enabled', true) }}"
   homepage_ingress_class_name: "{{ infra_deploy.get('homepage', {}).get('ingress', {}).get('class_name', 'traefik') }}"
+  coinops_enabled: "{{ infra_deploy.get('coinops', {}).get('enabled', true) }}"
+  coinops_hostname: "{{ infra_deploy.get('coinops', {}).get('hostname', infra_deploy.get('app_domain', 'coinops.test')) }}"
+  coinops_ingress_enabled: "{{ infra_deploy.get('coinops', {}).get('ingress', {}).get('enabled', true) }}"
+  coinops_ingress_class_name: "{{ infra_deploy.get('coinops', {}).get('ingress', {}).get('class_name', 'traefik') }}"
+  coinops_runtime_backend: "{{ infra_deploy.get('coinops', {}).get('runtime_backend', 'postgres') }}"
 
 local_generated_config_path: "{{ repo_root ~ '/ansible/vars/local.generated.json' }}"
 local_generated_config_text: "{{ lookup('file', local_generated_config_path, errors='ignore') | default('{}', true) | string }}"
@@ -244,7 +252,18 @@ proxy_image: "{{ image_registry }}/coin-ops-proxy:{{ image_tag }}"
 history_api_image: "{{ image_registry }}/coin-ops-history-api:{{ image_tag }}"
 history_consumer_image: "{{ image_registry }}/coin-ops-history-consumer:{{ image_tag }}"
 ui_image: "{{ image_registry }}/coin-ops-ui:{{ image_tag }}"
-postgres_runtime_image: "{{ image_registry }}/coin-ops-postgres-runtime:{{ image_tag }}"
+postgres_runtime_image: >-
+  {{
+    lookup('env', 'POSTGRES_RUNTIME_IMAGE')
+    | default(
+        deploy_config.postgres_runtime_image,
+        true
+      )
+    | default(
+        image_registry ~ '/coin-ops-postgres-runtime:' ~ image_tag,
+        true
+      )
+  }}
 postgres_image: "{{ postgres_runtime_image if runtime_backend == 'postgres' else 'postgres:16-alpine' }}"
 registry_username: "{{ lookup('env', 'GHCR_USERNAME') | default(deploy_config.registry_username, true) }}"
 

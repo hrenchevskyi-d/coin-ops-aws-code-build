@@ -127,6 +127,23 @@ This is required so:
 - local kubeconfig artifacts and tunnel helpers are regenerated with the new
   endpoint
 
+## Traefik Exposure Model
+
+The packaged `k3s` Traefik is customized through a `HelmChartConfig` manifest
+rendered by:
+
+- `/home/notebook/projects/coin-ops/ansible/roles/k3s_traefik`
+
+This forces Traefik into:
+
+- `DaemonSet` mode
+- `hostPort` on `80` and `443`
+- `ClusterIP` service type
+
+This is intentional. We do not want the default `LoadBalancer` Traefik service
+to allocate `NodePort`s. The external GCP public ingress load balancer is
+expected to send traffic directly to ports `80/443` on the `k3s` server nodes.
+
 ## Generated Local Artifacts
 
 After `ansible/k3s-cluster.yml`, expect operator-local artifacts under:

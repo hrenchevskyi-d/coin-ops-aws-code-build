@@ -1,0 +1,16 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: {{ k3s_traefik_chart_name }}
+  namespace: {{ k3s_traefik_chart_namespace }}
+spec:
+  valuesContent: |-
+    deployment:
+      kind: {{ k3s_traefik_deployment_kind }}
+    service:
+      type: {{ k3s_traefik_service_type }}
+    ports:
+      web:
+        hostPort: {{ k3s_traefik_web_host_port }}
+      websecure:
+        hostPort: {{ k3s_traefik_websecure_host_port }}

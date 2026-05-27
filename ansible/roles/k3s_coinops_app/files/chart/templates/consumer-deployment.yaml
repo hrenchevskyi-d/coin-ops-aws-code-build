@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.consumer.name }}
+  labels:
+{{ include "coinops-app.labels" . | indent 4 }}
+    app.kubernetes.io/name: {{ .Values.consumer.name }}
+spec:
+  replicas: {{ .Values.consumer.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.consumer.name }}
+  template:
+    metadata:
+      labels:
+{{ include "coinops-app.labels" . | indent 8 }}
+        app.kubernetes.io/name: {{ .Values.consumer.name }}
+    spec:
+      serviceAccountName: {{ .Values.consumer.serviceAccountName }}
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecretName }}
+      containers:
+        - name: history-consumer
+          image: {{ .Values.consumer.image }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: RUNTIME_BACKEND
+              value: {{ .Values.runtimeBackend | quote }}
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secret.name }}
+                  key: DATABASE_URL
+            {{- if eq .Values.runtimeBackend "external" }}
+            - name: RABBITMQ_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secret.name }}
+                  key: RABBITMQ_URL
+            {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
