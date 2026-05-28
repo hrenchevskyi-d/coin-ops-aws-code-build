@@ -1,0 +1,10 @@
+---
+k3s_headlamp_tunnel_enabled: "{{ infra_deploy.get('headlamp', {}).get('cloudflare_tunnel', {}).get('enabled', false) | bool }}"
+k3s_headlamp_tunnel_namespace: "{{ infra_deploy.get('headlamp', {}).get('cloudflare_tunnel', {}).get('namespace', 'cloudflare-tunnel') }}"
+k3s_headlamp_tunnel_release_name: "{{ infra_deploy.get('headlamp', {}).get('cloudflare_tunnel', {}).get('release_name', 'headlamp-tunnel') }}"
+k3s_headlamp_tunnel_chart_repo_name: cloudflare
+k3s_headlamp_tunnel_chart_repo_url: https://cloudflare.github.io/helm-charts
+k3s_headlamp_tunnel_chart_ref: cloudflare/cloudflare-tunnel-remote
+k3s_headlamp_tunnel_chart_version: "{{ infra_deploy.get('headlamp', {}).get('cloudflare_tunnel', {}).get('chart_version', '') }}"
+k3s_headlamp_tunnel_replica_count: "{{ infra_deploy.get('headlamp', {}).get('cloudflare_tunnel', {}).get('replica_count', 2) }}"
+k3s_headlamp_tunnel_token: "{{ cloud_runtime_metadata.get('headlamp_tunnel_token', '') }}"

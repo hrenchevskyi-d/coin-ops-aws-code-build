@@ -35,3 +35,4 @@
       tags: [runtime_config, headlamp, kubeconfig]
   roles:
     - k3s_headlamp
+    - k3s_headlamp_tunnel

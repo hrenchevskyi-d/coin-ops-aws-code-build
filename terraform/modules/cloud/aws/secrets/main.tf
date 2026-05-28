@@ -37,8 +37,10 @@ resource "aws_secretsmanager_secret_version" "app_secrets_data" {
   secret_id = aws_secretsmanager_secret.app_secrets.id
 
   secret_string = jsonencode({
-    GHCR_TOKEN           = var.ghcr_token
-    CLOUDFLARE_API_TOKEN = var.cloudflare_api_token
-    TAILSCALE_AUTH_KEY   = var.tailscale_auth_key
+    GHCR_TOKEN                = var.ghcr_token
+    CLOUDFLARE_API_TOKEN      = var.cloudflare_api_token
+    TAILSCALE_AUTH_KEY        = var.tailscale_auth_key
+    GITHUB_OAUTH_CLIENT_ID     = var.github_oauth_client_id
+    GITHUB_OAUTH_CLIENT_SECRET = var.github_oauth_client_secret
   })
 }

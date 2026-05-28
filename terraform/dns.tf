@@ -29,12 +29,13 @@ locals {
     azure = local.azure_has_ui
   }
 
-  dns_has_api_token   = nonsensitive(local.effective_cloudflare_api_token) != ""
-  dns_enabled         = (local.gcp_enabled || local.aws_enabled || local.azure_enabled) && local.dns_has_api_token && local.cloudflare_zone_id != ""
-  dns_primary_has_ui  = lookup(local.cloud_has_ui, local.dns_primary_cloud, false)
-  coinops_public_ip   = local.gcp_k3s_public_ingress_lb_enabled ? try(module.gcp_k3s_public_ingress_lb[0].ip_address, "") : ""
-  headlamp_private_ip = local.gcp_k3s_ingress_lb_enabled ? try(module.gcp_k3s_ingress_lb[0].ip_address, "") : ""
-  homepage_public_ip  = local.gcp_k3s_public_ingress_lb_enabled ? try(module.gcp_k3s_public_ingress_lb[0].ip_address, "") : ""
+  dns_has_api_token      = nonsensitive(local.effective_cloudflare_api_token) != ""
+  dns_enabled            = (local.gcp_enabled || local.aws_enabled || local.azure_enabled) && local.dns_has_api_token && local.cloudflare_zone_id != ""
+  dns_primary_has_ui     = lookup(local.cloud_has_ui, local.dns_primary_cloud, false)
+  coinops_public_ip      = local.gcp_k3s_public_ingress_lb_enabled ? try(module.gcp_k3s_public_ingress_lb[0].ip_address, "") : ""
+  headlamp_private_ip    = local.gcp_k3s_ingress_lb_enabled ? try(module.gcp_k3s_ingress_lb[0].ip_address, "") : ""
+  headlamp_tunnel_target = local.headlamp_tunnel_enabled ? "${cloudflare_zero_trust_tunnel_cloudflared.headlamp[0].id}.cfargotunnel.com" : ""
+  homepage_public_ip     = local.gcp_k3s_public_ingress_lb_enabled ? try(module.gcp_k3s_public_ingress_lb[0].ip_address, "") : ""
   cloudflare_dns_records = {
     root_a = {
       enabled         = local.dns_enabled && local.gcp_k3s_public_ingress_lb_enabled
@@ -55,12 +56,21 @@ locals {
       allow_overwrite = true
     }
     headlamp_private_a = {
-      enabled         = local.dns_enabled && local.gcp_k3s_ingress_lb_enabled
+      enabled         = local.dns_enabled && local.gcp_k3s_ingress_lb_enabled && !local.headlamp_tunnel_enabled
       name            = local.headlamp_dns_name
       content         = local.headlamp_private_ip
       type            = "A"
       proxied         = false
       ttl             = local.dns_ttl
+      allow_overwrite = true
+    }
+    headlamp_tunnel_cname = {
+      enabled         = local.dns_enabled && local.headlamp_tunnel_enabled
+      name            = local.headlamp_dns_name
+      content         = local.headlamp_tunnel_target
+      type            = "CNAME"
+      proxied         = true
+      ttl             = 1
       allow_overwrite = true
     }
     homepage_public_a = {

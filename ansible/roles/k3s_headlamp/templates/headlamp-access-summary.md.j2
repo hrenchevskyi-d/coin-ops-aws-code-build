@@ -1,12 +1,21 @@
 # Headlamp Access Summary
 
-Preferred ingress URL: `{{ headlamp_access_scheme }}://{{ k3s_headlamp_ingress_host }}/`
+{% if cloud_runtime_metadata.get('headlamp_tunnel_enabled', false) | bool %}Preferred URL: `https://{{ k3s_headlamp_ingress_host }}/`
 
-Port-forward URL: `http://127.0.0.1:{{ k3s_headlamp_local_port }}/`
+Access path: `Cloudflare Tunnel (remote-managed)`
+
+Cloudflare Access login: `GitHub`
+
+The private Headlamp ingress load balancer is no longer used for the primary browser path.
+{% elif k3s_headlamp_ingress_enabled | bool %}Preferred URL: `{{ headlamp_access_scheme }}://{{ k3s_headlamp_ingress_host }}/`
 
 Ingress load balancer IP: `{{ headlamp_access_ip }}`
+{% else %}Preferred URL: `http://127.0.0.1:{{ k3s_headlamp_local_port }}/`
 
-Kubeconfig for tunneled CLI access:
+Cloudflare Tunnel is configured in code but not yet active in runtime metadata. Until Terraform has created the tunnel token and DNS, use the port-forward fallback below.
+{% endif %}
+
+Kubeconfig helper:
 
 `{{ k3s_headlamp_local_artifact_dir }}/kubeconfig-gcp-k3s-tunneled.yaml`
 
@@ -14,14 +23,8 @@ Port-forward helper:
 
 `{{ k3s_headlamp_local_artifact_dir }}/headlamp-port-forward.sh`
 
-Full access helper:
+Combined fallback helper:
 
 `{{ k3s_headlamp_local_artifact_dir }}/headlamp-start.sh`
 
-Manual fallback host mapping:
-
-`{{ headlamp_access_ip }} {{ k3s_headlamp_ingress_host }}`
-
-TLS enabled: `{{ k3s_headlamp_tls_enabled | bool }}`
-
-Terraform can manage `{{ k3s_headlamp_ingress_host }}` in Cloudflare and point it at the private ingress load balancer IP.
+Fallback access remains available through `kubectl port-forward` if the tunnel is unavailable.

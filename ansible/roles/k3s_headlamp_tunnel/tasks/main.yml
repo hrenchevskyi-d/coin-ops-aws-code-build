@@ -1,0 +1,44 @@
+---
+- name: k3s-headlamp-tunnel-uninstall-release-when-disabled
+  kubernetes.core.helm:
+    name: "{{ k3s_headlamp_tunnel_release_name }}"
+    release_namespace: "{{ k3s_headlamp_tunnel_namespace }}"
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
+    release_state: absent
+    wait: true
+  when: not (k3s_headlamp_tunnel_enabled | bool)
+  tags: [headlamp, cloudflare, tunnel, k3s]
+
+- name: k3s-headlamp-tunnel-assert-token-is-available
+  assert:
+    that:
+      - k3s_headlamp_tunnel_token | length > 0
+    fail_msg: >-
+      Cloudflare Tunnel is enabled for Headlamp, but terraform/config/ansible-runtime.json does not yet contain
+      headlamp_tunnel_token. Run terraform apply after filling Cloudflare account/GitHub OAuth settings.
+  when: k3s_headlamp_tunnel_enabled | bool
+  tags: [headlamp, cloudflare, tunnel, k3s]
+
+- name: k3s-headlamp-tunnel-add-helm-repository
+  kubernetes.core.helm_repository:
+    name: "{{ k3s_headlamp_tunnel_chart_repo_name }}"
+    repo_url: "{{ k3s_headlamp_tunnel_chart_repo_url }}"
+  when: k3s_headlamp_tunnel_enabled | bool
+  tags: [headlamp, cloudflare, tunnel, k3s, helm]
+
+- name: k3s-headlamp-tunnel-install-or-upgrade-release
+  kubernetes.core.helm:
+    name: "{{ k3s_headlamp_tunnel_release_name }}"
+    chart_ref: "{{ k3s_headlamp_tunnel_chart_ref }}"
+    chart_version: "{{ k3s_headlamp_tunnel_chart_version if (k3s_headlamp_tunnel_chart_version | length > 0) else omit }}"
+    release_namespace: "{{ k3s_headlamp_tunnel_namespace }}"
+    create_namespace: true
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
+    wait: true
+    values:
+      replicaCount: "{{ k3s_headlamp_tunnel_replica_count | int }}"
+      cloudflare:
+        tunnel_token: "{{ k3s_headlamp_tunnel_token }}"
+  when: k3s_headlamp_tunnel_enabled | bool
+  no_log: true
+  tags: [headlamp, cloudflare, tunnel, k3s, helm]

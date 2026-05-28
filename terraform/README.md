@@ -36,87 +36,74 @@ the secret container still exists in configuration but the underlying secret
 versions were already deleted, or when the secret backend is intentionally being
 removed as part of the current teardown.
 
-## Multicloud Gateway Routing
+## Current Active Topology
 
-The current multicloud path uses dedicated `gateway` hosts as Tailscale subnet
-routers. Remote cloud CIDRs should normally be delivered through cloud-native
-route tables, not host-level static routes on workload VMs. The intended
-contract is:
+The repository still keeps the multicloud design and related configuration, but
+its current active access path no longer uses the old Tailscale subnet-router
+gateway.
 
-- `jump-host`: bastion / emergency fallback path
-- `gateway`: Tailscale subnet router + primary private-subnet egress/transit
-- `app-ui` and `app-backend`: regular workload hosts that consume remote cloud
-  CIDRs through their cloud route tables via the local `gateway`
+Current contract:
+- `jump-host`: public bastion for operator SSH access into private nodes
+- private workload nodes: reached through `ProxyJump` via `jump-host`
+- cloud-native NAT: outbound internet access for private subnets without public
+  IPs
+- `Cloudflare Tunnel`: in-cluster path for private Headlamp browser access
 
-The default topology and routing knobs live in `terraform/config/instances.json`
-and `terraform/config/networks.json`.
-
-Important defaults:
-
-- `tailscale.snat_subnet_routes = true` is the correct default for the current
-  single-NIC gateway design. Each gateway lives on the external subnet, so SNAT
-  keeps return traffic from private workload hosts routable without requiring a
-  second gateway NIC on every private subnet.
-- `routing.remote_target_tags = ["internal-vm", "app-ui", "app-backend"]`
-  makes the GCP remote CIDR routes apply to both private and UI workloads.
-- `tailscale.static_route_roles = []` keeps workload-level static routes off by
-  default. Use host routes only as a break-glass fallback while debugging.
-- `gateway` and `jump-host` are defined for all three clouds, so enabling
-  `gcp`, `aws`, and `azure` can build the same routing pattern everywhere.
+Important consequences:
+- Tailscale configuration is still present in code for possible future reuse,
+  but it is currently disabled in `terraform/config/networks.json`
+- the old dedicated `gateway` instance has been removed from the active
+  instance layout
+- private nodes do **not** need public IPs for outbound access when the
+  selected cloud's managed NAT path is enabled
 
 ## Post-Deploy Acceptance
 
-After `terraform apply`, `ansible/provision.yml`, and `ansible/deploy.yml`,
-verify the multicloud path in this order:
+After `terraform apply`, `ansible/provision.yml`, and the relevant Ansible
+platform playbooks, verify the private-node access path in this order:
 
-1. On each gateway, confirm Tailscale peers are connected:
+1. Confirm the jump host is reachable:
 
    ```bash
-   sudo tailscale status
+   ssh coinops-gcp-jump-host
    ```
 
-2. On each gateway, confirm the Tailscale-side masquerade rule exists:
+2. Confirm a private k3s node is reachable through ProxyJump:
 
    ```bash
-   sudo iptables -t nat -S POSTROUTING | grep tailscale0
+   ssh coinops-gcp-k3s-server-1
    ```
 
-   Expect a rule like:
+3. On a k3s node, confirm outbound internet works through Cloud NAT:
 
    ```bash
-   -A POSTROUTING -s 10.20.0.0/16 -o tailscale0 -j MASQUERADE
+   curl -I https://github.com
    ```
 
-3. On the backend host, verify the internal TLS gateway is healthy:
+4. Confirm the Headlamp tunnel rollout path:
 
    ```bash
-   curl -vk https://localhost:8443/health
-   ```
-
-4. On the UI host, verify cross-cloud backend reachability:
-
-   ```bash
-   curl -vk --connect-timeout 5 https://<remote-backend-private-ip>:8443/health
+   terraform apply
+   ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-headlamp.yml
    ```
 
 ## Troubleshooting
 
-If `gateway -> backend` works but `app-ui -> backend` times out:
+If the jump host is reachable but a private `k3s-server` is not:
+- verify the firewall rule allowing `jump-host -> k3s-server` on the SSH port
+- verify the private node still has label/tag `k3s-server`
+- confirm Ansible inventory is still using `ProxyJump=coinops-gcp-jump-host`
 
-- check the Tailscale-side masquerade rule on the source-cloud gateway
-- check that workload-level static routes are absent unless you intentionally
-  enabled them as a fallback
-- verify the cloud route table for the remote CIDR points at the local gateway
+If a private `k3s-server` has no internet access:
+- verify `cloud_nat.enabled=true` in `terraform/config/networks.json`
+- verify the `internal` subnet is included in `cloud_nat.subnet_names`
+- verify the GCP router NAT resources exist after `terraform apply`
 
-On workload hosts, stale fallback routes should not remain after provisioning:
-
-```bash
-ip route
-```
-
-If you still see routes like `10.30.0.0/16 via ... onlink` on `app-ui` or
-`app-backend`, rerun `ansible/provision.yml` after confirming
-`tailscale.static_route_roles = []`.
+If Headlamp tunnel apply fails with Cloudflare authentication errors:
+- verify `dns.cloudflare.account_id` matches the Cloudflare account that owns
+  Zero Trust
+- verify the Cloudflare API token has Zero Trust Tunnel, Access Apps/Policies,
+  Access Identity Providers, and DNS permissions
 
 ## Repairing Drift
 

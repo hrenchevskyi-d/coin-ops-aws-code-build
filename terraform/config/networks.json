@@ -1,7 +1,9 @@
 {
     "routing": {},
     "security": {
-        "egress_cidrs": ["0.0.0.0/0"]
+        "egress_cidrs": [
+            "0.0.0.0/0"
+        ]
     },
     "cloud_networks": {
         "gcp": {
@@ -9,7 +11,9 @@
             "vpc_cidr": "10.20.0.0/16",
             "cloud_nat": {
                 "enabled": true,
-                "subnet_names": ["internal"]
+                "subnet_names": [
+                    "internal"
+                ]
             },
             "k3s_api_load_balancer": {
                 "enabled": true,
@@ -19,9 +23,12 @@
                 "allow_global_access": false
             },
             "k3s_ingress_load_balancer": {
-                "enabled": true,
+                "enabled": false,
                 "name": "coin-ops-k3s-ingress",
-                "ports": [80, 443],
+                "ports": [
+                    80,
+                    443
+                ],
                 "health_check_port": 80,
                 "address": "10.20.1.77",
                 "internal_subnet": "internal",
@@ -31,7 +38,9 @@
                 "enabled": true,
                 "name": "coin-ops-k3s-public-ingress",
                 "health_check_port": 443,
-                "frontend_ports": [443]
+                "frontend_ports": [
+                    443
+                ]
             },
             "subnets": {
                 "internal": {
@@ -86,86 +95,117 @@
         }
     },
     "tailscale": {
-        "enabled": true,
+        "enabled": false,
         "control_plane": "saas",
         "auth_key_secret_name": "TAILSCALE_AUTH_KEY",
-        "accept_routes": true,
-        "snat_subnet_routes": true,
-        "client_cidrs": ["100.64.0.0/10"],
+        "accept_routes": false,
+        "snat_subnet_routes": false,
+        "client_cidrs": [
+            "100.64.0.0/10"
+        ],
         "static_route_roles": [],
         "tags": {
-            "gateway": ["tag:coinops-gateway"]
+            "gateway": [
+                "tag:coinops-gateway"
+            ]
         },
-        "advertised_routes_per_cloud": {
-            "gcp": ["10.20.0.0/16"],
-            "aws": ["10.30.0.0/16"],
-            "azure": ["10.40.0.0/16"]
-        }
+        "advertised_routes_per_cloud": {}
     },
     "firewall_rules": {
         "allow-ssh-jump-host": {
-            "protocols": [{ "protocol": "tcp", "ports": ["53725"] }],
-            "source_cidrs": ["0.0.0.0/0"],
+            "protocols": [
+                {
+                    "protocol": "tcp",
+                    "ports": [
+                        "53725"
+                    ]
+                }
+            ],
+            "source_cidrs": [
+                "0.0.0.0/0"
+            ],
             "target_role": "jump-host"
         },
-        "allow-tailscale-gateway-udp": {
-            "protocols": [{ "protocol": "udp", "ports": ["41641"] }],
-            "source_cidrs": ["0.0.0.0/0"],
-            "target_role": "gateway"
-        },
-        "allow-gateway-admin-from-jump": {
-            "protocols": [{ "protocol": "tcp", "ports": ["53725"] }],
-            "source_role": "jump-host",
-            "target_role": "gateway"
-        },
         "allow-k3s-server-admin-from-jump": {
-            "protocols": [{ "protocol": "tcp", "ports": ["53725"] }],
-            "source_role": "jump-host",
-            "target_role": "k3s-server"
-        },
-        "allow-k3s-ingress-from-gateway": {
             "protocols": [
-                { "protocol": "tcp", "ports": ["80", "443"] },
-                { "protocol": "icmp" }
+                {
+                    "protocol": "tcp",
+                    "ports": [
+                        "53725"
+                    ]
+                }
             ],
-            "source_role": "gateway",
+            "source_role": "jump-host",
             "target_role": "k3s-server"
         },
         "allow-k3s-control-plane-internal": {
             "protocols": [
-                { "protocol": "tcp", "ports": ["6443", "9345", "2379-2380", "10250"] },
-                { "protocol": "udp", "ports": ["8472"] },
-                { "protocol": "icmp" }
+                {
+                    "protocol": "tcp",
+                    "ports": [
+                        "6443",
+                        "9345",
+                        "2379-2380",
+                        "10250"
+                    ]
+                },
+                {
+                    "protocol": "udp",
+                    "ports": [
+                        "8472"
+                    ]
+                },
+                {
+                    "protocol": "icmp"
+                }
             ],
-            "source_cidrs": ["10.20.0.0/16"],
-            "target_role": "k3s-server"
-        },
-        "allow-k3s-from-tailnet": {
-            "protocols": [
-                { "protocol": "tcp", "ports": ["80", "443", "6443"] },
-                { "protocol": "icmp" }
+            "source_cidrs": [
+                "10.20.0.0/16"
             ],
-            "source_cidrs": ["100.64.0.0/10"],
             "target_role": "k3s-server"
         },
         "allow-k3s-public-ingress-https": {
-            "protocols": [{ "protocol": "tcp", "ports": ["443"] }],
-            "source_cidrs": ["0.0.0.0/0"],
+            "protocols": [
+                {
+                    "protocol": "tcp",
+                    "ports": [
+                        "443"
+                    ]
+                }
+            ],
+            "source_cidrs": [
+                "0.0.0.0/0"
+            ],
             "target_role": "k3s-server"
         },
         "allow-k3s-api-lb-health-checks": {
-            "protocols": [{ "protocol": "tcp", "ports": ["6443"] }],
-            "source_cidrs": ["35.191.0.0/16", "130.211.0.0/22"],
-            "target_role": "k3s-server"
-        },
-        "allow-k3s-ingress-lb-health-checks": {
-            "protocols": [{ "protocol": "tcp", "ports": ["80"] }],
-            "source_cidrs": ["35.191.0.0/16", "130.211.0.0/22"],
+            "protocols": [
+                {
+                    "protocol": "tcp",
+                    "ports": [
+                        "6443"
+                    ]
+                }
+            ],
+            "source_cidrs": [
+                "35.191.0.0/16",
+                "130.211.0.0/22"
+            ],
             "target_role": "k3s-server"
         },
         "allow-k3s-public-ingress-lb-health-checks": {
-            "protocols": [{ "protocol": "tcp", "ports": ["443"] }],
-            "source_cidrs": ["35.191.0.0/16", "130.211.0.0/22"],
+            "protocols": [
+                {
+                    "protocol": "tcp",
+                    "ports": [
+                        "443"
+                    ]
+                }
+            ],
+            "source_cidrs": [
+                "35.191.0.0/16",
+                "130.211.0.0/22"
+            ],
             "target_role": "k3s-server"
         }
     }

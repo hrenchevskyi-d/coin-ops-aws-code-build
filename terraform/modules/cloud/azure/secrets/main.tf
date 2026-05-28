@@ -41,9 +41,11 @@ resource "azurerm_key_vault_secret" "db_secrets" {
 resource "azurerm_key_vault_secret" "app_secrets" {
   name = var.app_secret_name
   value = jsonencode({
-    GHCR_TOKEN           = var.ghcr_token
-    CLOUDFLARE_API_TOKEN = var.cloudflare_api_token
-    TAILSCALE_AUTH_KEY   = var.tailscale_auth_key
+    GHCR_TOKEN                = var.ghcr_token
+    CLOUDFLARE_API_TOKEN      = var.cloudflare_api_token
+    TAILSCALE_AUTH_KEY        = var.tailscale_auth_key
+    GITHUB_OAUTH_CLIENT_ID     = var.github_oauth_client_id
+    GITHUB_OAUTH_CLIENT_SECRET = var.github_oauth_client_secret
   })
   key_vault_id = azurerm_key_vault.this.id
 }

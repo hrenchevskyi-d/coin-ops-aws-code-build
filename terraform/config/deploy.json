@@ -18,7 +18,9 @@
             "channel": "stable",
             "version": "v1.35.4+k3s1",
             "disable_cloud_controller": true,
-            "disable_components": ["servicelb"],
+            "disable_components": [
+                "servicelb"
+            ],
             "flannel_backend": "vxlan"
         },
         "public_ingress": {
@@ -29,8 +31,20 @@
             "enabled": true,
             "hostname": "headlamp.coinops-d.pp.ua",
             "ingress": {
-                "enabled": true,
+                "enabled": false,
                 "class_name": "traefik"
+            },
+            "cloudflare_tunnel": {
+                "enabled": true,
+                "namespace": "cloudflare-tunnel",
+                "release_name": "headlamp-tunnel",
+                "replica_count": 2,
+                "service": "http://headlamp.headlamp.svc.cluster.local:80",
+                "chart_version": "",
+                "access": {
+                    "enabled": true,
+                    "allowed_emails": ["grenchevskiyd@gmail.com"]
+                }
             }
         },
         "homepage": {

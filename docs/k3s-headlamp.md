@@ -1,134 +1,106 @@
-# Headlamp via Tailscale and Ingress
+# Headlamp via Cloudflare Tunnel and Access
 
 This repository deploys Headlamp as an in-cluster application and exposes it
-through Traefik Ingress for private operator access.
+through a remotely managed Cloudflare Tunnel protected by Cloudflare Access.
 
 Current access model:
-- Headlamp runs as a normal Kubernetes workload
-- Traefik routes `https://headlamp.<app_domain>/` inside the cluster when
-  `tls_mode=certbot`
-- a dedicated `gateway` VM advertises the GCP subnet into Tailscale
-- operators reach the private GCP subnet from their own machine through
-  Tailscale
+- Headlamp runs as a normal Kubernetes workload in `k3s`
+- a `cloudflared` deployment runs in-cluster via the `cloudflare-tunnel-remote`
+  Helm chart
+- Cloudflare Tunnel publishes `https://headlamp.<app_domain>/`
+- Cloudflare Access requires a GitHub login before the user can reach the
+  Headlamp UI
+- Headlamp itself still uses Kubernetes token login unless you later switch it
+  to OIDC
 - `kubectl port-forward` remains available as a fallback path
 
-This keeps the UI off the public internet while making browser access much
-easier than SSH proxying.
+This keeps the UI off your private subnet routing model and removes the need for
+Tailscale on the operator workstation for browser access.
 
 ## What This Runbook Covers
 
 This runbook explains:
 - how Headlamp is deployed
-- how the Tailscale gateway fits into the network path
-- how to open the UI from a Windows browser
+- how the Cloudflare Tunnel fits into the access path
+- which Cloudflare and GitHub prerequisites are required
+- how to open the UI from a browser
 - when to use the port-forward fallback
 - how to generate a login token
 
+## Prerequisites
+
+Before the tunnel can be created end-to-end, fill in the following inputs:
+- `terraform/config/dns.json`
+  - `dns.cloudflare.account_id`
+- app secret backend payload (or the bootstrap tfvars used to seed it)
+  - `CLOUDFLARE_API_TOKEN`
+  - `GITHUB_OAUTH_CLIENT_ID`
+  - `GITHUB_OAUTH_CLIENT_SECRET`
+
+The Cloudflare API token needs permissions for:
+- DNS edit on the target zone
+- Zero Trust tunnel management
+- Zero Trust Access applications and policies
+- Zero Trust identity providers
+
+The GitHub OAuth App should use the Cloudflare Access callback URL shown in the
+Cloudflare Zero Trust GitHub login-method setup.
+
 ## Deployment Flow
 
-1. Reconcile the cluster:
+1. Apply Terraform so Cloudflare resources and generated runtime metadata are up
+   to date:
+
+   ```bash
+   cd terraform
+   terraform apply
+   ```
+
+2. Reconcile the cluster:
 
    ```bash
    ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-cluster.yml
    ```
 
-2. Install or update Headlamp:
+3. Install or update Headlamp and the in-cluster tunnel:
 
    ```bash
    ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-headlamp.yml
    ```
 
-3. Or do both in one run:
-
-   ```bash
-   ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-platform.yml
-   ```
-
 4. Review generated operator notes:
 
-   - `ansible/artifacts/headlamp-ingress-access.md`
    - `ansible/artifacts/headlamp-access-summary.md`
    - `ansible/artifacts/kubeconfig-gcp-k3s-tunneled.yaml`
    - `ansible/artifacts/headlamp-start.sh`
 
-## Generated Artifacts
+## Access Path
 
-After a successful run, the following local helper files are relevant:
+### Primary browser flow
 
-- `ansible/artifacts/headlamp-ingress-access.md`
-  Primary runbook for browser access through Tailscale and Ingress.
-- `ansible/artifacts/headlamp-access-summary.md`
-  Port-forward fallback summary.
-- `ansible/artifacts/kubeconfig-gcp-k3s-tunneled.yaml`
-  Operator kubeconfig for token generation and CLI use through the API tunnel.
-- `ansible/artifacts/headlamp-start.sh`
-  Fallback helper that opens the SSH tunnel and starts `kubectl port-forward`.
-
-These artifacts are operator-local and should not be committed.
-
-## Primary Access Path
-
-### Preconditions
-
-You need:
-- Tailscale installed on the machine where your browser runs
-- the GCP subnet route `10.20.0.0/16` advertised by the gateway and accepted by
-  the client
-- generated artifacts under `ansible/artifacts/`
-- a private DNS record for `headlamp.<app_domain>` or a temporary local hosts
-  entry
-
-### Recommended Browser Flow
-
-1. Sign in to Tailscale on your **Windows host**.
-
-2. Confirm the route to GCP is active. `autoApprovers.routes` in the Tailscale
-   ACL only auto-approves the gateway's advertised route; it does **not**
-   guarantee the Windows client has installed and accepted that route yet.
-
-3. Preferred: let Terraform manage the `headlamp.<app_domain>` Cloudflare
-   record. The record is DNS-only and points to the private internal ingress
-   load balancer IP.
-
-4. Fallback: if you are not using the Terraform-managed DNS record yet, add a
-   hosts entry on the machine where the browser runs. The generated file
-   `ansible/artifacts/headlamp-ingress-access.md` shows the current private IP
-   to use.
-
-   Example:
-
-   ```text
-   <private_ingress_lb_ip> headlamp.coinops.test
-   ```
-
-5. Open:
+1. Open:
 
    ```text
    https://headlamp.<app_domain>/
    ```
 
-6. Generate a login token from WSL or any operator shell:
+2. Cloudflare Access prompts for GitHub authentication.
+
+3. After Access allows the session, Headlamp loads.
+
+4. Generate a login token from WSL or any operator shell:
 
    ```bash
    KUBECONFIG=/home/notebook/projects/coin-ops/ansible/artifacts/kubeconfig-gcp-k3s-tunneled.yaml \
    kubectl create token headlamp-admin -n kube-system
    ```
 
-7. Paste the token into the Headlamp login screen.
+5. Paste the token into the Headlamp login screen.
 
-## WSL + Windows Browser
+### Fallback path
 
-Recommended split:
-- run Terraform, Ansible, and `kubectl` in WSL
-- run Tailscale and the browser on Windows
-
-Why:
-- the browser gets direct tailnet reachability without WSL proxy/tunnel issues
-- WSL remains the CLI workspace
-
-## Fallback Access Path
-
-If Tailscale access is not ready yet, you can still use port-forward:
+If the tunnel is not ready yet or Cloudflare-side auth is still being wired,
+use the local fallback helper:
 
 ```bash
 /home/notebook/projects/coin-ops/ansible/artifacts/headlamp-start.sh
@@ -140,67 +112,45 @@ Then open:
 http://127.0.0.1:8080/
 ```
 
-This is a fallback, not the preferred day-to-day access path.
-
-## TLS and Certificates
-
-Headlamp TLS is managed inside the cluster through `cert-manager`.
-
-When `tls_mode=certbot`:
-- `cert-manager` is installed through Helm
-- a Cloudflare API token is written into a Kubernetes Secret in the
-  `cert-manager` namespace
-- a `ClusterIssuer` is created for Let's Encrypt DNS-01
-- a `Certificate` is created for `headlamp.<app_domain>`
-- the Headlamp `Ingress` references the resulting TLS Secret
-
-This uses the same Cloudflare token you already keep in the app secret backend,
-but the certificate lifecycle is now Kubernetes-native rather than VM-local.
-
-### Important staging note
-
-If `certbot.staging=true` in
-`/home/notebook/projects/coin-ops/terraform/config/deploy.json`, cert-manager
-will issue a **Let's Encrypt staging certificate**. That is useful for dry-runs
-but browsers will not trust it.
-
-For a normal trusted browser experience, keep `certbot.staging=false`.
-
 ## Operational Notes
 
-- Headlamp itself runs with `replicaCount: 2`.
-- Traefik is the current ingress controller.
-- The ingress hostname is `headlamp.<app_domain>`.
-- The preferred private ingress endpoint is a static internal GCP load balancer
-  IP. Terraform also manages the matching DNS-only Cloudflare record for that
-  hostname when DNS automation is enabled.
-- TLS certificates are handled by `cert-manager` using Cloudflare DNS-01 when
-  `tls_mode=certbot`.
-- If you change the GCP HA API load balancer in Terraform, re-run
-  `ansible/k3s-cluster.yml` so `tls-san` and the local kubeconfig artifacts are
-  regenerated.
+- `cloudflared` is deployed in Kubernetes, not on a VM.
+- The tunnel is remotely managed from Cloudflare Zero Trust.
+- Terraform now creates a proxied Cloudflare `CNAME` for
+  `headlamp.<app_domain>` that points at the tunnel.
+- The previous private `A` record to the internal ingress load balancer is no
+  longer the intended steady-state path.
+- Tailscale is preserved in code but disabled in the current config.
+- The former dedicated gateway VM has been removed from the active topology.
 
 ## Security Notes
 
-- Headlamp is still private; it is not published to the public internet.
-- Kubernetes auth still matters even with Tailscale.
-- The initial `headlamp-admin` binding uses `cluster-admin` for convenience and
-  should be narrowed later if needed.
-- `kubeconfig-gcp-k3s-tunneled.yaml` is sensitive because it grants cluster
-  access when combined with network reachability.
+- Cloudflare Access is only the first gate; Headlamp still requires Kubernetes
+  authentication.
+- If `allowed_emails` is left empty in
+  `terraform/config/deploy.json`, any GitHub-authenticated user can reach the
+  Access prompt for this application. Restrict it before production use.
+- `kubeconfig-gcp-k3s-tunneled.yaml` remains sensitive because it grants
+  cluster access when combined with a valid token.
 
 ## Troubleshooting
 
-### The browser cannot open `headlamp.<app_domain>`
+### Cloudflare Access opens but Headlamp does not
 
 Check:
-- Tailscale is connected on Windows
-- the Windows client is set to accept subnet routes and actually has a route for
-  `10.20.0.0/16`
-- the Windows hosts entry points to the IP shown in
-  `ansible/artifacts/headlamp-ingress-access.md`
-- the Tailscale ACL allows your user or device to reach `10.20.0.0/16`, not
-  just the `tag:coinops-gateway` router itself
+- `terraform validate` and `terraform apply` succeeded
+- `terraform/config/ansible-runtime.json` contains `headlamp_tunnel_token`
+- `ansible/k3s-headlamp.yml` completed successfully
+- the `cloudflare-tunnel-remote` release is running in the configured
+  namespace
+
+### GitHub login does not appear
+
+Check:
+- the Cloudflare Access GitHub identity provider was created successfully
+- the GitHub OAuth client ID and secret are present in the app secret backend
+- the OAuth callback URL configured in GitHub matches the one expected by
+  Cloudflare Access
 
 ### Headlamp opens but login fails
 
@@ -209,13 +159,4 @@ Generate a fresh token:
 ```bash
 KUBECONFIG=/home/notebook/projects/coin-ops/ansible/artifacts/kubeconfig-gcp-k3s-tunneled.yaml \
 kubectl create token headlamp-admin -n kube-system
-```
-
-### Need to recreate helper files
-
-Re-run:
-
-```bash
-ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-cluster.yml
-ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-headlamp.yml
 ```

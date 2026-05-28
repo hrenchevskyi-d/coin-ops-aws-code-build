@@ -215,6 +215,19 @@ chmod 600 "$GENERATED_ENV_PATH"
 cp "$GENERATED_ENV_PATH" "$GENERATED_ACTIVE_ENV_PATH"
 chmod 600 "$GENERATED_ACTIVE_ENV_PATH"
 
+# Keep the committed example template in sync with the bootstrap placeholders.
+BOOTSTRAP_TFVARS_EXAMPLE="${REPO_ROOT}/terraform/bootstrap.secrets.auto.tfvars.example"
+echo "Writing bootstrap secrets example template at ${BOOTSTRAP_TFVARS_EXAMPLE}..."
+cat > "$BOOTSTRAP_TFVARS_EXAMPLE" << EOF
+db_password           = "CHANGE_ME"
+rabbitmq_password     = "CHANGE_ME"
+ghcr_token            = "CHANGE_ME"
+cloudflare_api_token  = "CHANGE_ME"
+tailscale_auth_key    = "CHANGE_ME"
+github_oauth_client_id     = "CHANGE_ME"
+github_oauth_client_secret = "CHANGE_ME"
+EOF
+
 # Create a gitignored bootstrap secret file for one-time Secret Manager seeding.
 BOOTSTRAP_TFVARS="${REPO_ROOT}/terraform/bootstrap.secrets.auto.tfvars"
 if [ ! -f "$BOOTSTRAP_TFVARS" ]; then
@@ -224,6 +237,8 @@ db_password          = "not_serious_just_a_placeholder"
 rabbitmq_password    = "not_serious_just_a_placeholder"
 ghcr_token           = "not_serious_just_a_placeholder"
 cloudflare_api_token = "not_serious_just_a_placeholder"
+github_oauth_client_id     = "not_serious_just_a_placeholder"
+github_oauth_client_secret = "not_serious_just_a_placeholder"
 EOF
 fi
 

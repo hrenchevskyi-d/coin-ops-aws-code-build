@@ -7,13 +7,13 @@
 - name: k3s-headlamp-install-cert-manager
   include_role:
     name: k3s_cert_manager
-  when: k3s_headlamp_tls_enabled | bool
+  when: k3s_headlamp_tls_enabled | bool and k3s_headlamp_ingress_enabled | bool
   tags: [headlamp, k3s, cert_manager, tls]
 
 - name: k3s-headlamp-configure-acme-cloudflare-issuer
   include_role:
     name: k3s_acme_cloudflare
-  when: k3s_headlamp_tls_enabled | bool
+  when: k3s_headlamp_tls_enabled | bool and k3s_headlamp_ingress_enabled | bool
   tags: [headlamp, k3s, cert_manager, tls]
 
 - name: k3s-headlamp-add-helm-repository
@@ -79,7 +79,7 @@
     headlamp_service: "{{ headlamp_service_info.resources[0] }}"
     headlamp_service_port: "{{ headlamp_service_info.resources[0].spec.ports[0].port }}"
     headlamp_access_ip: "{{ cloud_runtime_metadata.get('headlamp_ingress_ip', '') | default(hostvars[groups['role_k3s_server'] | sort | first].ansible_host, true) }}"
-    headlamp_access_scheme: "{{ 'https' if (k3s_headlamp_tls_enabled | bool) else 'http' }}"
+    headlamp_access_scheme: "{{ 'https' if (cloud_runtime_metadata.get('headlamp_tunnel_enabled', false) | bool or k3s_headlamp_tls_enabled | bool) else 'http' }}"
   tags: [headlamp, k3s]
 
 - name: k3s-headlamp-configure-ingress-and-certificate
@@ -150,4 +150,14 @@
     mode: "0644"
   delegate_to: localhost
   become: false
+  when: k3s_headlamp_ingress_enabled | bool
+  tags: [headlamp, k3s, artifacts]
+
+- name: k3s-headlamp-remove-obsolete-ingress-summary-when-disabled
+  file:
+    path: "{{ k3s_headlamp_local_artifact_dir }}/headlamp-ingress-access.md"
+    state: absent
+  delegate_to: localhost
+  become: false
+  when: not (k3s_headlamp_ingress_enabled | bool)
   tags: [headlamp, k3s, artifacts]

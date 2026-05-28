@@ -12,10 +12,10 @@ Kubernetes namespace: `{{ k3s_headlamp_namespace }}`
 
 Terraform can manage `{{ k3s_headlamp_ingress_host }}` in Cloudflare as a DNS-only `A` record pointing at `{{ headlamp_access_ip }}`.
 
-Fallback local hosts entry:
+Hosts file fallback:
 
 `{{ headlamp_access_ip }} {{ k3s_headlamp_ingress_host }}`
 
-URL to open:
+URL:
 
 `{{ headlamp_access_scheme }}://{{ k3s_headlamp_ingress_host }}/`

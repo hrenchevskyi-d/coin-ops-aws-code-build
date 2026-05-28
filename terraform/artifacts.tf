@@ -115,12 +115,15 @@ module "local_operator_artifacts" {
   ansible_runtime_content = jsonencode(merge(
     local.gcp_enabled ? {
       gcp = {
-        k3s_api_endpoint     = local.gcp_k3s_api_lb_enabled ? try(module.gcp_k3s_api_lb[0].ip_address, "") : ""
-        headlamp_ingress_ip  = local.gcp_k3s_ingress_lb_enabled ? try(module.gcp_k3s_ingress_lb[0].ip_address, "") : ""
-        homepage_public_ip   = local.gcp_k3s_public_ingress_lb_enabled ? try(module.gcp_k3s_public_ingress_lb[0].ip_address, "") : ""
-        homepage_public_host = local.homepage_domain
-        database_ip          = try(module.gcp_database[0].private_ip, "")
-        use_managed_db       = try(module.gcp_database[0].private_ip, "") != ""
+        k3s_api_endpoint        = local.gcp_k3s_api_lb_enabled ? try(module.gcp_k3s_api_lb[0].ip_address, "") : ""
+        headlamp_ingress_ip     = local.gcp_k3s_ingress_lb_enabled ? try(module.gcp_k3s_ingress_lb[0].ip_address, "") : ""
+        headlamp_tunnel_enabled = local.headlamp_tunnel_enabled
+        headlamp_tunnel_token   = local.headlamp_tunnel_enabled ? cloudflare_zero_trust_tunnel_cloudflared.headlamp[0].tunnel_token : ""
+        headlamp_public_host    = local.headlamp_domain
+        homepage_public_ip      = local.gcp_k3s_public_ingress_lb_enabled ? try(module.gcp_k3s_public_ingress_lb[0].ip_address, "") : ""
+        homepage_public_host    = local.homepage_domain
+        database_ip             = try(module.gcp_database[0].private_ip, "")
+        use_managed_db          = try(module.gcp_database[0].private_ip, "") != ""
         database = {
           host    = try(module.gcp_database[0].private_ip, "")
           port    = local.db_port

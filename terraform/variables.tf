@@ -52,6 +52,12 @@ variable "cloudflare_zone_id" {
   default     = ""
 }
 
+variable "cloudflare_account_id" {
+  type        = string
+  description = "Fallback Cloudflare account ID for Zero Trust resources. The canonical non-secret value lives in terraform/config/dns.json."
+  default     = ""
+}
+
 variable "app_domain" {
   type        = string
   description = "Fallback root domain. The canonical non-secret value lives in terraform/config/deploy.json."
@@ -102,6 +108,20 @@ variable "ghcr_token" {
 
 variable "tailscale_auth_key" {
   description = "Tailscale auth key used by gateway subnet routers."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "github_oauth_client_id" {
+  description = "GitHub OAuth client ID used for Cloudflare Access login."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "github_oauth_client_secret" {
+  description = "GitHub OAuth client secret used for Cloudflare Access login."
   type        = string
   sensitive   = true
   default     = ""

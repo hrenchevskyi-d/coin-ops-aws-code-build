@@ -88,17 +88,19 @@ module "azure_database" {
 }
 
 module "azure_secrets" {
-  count                = local.write_azure_secret_backend ? 1 : 0
-  source               = "./modules/cloud/azure/secrets"
-  resource_group_name  = module.azure_network[0].resource_group_name
-  location             = local.azure_location
-  tenant_id            = local.azure_tenant_id
-  key_vault_name       = local.azure_key_vault_name
-  db_secret_name       = local.db_secret_name
-  app_secret_name      = local.app_secret_name
-  db_password          = local.effective_db_password
-  rabbitmq_password    = local.effective_rabbitmq_password
-  ghcr_token           = local.effective_ghcr_token
-  cloudflare_api_token = local.effective_cloudflare_api_token
-  tailscale_auth_key   = local.effective_tailscale_auth_key
+  count                      = local.write_azure_secret_backend ? 1 : 0
+  source                     = "./modules/cloud/azure/secrets"
+  resource_group_name        = module.azure_network[0].resource_group_name
+  location                   = local.azure_location
+  tenant_id                  = local.azure_tenant_id
+  key_vault_name             = local.azure_key_vault_name
+  db_secret_name             = local.db_secret_name
+  app_secret_name            = local.app_secret_name
+  db_password                = local.effective_db_password
+  rabbitmq_password          = local.effective_rabbitmq_password
+  ghcr_token                 = local.effective_ghcr_token
+  cloudflare_api_token       = local.effective_cloudflare_api_token
+  tailscale_auth_key         = local.effective_tailscale_auth_key
+  github_oauth_client_id     = local.effective_github_oauth_client_id
+  github_oauth_client_secret = local.effective_github_oauth_client_secret
 }

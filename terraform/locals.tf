@@ -386,10 +386,24 @@ locals {
   azure_resource_group_name = try(local.azure_account.resource_group_name, "${local.project_name}-azure-rg")
   azure_key_vault_name      = try(local.azure_account.key_vault_name, "${replace(local.project_name, "-", "")}kv")
 
-  app_domain         = try(local.deploy.app_domain, var.app_domain)
-  homepage_domain    = try(local.deploy.homepage.hostname, "home.${local.app_domain}")
-  cloudflare_config  = lookup(local.dns, "cloudflare", {})
-  cloudflare_zone_id = try(local.cloudflare_config.zone_id, var.cloudflare_zone_id)
+  app_domain      = try(local.deploy.app_domain, var.app_domain)
+  homepage_domain = try(local.deploy.homepage.hostname, "home.${local.app_domain}")
+  headlamp_cfg    = try(local.deploy.headlamp, {})
+  headlamp_tunnel_cfg = merge({
+    enabled       = false
+    namespace     = "cloudflare-tunnel"
+    release_name  = "headlamp-tunnel"
+    replica_count = 2
+    chart_version = ""
+    service       = "http://headlamp.headlamp.svc.cluster.local:80"
+    access = {
+      enabled        = true
+      allowed_emails = []
+    }
+  }, try(local.headlamp_cfg.cloudflare_tunnel, {}))
+  cloudflare_config     = lookup(local.dns, "cloudflare", {})
+  cloudflare_zone_id    = try(local.cloudflare_config.zone_id, var.cloudflare_zone_id)
+  cloudflare_account_id = try(local.cloudflare_config.account_id, var.cloudflare_account_id)
 
   gcp_cfg = {
     zone = local.gcp_zone
@@ -488,4 +502,21 @@ locals {
   effective_tailscale_auth_key = (
     local.seed_secret_manager ? var.tailscale_auth_key : try(local.active_app_secrets.TAILSCALE_AUTH_KEY, var.tailscale_auth_key)
   )
+  effective_github_oauth_client_id = (
+    local.seed_secret_manager ? var.github_oauth_client_id : try(local.active_app_secrets.GITHUB_OAUTH_CLIENT_ID, var.github_oauth_client_id)
+  )
+  effective_github_oauth_client_secret = (
+    local.seed_secret_manager ? var.github_oauth_client_secret : try(local.active_app_secrets.GITHUB_OAUTH_CLIENT_SECRET, var.github_oauth_client_secret)
+  )
+  headlamp_tunnel_enabled = (
+    try(local.headlamp_cfg.enabled, true)
+    && try(local.headlamp_tunnel_cfg.enabled, false)
+    && local.cloudflare_zone_id != ""
+    && local.cloudflare_account_id != ""
+    && nonsensitive(local.effective_cloudflare_api_token) != ""
+    && nonsensitive(local.effective_github_oauth_client_id) != ""
+    && nonsensitive(local.effective_github_oauth_client_secret) != ""
+  )
+  headlamp_access_enabled        = local.headlamp_tunnel_enabled && try(local.headlamp_tunnel_cfg.access.enabled, true)
+  headlamp_access_allowed_emails = try(local.headlamp_tunnel_cfg.access.allowed_emails, [])
 }
