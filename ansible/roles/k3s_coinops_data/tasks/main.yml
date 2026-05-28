@@ -107,7 +107,7 @@
     namespace: "{{ k3s_coinops_data_namespace }}"
     name: "{{ k3s_coinops_data_bootstrap_job_name }}"
   register: k3s_coinops_data_bootstrap_job
-  retries: 5
+  retries: 10
   delay: 10
   until: >-
     (

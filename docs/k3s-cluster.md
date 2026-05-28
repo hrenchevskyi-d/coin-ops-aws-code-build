@@ -159,17 +159,30 @@ That model works as follows:
 - node SSH is still needed for host-level work, but ordinary Kubernetes changes
   are meant to be driven from localhost
 
-The preferred operator kubeconfig artifact is:
-
-- `/home/notebook/projects/coin-ops/ansible/artifacts/kubeconfig-gcp-k3s.yaml`
-
-The tunneled variant remains available as a fallback when you explicitly want
-local port-forwarded API access:
+The preferred operator kubeconfig artifact for localhost-driven cluster
+application playbooks is the tunneled variant:
 
 - `/home/notebook/projects/coin-ops/ansible/artifacts/kubeconfig-gcp-k3s-tunneled.yaml`
 
-If that artifact is missing, re-run `ansible/k3s-cluster.yml` before trying to
+This keeps local `kubectl`, `helm`, and `kubernetes.core` calls independent of
+private VPC routing on the operator machine. The direct cluster kubeconfig is
+still rendered for debugging or environments that already have a route to the
+internal GCP API endpoint:
+
+- `/home/notebook/projects/coin-ops/ansible/artifacts/kubeconfig-gcp-k3s.yaml`
+
+The `make k3s-headlamp`, `make k3s-homepage`, `make k3s-coinops`, and `make k3s-platform` targets automatically start the generated `k8s-api-tunnel.sh` helper when the local API tunnel is not already listening on `127.0.0.1:6443`.
+
+If those artifacts are missing, re-run `ansible/k3s-cluster.yml` before trying to
 reconcile cluster applications.
+
+For interactive `kubectl` from a new shell:
+
+```bash
+cd /home/notebook/projects/coin-ops
+make k8s-api-ready
+export KUBECONFIG=/home/notebook/projects/coin-ops/ansible/artifacts/kubeconfig-gcp-k3s-tunneled.yaml
+```
 
 ## Generated Local Artifacts
 

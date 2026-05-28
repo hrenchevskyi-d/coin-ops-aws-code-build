@@ -3,7 +3,7 @@ k3s_headlamp_tls_enabled: "{{ tls_mode == 'certbot' }}"
 k3s_headlamp_tls_secret_name: headlamp-tls
 k3s_headlamp_certificate_name: headlamp-tls
 k3s_headlamp_release_name: headlamp
-k3s_headlamp_namespace: kube-system
+k3s_headlamp_namespace: headlamp
 k3s_headlamp_chart_repo_name: headlamp
 k3s_headlamp_chart_repo_url: https://kubernetes-sigs.github.io/headlamp/
 k3s_headlamp_chart_ref: headlamp/headlamp

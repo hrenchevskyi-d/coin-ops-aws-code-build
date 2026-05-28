@@ -7,6 +7,7 @@ secret:
   rabbitmqUrl: {{ k3s_coinops_app_rabbitmq_url | to_json }}
   redisUrl: {{ k3s_coinops_app_redis_url | to_json }}
 proxy:
+  namespace: {{ k3s_coinops_app_proxy_namespace | to_json }}
   name: {{ k3s_coinops_app_proxy_name | to_json }}
   serviceAccountName: "coinops-proxy"
   image: {{ k3s_coinops_app_proxy_image | to_json }}
@@ -15,6 +16,7 @@ proxy:
   resources:
 {{ k3s_coinops_app_proxy_resources | to_nice_yaml(indent=2) | indent(4, true) }}
 historyApi:
+  namespace: {{ k3s_coinops_app_history_api_namespace | to_json }}
   name: {{ k3s_coinops_app_history_api_name | to_json }}
   serviceAccountName: "coinops-history-api"
   image: {{ k3s_coinops_app_history_api_image | to_json }}
@@ -23,6 +25,7 @@ historyApi:
   resources:
 {{ k3s_coinops_app_history_api_resources | to_nice_yaml(indent=2) | indent(4, true) }}
 consumer:
+  namespace: {{ k3s_coinops_app_consumer_namespace | to_json }}
   name: {{ k3s_coinops_app_consumer_name | to_json }}
   serviceAccountName: "coinops-history-consumer"
   image: {{ k3s_coinops_app_consumer_image | to_json }}

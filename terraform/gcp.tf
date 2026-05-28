@@ -54,7 +54,6 @@ module "gcp_nat_route" {
   routes      = local.gcp_route_specs
   next_hop_ip = try(module.gcp_instances[0].instance_ips[local.gcp_route_host_name].private_ip, "")
 
-  depends_on = [module.gcp_instances]
 }
 
 module "gcp_database" {
@@ -82,7 +81,6 @@ module "gcp_k3s_servers_group" {
   ]
   named_ports = {}
 
-  depends_on = [module.gcp_instances]
 }
 
 module "gcp_k3s_api_lb" {

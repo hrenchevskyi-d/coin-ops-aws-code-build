@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Values.proxy.name }}
+  namespace: {{ .Values.proxy.namespace }}
   labels:
 {{ include "coinops-app.labels" . | indent 4 }}
     app.kubernetes.io/name: {{ .Values.proxy.name }}

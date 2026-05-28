@@ -98,6 +98,17 @@ resource "google_compute_instance" "vm" {
     }
   }
 
+
+
+  lifecycle {
+    # GCP resolves image families and shorthand image references to a concrete
+    # source image after creation. Without ignoring that normalized value,
+    # Terraform can keep planning no-op boot disk image updates forever.
+    ignore_changes = [
+      boot_disk[0].initialize_params[0].image,
+    ]
+  }
+
   metadata = merge(
     {
       # Keep SSH auth deterministic: only instance-level keys from Terraform.

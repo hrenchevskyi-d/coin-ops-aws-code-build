@@ -18,6 +18,53 @@
   set_fact:
     azure_key_vault_url: "{{ lookup('env', 'AZURE_KEYVAULT_URL') | default(('https://' ~ azure_key_vault_name ~ '.vault.azure.net/') if (azure_key_vault_name | length > 0) else '', true) }}"
 
+- name: Validate GCP secret backend inputs
+  assert:
+    that:
+      - gcp_project | length > 0
+      - gcp_service_account_file | length > 0
+    fail_msg: >-
+      GCP secret backend is selected, but required settings are missing.
+      gcp_project='{{ gcp_project }}', service_account_file='{{ gcp_service_account_file }}'.
+  when: secret_backend == 'gcp'
+
+- name: Check GCP service account file exists for secret lookup
+  stat:
+    path: "{{ gcp_service_account_file }}"
+  register: gcp_secret_service_account_file
+  delegate_to: localhost
+  become: false
+  when: secret_backend == 'gcp'
+
+- name: Fail fast when GCP service account file is missing
+  assert:
+    that:
+      - gcp_secret_service_account_file.stat.exists | default(false)
+    fail_msg: >-
+      GCP secret backend is selected, but {{ gcp_service_account_file }} is missing.
+      Re-run the bootstrap that creates the local Terraform service-account artifact.
+  when: secret_backend == 'gcp'
+
+- name: Probe GCP secret backend authentication before lookup
+  command:
+    argv:
+      - python3
+      - -c
+      - |
+        from google.auth.transport.requests import Request
+        from google.oauth2 import service_account
+        creds = service_account.Credentials.from_service_account_file(
+            "{{ gcp_service_account_file }}",
+            scopes=["https://www.googleapis.com/auth/cloud-platform"],
+        )
+        creds.refresh(Request())
+        print("ok")
+  register: gcp_secret_auth_probe
+  changed_when: false
+  delegate_to: localhost
+  become: false
+  when: secret_backend == 'gcp'
+
 - name: Show resolved secret backend selector
   debug:
     msg:

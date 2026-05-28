@@ -2,6 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ .Values.proxy.name }}
+  namespace: {{ .Values.proxy.namespace }}
   labels:
 {{ include "coinops-app.labels" . | indent 4 }}
 spec:
