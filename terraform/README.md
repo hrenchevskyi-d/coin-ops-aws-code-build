@@ -48,6 +48,8 @@ Current contract:
 - cloud-native NAT: outbound internet access for private subnets without public
   IPs
 - `Cloudflare Tunnel`: in-cluster path for private Headlamp browser access
+- `full-destroy.sh`: pre-cleans Terraform-managed Cloudflare Tunnel, Access,
+  and tunnel DNS resources before the final destroy when the Headlamp path is in scope
 
 Important consequences:
 - Tailscale configuration is still present in code for possible future reuse,

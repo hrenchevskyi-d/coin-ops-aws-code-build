@@ -7,7 +7,7 @@ resource "random_bytes" "headlamp_tunnel_secret" {
 resource "cloudflare_zero_trust_tunnel_cloudflared" "headlamp" {
   count      = local.headlamp_tunnel_enabled ? 1 : 0
   account_id = local.cloudflare_account_id
-  name       = "headlamp"
+  name       = local.headlamp_tunnel_name
   secret     = random_bytes.headlamp_tunnel_secret[0].base64
 }
 
@@ -32,7 +32,7 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "headlamp" {
 resource "cloudflare_zero_trust_access_identity_provider" "github" {
   count      = local.headlamp_access_enabled ? 1 : 0
   account_id = local.cloudflare_account_id
-  name       = "GitHub"
+  name       = local.headlamp_access_identity_provider_name
   type       = "github"
 
   config {
@@ -44,7 +44,7 @@ resource "cloudflare_zero_trust_access_identity_provider" "github" {
 resource "cloudflare_zero_trust_access_application" "headlamp" {
   count      = local.headlamp_access_enabled ? 1 : 0
   account_id = local.cloudflare_account_id
-  name       = "Headlamp"
+  name       = local.headlamp_access_application_name
   domain     = local.headlamp_domain
   type       = "self_hosted"
 
@@ -55,7 +55,7 @@ resource "cloudflare_zero_trust_access_policy" "headlamp" {
   count          = local.headlamp_access_enabled ? 1 : 0
   account_id     = local.cloudflare_account_id
   application_id = cloudflare_zero_trust_access_application.headlamp[0].id
-  name           = "Headlamp GitHub Access"
+  name           = local.headlamp_access_policy_name
   decision       = "allow"
   precedence     = 1
 

@@ -418,9 +418,13 @@ locals {
       allowed_emails = []
     }
   }, try(local.headlamp_cfg.cloudflare_tunnel, {}))
-  cloudflare_config     = lookup(local.dns, "cloudflare", {})
-  cloudflare_zone_id    = try(local.cloudflare_config.zone_id, var.cloudflare_zone_id)
-  cloudflare_account_id = try(local.cloudflare_config.account_id, var.cloudflare_account_id)
+  cloudflare_config                      = lookup(local.dns, "cloudflare", {})
+  cloudflare_zone_id                     = try(local.cloudflare_config.zone_id, var.cloudflare_zone_id)
+  cloudflare_account_id                  = try(local.cloudflare_config.account_id, var.cloudflare_account_id)
+  headlamp_tunnel_name                   = "${local.project_name}-headlamp"
+  headlamp_access_identity_provider_name = "${local.project_name}-headlamp-github"
+  headlamp_access_application_name       = "${local.project_name}-headlamp"
+  headlamp_access_policy_name            = "${local.project_name}-headlamp-github-access"
 
   gcp_cfg = {
     zone = local.gcp_zone

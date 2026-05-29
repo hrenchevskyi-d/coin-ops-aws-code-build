@@ -11,7 +11,8 @@ resources by:
   1. copying the Terraform root into a temporary directory
   2. removing hard destroy protections in the temporary copy only
   3. pre-cleaning provider-specific blockers for protected stateful resources
-  4. running terraform destroy there against the same backend state
+  4. pre-cleaning Terraform-managed Cloudflare Tunnel / Access / DNS resources when applicable
+  5. running terraform destroy there against the same backend state
 
 By default, it destroys resources across all enabled clouds. Use `--cloud` to
 limit the destroy to a single cloud's Terraform modules.
@@ -681,6 +682,13 @@ build_destroy_command() {
     case "${target_cloud}" in
       gcp)
         cmd+=(
+          -target=random_bytes.headlamp_tunnel_secret
+          -target=cloudflare_zero_trust_tunnel_cloudflared_config.headlamp
+          -target=cloudflare_zero_trust_tunnel_cloudflared.headlamp
+          -target=cloudflare_zero_trust_access_policy.headlamp
+          -target=cloudflare_zero_trust_access_application.headlamp
+          -target=cloudflare_zero_trust_access_identity_provider.github
+          -target=module.cloudflare_dns_records
           -target=module.gcp_nat_route
           -target=module.gcp_instances
           -target=module.gcp_firewall
@@ -722,6 +730,7 @@ if [[ "${TARGET_CLOUD}" == "all" || "${TARGET_CLOUD}" == "aws" ]]; then
 fi
 
 if [[ "${TARGET_CLOUD}" == "all" || "${TARGET_CLOUD}" == "gcp" ]]; then
+  bash "${TMP_TERRAFORM_DIR}/cloudflare-cleanup.sh" --prune-state
   disable_gcp_sql_deletion_protection
   delete_gcp_sql_instances
   delete_gcp_private_service_access
