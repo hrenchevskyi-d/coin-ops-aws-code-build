@@ -1,6 +1,6 @@
 # Coin-Ops Infrastructure Context
 
-This repository is the infrastructure control plane for a frozen Coin-Ops application. Application source was removed intentionally; deploys pull immutable or moving GHCR image tags configured through `terraform/config/deploy.json`, `IMAGE_REGISTRY`, and `IMAGE_TAG`.
+This repository is the infrastructure control plane for Coin-Ops. Application source has been removed; deploys pull GHCR image tags configured through `terraform/config/deploy.json`, `IMAGE_REGISTRY`, and `IMAGE_TAG`.
 
 ## Ownership Map
 
@@ -9,7 +9,7 @@ This repository is the infrastructure control plane for a frozen Coin-Ops applic
 | `terraform/` | Cloud resources, multicloud networking, secret-manager seeding, Cloudflare, generated operator metadata |
 | `ansible/` | Host provisioning, VM Compose deploy, k3s platform/app install, runtime config materialization |
 | `deploy/compose/` | Jinja Docker Compose templates rendered by Ansible for VM deploys |
-| `deploy/sql/` | Infra-owned PostgreSQL history/runtime bootstrap SQL |
+| `deploy/sql/` | PostgreSQL history/runtime bootstrap SQL |
 | `deploy/postgres-runtime/` | PostgreSQL runtime image with `pg_cron` and `pgmq` |
 | `packer/` | Optional golden-image build definitions for pre-baked app hosts |
 | `docs/` | Operator runbooks and architecture notes |
@@ -24,13 +24,13 @@ Both paths consume GHCR application images. Neither path builds app code locally
 ## Runtime Modes
 
 - `postgres`: normal mode. PostgreSQL plus `pgmq`/`pg_cron` handles queue and runtime state.
-- `external`: rollback mode. RabbitMQ and Redis are retained in Compose templates only for controlled fallback.
+- `external`: rollback mode. RabbitMQ and Redis remain in the Compose templates.
 
 ## Networking
 
 - Multicloud support remains part of the design.
 - Tailscale subnet routing remains supported for gateway-based inter-cloud reachability.
-- Cloudflare DNS, Tunnel, and Access remain supported for public and operator-facing entrypoints.
+- Cloudflare DNS, Tunnel, and Access remain supported for public and admin entrypoints.
 - Frontend traffic stays same-origin through `/api` and `/history-api` reverse proxy paths.
 
 ## Configuration Flow
@@ -42,4 +42,4 @@ Both paths consume GHCR application images. Neither path builds app code locally
 
 ## Safety Notes
 
-Generated files such as `terraform/backend.active.tf`, `terraform/local.generated.auto.tfvars.json`, `terraform/config/hosts.json`, `terraform/config/ansible-runtime.json`, `ansible/vars/local.generated.json`, and `ansible/artifacts/` are local operator artifacts and must stay out of commits.
+Generated files such as `terraform/backend.active.tf`, `terraform/local.generated.auto.tfvars.json`, `terraform/config/hosts.json`, `terraform/config/ansible-runtime.json`, `ansible/vars/local.generated.json`, and `ansible/artifacts/` are local generated files and must stay out of commits.

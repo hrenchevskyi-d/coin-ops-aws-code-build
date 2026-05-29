@@ -1,5 +1,4 @@
-# Homepage config is operator UX, not application logic. Links/widgets should
-# describe the live infra surface only.
+# Dashboard links and widgets for the current infra environment.
 apiVersion: v1
 kind: ConfigMap
 metadata:

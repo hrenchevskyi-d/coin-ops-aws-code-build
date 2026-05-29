@@ -1,6 +1,6 @@
 ---
-# deploy.yml — legacy VM Compose deploy path.
-# Safe to re-run when this rollback path is intentionally kept.
+# deploy.yml - legacy VM Compose deploy path.
+# Re-runnable while this path is still kept.
 #
 #   ansible-playbook -i ansible/inventory ansible/deploy.yml
 

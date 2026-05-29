@@ -50,7 +50,7 @@ make k3s-homepage
 make k3s-coinops
 ```
 
-The local kubeconfig and helper scripts are generated under `ansible/artifacts/`. They are sensitive operator artifacts and must not be committed.
+The local kubeconfig and helper scripts are generated under `ansible/artifacts/`. They are sensitive and must not be committed.
 
 ## Runtime SQL
 
@@ -75,7 +75,7 @@ Override with `IMAGE_REGISTRY`, `IMAGE_TAG`, or `POSTGRES_RUNTIME_IMAGE` only fo
 
 ## Rollback Runtime Mode
 
-`RUNTIME_BACKEND=external` keeps RabbitMQ and Redis available for controlled rollback. The normal runtime is PostgreSQL-backed `RUNTIME_BACKEND=postgres`.
+`RUNTIME_BACKEND=external` keeps RabbitMQ and Redis available for rollback. The normal runtime is PostgreSQL-backed `RUNTIME_BACKEND=postgres`.
 
 ## Destroy and Repair
 

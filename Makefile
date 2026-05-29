@@ -53,7 +53,7 @@ help:
 	@echo "                               - SSH using generated terraform ssh_config"
 	@echo ""
 	@echo "Ansible:"
-	@echo "  make runtime-config          - Resolve and print the materialized runtime configuration locally"
+	@echo "  make runtime-config          - Resolve and print runtime configuration locally"
 	@echo "  make ansible-check           - Run local syntax checks for the main Ansible entrypoints"
 	@echo "  make provision               - Run ansible/provision.yml"
 	@echo "  make deploy                  - Run ansible/deploy.yml"

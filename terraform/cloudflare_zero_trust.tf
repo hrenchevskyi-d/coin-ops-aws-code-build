@@ -1,4 +1,4 @@
-# Headlamp tunnel resources are optional and isolated from the main app ingress.
+# Optional Headlamp tunnel; app ingress uses the normal k3s path.
 resource "random_bytes" "headlamp_tunnel_secret" {
   count  = local.headlamp_tunnel_enabled ? 1 : 0
   length = 32
@@ -59,8 +59,7 @@ resource "cloudflare_zero_trust_access_policy" "headlamp" {
   decision       = "allow"
   precedence     = 1
 
-  # Non-empty allowed_emails turns Access into an allowlist. Empty means any
-  # authenticated GitHub identity can pass, which is useful for private labs.
+  # Empty allowed_emails means any GitHub-authenticated user can pass Access.
   dynamic "include" {
     for_each = length(local.headlamp_access_allowed_emails) > 0 ? [local.headlamp_access_allowed_emails] : []
     content {

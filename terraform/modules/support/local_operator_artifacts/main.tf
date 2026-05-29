@@ -1,5 +1,4 @@
-# Local files are generated handoff artifacts for the operator machine. They
-# are intentionally outside remote state consumers and are gitignored.
+# Generated local files for Ansible and SSH. Gitignored.
 resource "local_file" "hosts" {
   filename = var.hosts_filename
   content  = var.hosts_content

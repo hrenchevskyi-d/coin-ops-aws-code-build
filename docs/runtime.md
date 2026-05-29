@@ -14,7 +14,7 @@ PostgreSQL runtime mode requires:
 - `pg_cron` for scheduled cleanup jobs
 - `pgmq` for queue primitives
 
-The infra-owned image definition is `deploy/postgres-runtime/Dockerfile`, published as `coin-ops-postgres-runtime`. The server must start with `shared_preload_libraries = 'pg_cron'` and `cron.database_name` set to the application database name.
+The image definition is `deploy/postgres-runtime/Dockerfile`, published as `coin-ops-postgres-runtime`. The server must start with `shared_preload_libraries = 'pg_cron'` and `cron.database_name` set to the application database name.
 
 ## Bootstrap Order
 
@@ -33,5 +33,5 @@ The infra-owned image definition is `deploy/postgres-runtime/Dockerfile`, publis
 
 - VM Compose deploy copies SQL to `/opt/cognitor/history` before starting backend services.
 - k3s deploy creates a ConfigMap and runs a CNPG bootstrap Job.
-- `RUNTIME_BACKEND=external` bypasses PostgreSQL queue/session primitives and is retained only for rollback.
+- `RUNTIME_BACKEND=external` bypasses PostgreSQL queue/session primitives and is kept for rollback.
 - Re-run the SQL bootstrap after runtime SQL changes as part of a controlled deployment, not as a standalone app migration flow.

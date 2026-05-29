@@ -77,7 +77,7 @@ locals {
   aws_network_cfg_raw   = merge(local.default_network_cfg, lookup(local.cloud_networks, "aws", {}))
   azure_network_cfg_raw = merge(local.default_network_cfg, lookup(local.cloud_networks, "azure", {}))
   # If remote_routes is omitted, derive cross-cloud routes from enabled clouds.
-  # Explicit remote_routes remains the escape hatch for partial meshes or labs.
+  # Explicit remote_routes overrides the generated mesh.
   gcp_network_cfg = merge(local.gcp_network_cfg_raw, {
     remote_routes = length(try(local.gcp_network_cfg_raw.remote_routes, [])) > 0 ? local.gcp_network_cfg_raw.remote_routes : [
       for remote_cloud, remote_cfg in {
@@ -294,8 +294,7 @@ locals {
   private_default_route_cfg     = try(local.routing.private_default_route, null)
   private_default_route_enabled = local.private_default_route_cfg != null
 
-  # Route resources are only emitted when a route host exists. This avoids
-  # provisioning blackhole routes in single-cloud or no-gateway topologies.
+  # Do not create routes without a gateway/NAT host.
   gcp_has_route_host = (
     local.gcp_route_host_name != ""
     && (

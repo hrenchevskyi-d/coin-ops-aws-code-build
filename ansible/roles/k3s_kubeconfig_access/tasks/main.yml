@@ -58,7 +58,7 @@
     - k3s_remote_fallback_local_cluster_kubeconfig_stat.stat.exists | default(false)
 
 # Remote fallback rewrites the local artifact to the target host's API address.
-# This keeps delegated k8s tasks usable even if /etc/rancher/k3s is unavailable.
+# Fallback for delegated k8s tasks when /etc/rancher/k3s is unavailable.
 - name: Render remote fallback kubeconfig
   template:
     src: remote-fallback-kubeconfig.yaml.j2

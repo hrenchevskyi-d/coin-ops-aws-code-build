@@ -33,7 +33,7 @@ Use `suppress_secret_manager_reads=true` only as a recovery / teardown switch.
 It tells Terraform not to read secret **versions** from the configured cloud
 secret backend while it reconciles the rest of the graph. This is useful when
 the secret container still exists in configuration but the underlying secret
-versions were already deleted, or when the secret backend is intentionally being
+versions were already deleted, or when the secret backend is being
 removed as part of the current teardown.
 
 ## Current Active Topology
@@ -122,7 +122,7 @@ delta before it is written back to state.
 
 ## Full Stateful Teardown
 
-Stateful resources in this repository intentionally have `prevent_destroy` and
+Stateful resources in this repository have `prevent_destroy` and
 provider-side deletion protection enabled. To tear everything down on purpose,
 use the dedicated helper:
 

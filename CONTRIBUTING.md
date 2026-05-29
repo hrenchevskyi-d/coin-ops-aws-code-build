@@ -1,6 +1,6 @@
 # Contributing
 
-This repository is infrastructure-only. The application is frozen and deployed from existing GHCR images; do not add app source, local app build steps, or smoke stacks back into this repo.
+This repository is infrastructure-only. The application is deployed from existing GHCR images; do not add app source, local app build steps, or smoke stacks back into this repo.
 
 ## Before Opening a PR
 
@@ -25,12 +25,12 @@ If you changed Compose templates, render them through the owning Ansible role or
 
 ## Infrastructure Areas
 
-- `terraform/`: cloud resources, remote-state bootstrap helpers, generated operator metadata, Cloudflare, and multicloud networking.
+- `terraform/`: cloud resources, remote-state bootstrap scripts, generated local metadata, Cloudflare, and multicloud networking.
 - `ansible/`: host provisioning, VM Compose deploys, k3s platform roles, runtime configuration, and operator artifacts.
 - `deploy/compose/`: Jinja-rendered VM Compose templates. Do not run these raw.
 - `deploy/sql/`: retained PostgreSQL schema/runtime bootstrap SQL used by VM Compose and k3s CNPG deployments.
-- `deploy/postgres-runtime/`: infra-owned PostgreSQL 16 image with `pg_cron` and `pgmq` support.
-- `docs/`: operator-facing documentation.
+- `deploy/postgres-runtime/`: PostgreSQL 16 image with `pg_cron` and `pgmq` support.
+- `docs/`: admin documentation.
 
 ## PR Expectations
 
@@ -44,4 +44,4 @@ Use a Conventional Commit style PR title when the change may reach `main`. Keep 
 
 ## Notes
 
-`RUNTIME_BACKEND=external` remains supported only as rollback. The normal path is PostgreSQL runtime mode. Existing application images are deployment inputs, not build outputs of this repository.
+`RUNTIME_BACKEND=external` remains rollback support. The normal path is PostgreSQL runtime mode. Application images are deployment inputs, not build outputs of this repository.

@@ -21,7 +21,7 @@ k3s_coinops_app_proxy_image: "{{ proxy_image }}"
 k3s_coinops_app_proxy_service_port: 8080
 k3s_coinops_app_proxy_replicas: 1
 # Conservative starting budget based on current kubectl top output.
-# These are intentionally modest so the small lab cluster keeps plenty of headroom.
+# Modest defaults for the small lab cluster.
 k3s_coinops_app_proxy_resources:
   requests:
     cpu: 25m

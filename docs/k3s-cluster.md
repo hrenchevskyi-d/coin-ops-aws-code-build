@@ -17,7 +17,7 @@ make k3s-coinops
 
 ## Operator Artifacts
 
-Generated files are written under `ansible/artifacts/`, including kubeconfigs and tunnel helpers. They are local, sensitive, and ignored by git.
+Generated kubeconfigs and tunnel scripts are written under `ansible/artifacts/`. They are local, sensitive, and ignored by git.
 
 Use the tunneled kubeconfig for localhost-driven Kubernetes work:
 
@@ -28,7 +28,7 @@ export KUBECONFIG=/home/notebook/projects/coin-ops/ansible/artifacts/kubeconfig-
 
 ## Traefik Model
 
-`ansible/roles/k3s_traefik` renders a `HelmChartConfig` that keeps Traefik as the cluster ingress entrypoint. Public load balancers should target node ports/host ports according to Terraform network config, not ad hoc app services.
+`ansible/roles/k3s_traefik` renders the packaged Traefik `HelmChartConfig`. Public load balancers should target the Terraform-defined ingress ports, not ad hoc app services.
 
 ## Reconcile Guidance
 

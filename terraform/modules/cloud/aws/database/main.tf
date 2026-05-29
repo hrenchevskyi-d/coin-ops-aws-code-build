@@ -1,5 +1,4 @@
-# Managed database resources are protected by prevent_destroy. Destroy flows
-# must be explicit because DB loss is not a normal infrastructure cleanup.
+# Managed DB resources use prevent_destroy; teardown scripts handle deletes.
 resource "random_id" "db_name_suffix" {
   byte_length = 4
 }

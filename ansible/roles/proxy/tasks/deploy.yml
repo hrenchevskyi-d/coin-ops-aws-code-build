@@ -1,6 +1,5 @@
 ---
-# Legacy VM Compose path: proxy deploys a frozen GHCR backend proxy image and
-# should disappear if the VM Compose rollback path is removed.
+# Legacy VM Compose path: backend proxy container.
 - name: Prepare proxy compose stack
   include_role:
     name: compose_stack

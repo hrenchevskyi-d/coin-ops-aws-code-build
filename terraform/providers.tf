@@ -1,5 +1,4 @@
-# Providers are configured from merged JSON locals so switching clouds is a
-# config change, not a code edit. Placeholder tokens avoid provider init failures.
+# Provider settings come from locals built from terraform/config/*.json.
 terraform {
   required_version = ">= 1.5.0"
 
@@ -50,8 +49,7 @@ provider "aws" {
 }
 
 provider "cloudflare" {
-  # The provider validates token shape during init even when Cloudflare resources
-  # are disabled, so use a harmless placeholder until secrets are resolved.
+  # Cloudflare validates this during init; placeholder keeps disabled plans usable.
   api_token = trimspace(local.effective_cloudflare_api_token != "" ? local.effective_cloudflare_api_token : "placeholder_token")
 }
 

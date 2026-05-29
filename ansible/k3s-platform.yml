@@ -1,5 +1,4 @@
 ---
-# Platform is a convenience wrapper: first reconcile the cluster, then optional
-# operator-facing add-ons such as Headlamp. Coin-Ops app install is separate.
+# Convenience wrapper: cluster first, admin add-ons second. App install is separate.
 - import_playbook: k3s-cluster.yml
 - import_playbook: k3s-headlamp.yml

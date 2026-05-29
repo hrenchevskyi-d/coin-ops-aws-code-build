@@ -1,6 +1,5 @@
 ---
-# Legacy VM Compose path: UI role owns nginx gateway config plus the frozen UI
-# container. k3s uses k3s_coinops_ui instead.
+# Legacy VM Compose path: nginx gateway plus UI container.
 - name: Render nginx gateway config
   template:
     src: nginx.gateway.conf.j2

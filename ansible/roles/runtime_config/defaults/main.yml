@@ -12,8 +12,7 @@ repo_root: >-
     )
   }}
 
-# Runtime config is the single merge point between Terraform JSON, generated metadata, env overrides, and secrets.
-# Keep this role public in playbooks; later roles read the facts it materializes.
+# Terraform JSON, generated files, env overrides, and secrets meet here.
 deploy_defaults: "{{ (lookup('file', repo_root ~ '/ansible/vars/deploy-config.yml') | from_yaml) | default({}, true) }}"
 infra_config_dir: "{{ repo_root ~ '/terraform/config' }}"
 infra_config_clouds: "{{ lookup('file', infra_config_dir ~ '/clouds.json') | from_json }}"
@@ -25,8 +24,7 @@ infra_config_dns_file: "{{ lookup('file', infra_config_dir ~ '/dns.json') | from
 infra_config_secrets_file: "{{ lookup('file', infra_config_dir ~ '/secrets.json') | from_json }}"
 infra_config_instances_file: "{{ lookup('file', infra_config_dir ~ '/instances.json') | from_json }}"
 infra_networks_file: "{{ lookup('file', infra_config_dir ~ '/networks.json') | from_json }}"
-# Split files are combined here to give Ansible the same view Terraform has.
-# combine(..., recursive=True) preserves nested defaults while allowing overrides.
+# Match Terraform config loading and keep nested overrides intact.
 infra_config: >-
   {{
     infra_config_clouds
@@ -123,8 +121,7 @@ local_generated_config: >-
     ((local_generated_config_text | trim | length) > 0)
     | ternary((local_generated_config_text | from_json), {})
   }}
-# Precedence: committed JSON -> optional Ansible overrides -> generated local artifacts.
-# Generated artifacts are last because Terraform knows live IPs, DB endpoints, and LB addresses.
+# Precedence: committed JSON -> Ansible overrides -> generated local files.
 deploy_config: "{{ json_deploy_config | combine(deploy_defaults, recursive=True) | combine(local_generated_config, recursive=True) }}"
 
 runtime_metadata_path: "{{ repo_root ~ '/terraform/config/ansible-runtime.json' }}"
@@ -198,8 +195,7 @@ cloud_image_profiles: "{{ infra_images.get(my_cloud, {}) }}"
 base_image_profile_name: "{{ infra_general.get('image_profile', 'debian-12') }}"
 base_image_profile_config: "{{ cloud_image_profiles.get(base_image_profile_name, {}) }}"
 host_image_profile_config: "{{ cloud_image_profiles.get(host_image_profile, {}) }}"
-# Golden-image detection is intentionally config-based, not cloud-image-name
-# based, so each provider can express baked images differently.
+# Golden-image detection is config-based; each cloud names images differently.
 host_uses_golden_image: >-
   {{
     host_image_profile == 'coinops-app-host'

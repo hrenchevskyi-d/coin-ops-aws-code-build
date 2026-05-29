@@ -21,4 +21,4 @@ Multicloud support remains in scope for the infra-only repository.
 
 ## Change Guidance
 
-Keep cloud-specific behavior isolated in provider modules, inventory plugins, or role defaults. Shared policy should live in `terraform/config/*.json` and be materialized through `ansible/roles/runtime_config` rather than duplicated in inventories or playbooks.
+Keep cloud-specific behavior in provider modules, inventory plugins, or role defaults. Shared settings belong in `terraform/config/*.json` and flow through `ansible/roles/runtime_config` instead of being copied into inventories or playbooks.

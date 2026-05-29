@@ -1,6 +1,5 @@
 ---
-# Bootstrap node owns the first cluster token and datastore init. Join nodes must
-# wait for this role to finish before they render their server config.
+# Bootstrap node creates the first token and initializes the datastore.
 - name: Render bootstrap k3s server configuration
   template:
     dest: "{{ k3s_config_file }}"
@@ -45,8 +44,7 @@
     state: started
   tags: [k3s, k3s_bootstrap]
 
-# The install script will not re-run after /usr/local/bin/k3s exists, so config
-# changes must restart the already-installed service explicitly.
+# get-k3s.sh will not re-run after install; config changes need a restart.
 - name: Restart bootstrap k3s service when configuration changes
   systemd:
     name: k3s

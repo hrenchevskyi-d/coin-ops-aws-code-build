@@ -1,6 +1,5 @@
 ---
-# App workloads are deployed from frozen GHCR images through a repo-owned chart.
-# This role manages Kubernetes shape, not application source.
+# Deploy prebuilt GHCR images with the local Helm chart.
 - name: k3s-coinops-app-install-helm-client
   include_role:
     name: k3s_helm_client

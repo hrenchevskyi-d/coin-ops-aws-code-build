@@ -1,6 +1,5 @@
 ---
-# UI chart deploys the frozen UI image and same-origin nginx routing. TLS/Ingress
-# are delegated to the shared ingress endpoint role.
+# UI chart deploys the prebuilt UI image and same-origin nginx routing.
 - name: k3s-coinops-ui-install-helm-client
   include_role:
     name: k3s_helm_client

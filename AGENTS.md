@@ -2,9 +2,9 @@
 
 ## Project Structure & Module Organization
 
-This repository now owns infrastructure only. Terraform lives in `terraform/`, Ansible in `ansible/`, VM Compose templates in `deploy/compose/`, retained PostgreSQL bootstrap SQL in `deploy/sql/`, and the infra-owned PostgreSQL runtime image in `deploy/postgres-runtime/`. Operator docs live in `docs/` plus the top-level runbook files.
+This repository now contains infrastructure only. Terraform lives in `terraform/`, Ansible in `ansible/`, VM Compose templates in `deploy/compose/`, PostgreSQL bootstrap SQL in `deploy/sql/`, and the PostgreSQL runtime image in `deploy/postgres-runtime/`. Operator docs live in `docs/` plus the top-level runbook files.
 
-Application source is intentionally absent. Deployments consume frozen GHCR images through `IMAGE_REGISTRY`, `IMAGE_TAG`, and the image defaults resolved by Ansible.
+Application source is absent. Deployments pull GHCR images through `IMAGE_REGISTRY`, `IMAGE_TAG`, and the image defaults resolved by Ansible.
 
 ## Build, Test, and Development Commands
 
@@ -40,7 +40,7 @@ docker build -t coin-ops-postgres-runtime -f deploy/postgres-runtime/Dockerfile 
 
 ## Coding Style & Naming Conventions
 
-Use Terraform `fmt` defaults. YAML files use two-space indentation. Ansible task names should describe the operator action, not implementation trivia. Keep comments short and helpful for an intern reading the deployment flow. Do not reintroduce local application build or test paths.
+Use Terraform `fmt` defaults. YAML files use two-space indentation. Ansible task names should describe the admin action. Keep comments short and practical. Do not add local application build or test paths.
 
 ## Testing Guidelines
 
@@ -56,8 +56,8 @@ Never commit real credentials, generated env files, kubeconfigs, tfstate, or loc
 
 ## Architecture Notes
 
-Terraform creates cloud resources and generated operator metadata. Ansible configures hosts, deploys VM Compose stacks, and installs k3s workloads. PostgreSQL stores history and runtime state; `RUNTIME_BACKEND=external` keeps RabbitMQ/Redis rollback support only.
+Terraform creates cloud resources and generated local metadata. Ansible configures hosts, deploys VM Compose stacks, and installs k3s workloads. PostgreSQL stores history and runtime state; `RUNTIME_BACKEND=external` is RabbitMQ/Redis rollback support only.
 
-Frontend URLs stay same-origin (`/api` and `/history-api`) so nginx can reverse-proxy to backend services. Do not reintroduce direct browser calls to private backend IPs unless intentionally debugging CORS.
+Frontend URLs stay same-origin (`/api` and `/history-api`) so nginx can reverse-proxy to backend services. Direct browser calls to private backend IPs are for CORS debugging only.
 
 Multicloud, Tailscale subnet routing, Cloudflare DNS/Access, Headlamp, Homepage, CNPG, VM Compose, and k3s are all supported infrastructure concerns and should remain intact.

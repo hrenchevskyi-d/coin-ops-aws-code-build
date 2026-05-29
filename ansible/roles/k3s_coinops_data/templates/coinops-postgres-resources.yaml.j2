@@ -1,5 +1,4 @@
-# Registry credentials are rendered by Ansible from the selected secret backend;
-# no image-building credentials should be committed to the repo.
+# Registry credentials come from the selected cloud secret backend.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -29,8 +28,7 @@ stringData:
   username: "{{ k3s_coinops_data_app_user }}"
   password: "{{ db_password }}"
 ---
-# Runtime SQL is infra-owned bootstrap data. It is mounted into a one-shot job,
-# not copied into application images.
+# Runtime SQL is mounted into the one-shot bootstrap job.
 apiVersion: v1
 kind: ConfigMap
 metadata:

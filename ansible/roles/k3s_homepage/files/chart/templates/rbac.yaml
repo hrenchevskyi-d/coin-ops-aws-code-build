@@ -1,5 +1,4 @@
-# Homepage needs read-only cluster visibility for widgets. Keep verbs limited to
-# get/list so the dashboard cannot mutate cluster state.
+# Read-only cluster access for Homepage widgets.
 {{- if .Values.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole

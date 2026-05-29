@@ -1,6 +1,5 @@
 ---
-# Cloudflare Tunnel is optional Headlamp access plumbing. Disable path removes
-# the Helm release so stale tunnels do not keep serving old endpoints.
+# Optional Cloudflare Tunnel for Headlamp. Disable removes the Helm release.
 - name: k3s-headlamp-tunnel-uninstall-release-when-disabled
   kubernetes.core.helm:
     name: "{{ k3s_headlamp_tunnel_release_name }}"

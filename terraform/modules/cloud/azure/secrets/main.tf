@@ -1,5 +1,4 @@
-# Key Vault stores JSON payloads matching the AWS/GCP secret shape. Access
-# policy and seeding are handled here so Ansible can read a stable contract.
+# Key Vault stores the same JSON payloads as AWS/GCP secrets.
 data "azurerm_client_config" "current" {}
 
 resource "azurerm_key_vault" "this" {

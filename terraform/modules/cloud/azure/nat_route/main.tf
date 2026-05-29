@@ -1,5 +1,4 @@
-# Azure expresses VM gateway routing through route tables with VirtualAppliance
-# next hops. Public routes are optional and only created when configured.
+# Azure route tables use the gateway VM as a VirtualAppliance next hop.
 moved {
   from = azurerm_route_table.this
   to   = azurerm_route_table.private

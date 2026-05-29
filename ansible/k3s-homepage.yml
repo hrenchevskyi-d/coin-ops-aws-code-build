@@ -1,6 +1,5 @@
 ---
-# Homepage is an optional k3s add-on. It is separate from Coin-Ops app deploy so
-# dashboard changes do not roll application workloads.
+# Optional k3s dashboard. Kept separate from the Coin-Ops app deploy.
 - name: Validate Homepage deployment contract
   hosts: localhost
   connection: local

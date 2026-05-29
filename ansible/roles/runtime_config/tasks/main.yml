@@ -1,6 +1,5 @@
 ---
-# Keep secret lookup on the operator machine. Remote hosts should receive only
-# rendered runtime values, never direct cloud credentials.
+# Resolve cloud secrets on localhost; remote hosts receive rendered values.
 - name: Materialize cloud secret backend selection
   set_fact:
     secret_backend: "{{ lookup('env', 'COINOPS_SECRET_BACKEND') | default(local_generated_config.get('secret_backend', deploy_defaults.get('secret_backend', infra_clouds.get('secret_backend', infra_clouds.get('control_plane', 'gcp')))), true) }}"
@@ -140,8 +139,7 @@
   become: false
   when: secret_backend == 'azure'
 
-# GCP/AWS lookups return either parsed mappings or JSON strings depending on
-# collection versions; normalize later instead of assuming one shape here.
+# Collection versions differ: lookups may return maps or JSON strings.
 - name: Materialize runtime secret payloads from GCP or AWS
   set_fact:
     db_secrets_raw: >-
@@ -216,8 +214,7 @@
   no_log: "{{ not (lookup('env', 'DEBUG_SECRET_LOOKUP') | default('false', true) | bool) }}"
   when: secret_backend == 'azure'
 
-# Keep no_log here even in debug mode: this is the point where both DB and app
-# secret payloads are fully materialized in memory.
+# Always hide the parsed DB/app secret maps.
 - name: Materialize runtime secret maps
   set_fact:
     db_secrets: "{{ db_secrets_raw if (db_secrets_raw is mapping) else (db_secrets_raw | from_json) }}"

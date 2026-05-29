@@ -1,5 +1,4 @@
-# UI image is frozen in GHCR; this chart only controls Kubernetes runtime
-# wiring such as nginx config mount and resource limits.
+# Prebuilt UI image; chart handles nginx config mount and resource limits.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

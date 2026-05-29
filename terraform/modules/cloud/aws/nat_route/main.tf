@@ -1,5 +1,4 @@
-# These routes target a VM network interface, not AWS NAT Gateway. That keeps
-# cross-cloud/Tailscale routing under the same gateway model as other clouds.
+# Routes target the gateway VM network interface, not AWS NAT Gateway.
 moved {
   from = aws_route.private_default_via_nat_instance
   to   = aws_route.private_via_nat_instance

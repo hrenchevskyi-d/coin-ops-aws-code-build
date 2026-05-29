@@ -1,6 +1,5 @@
 ---
-# --reset makes route/tag changes converge, but it also means every desired
-# Tailscale option must be declared here rather than configured manually.
+# --reset converges routes/tags; keep all desired Tailscale options here.
 - name: Configure Tailscale subnet router
   command:
     argv:

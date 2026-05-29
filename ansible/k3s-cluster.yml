@@ -1,6 +1,5 @@
 ---
-# This playbook intentionally builds a three-server control plane only.
-# Single-node experiments should use a separate lab playbook/config.
+# Three-server k3s control plane. Use a separate lab config for single-node tests.
 - name: Validate k3s cluster contract
   hosts: localhost
   connection: local

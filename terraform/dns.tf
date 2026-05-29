@@ -1,6 +1,4 @@
-# DNS Automation via Cloudflare.
-# The root app domain belongs to one primary cloud only.
-# Non-primary cloud deployments are intentionally tested by direct public IP.
+# Cloudflare DNS. The root app domain points at one primary cloud.
 
 locals {
   dns_primary_cloud       = try(local.dns.primary_cloud, local.control_plane_cloud)
@@ -36,7 +34,7 @@ locals {
   headlamp_private_ip    = local.gcp_k3s_ingress_lb_enabled ? try(module.gcp_k3s_ingress_lb[0].ip_address, "") : ""
   headlamp_tunnel_target = local.headlamp_tunnel_enabled ? "${cloudflare_zero_trust_tunnel_cloudflared.headlamp[0].id}.cfargotunnel.com" : ""
   homepage_public_ip     = local.gcp_k3s_public_ingress_lb_enabled ? try(module.gcp_k3s_public_ingress_lb[0].ip_address, "") : ""
-  # DNS is intentionally tied to the k3s ingress path; app images are not built here.
+  # DNS points at k3s ingress; images are handled outside Terraform.
   cloudflare_dns_records = {
     root_a = {
       enabled         = local.dns_enabled && local.gcp_k3s_public_ingress_lb_enabled

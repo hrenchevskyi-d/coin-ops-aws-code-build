@@ -1,6 +1,5 @@
 ---
-# Legacy VM Compose path: copy retained infra-owned SQL onto the backend host so
-# the frozen GHCR image does not need repository source mounted beside it.
+# Legacy VM Compose path: copy deployment SQL onto the backend host.
 - name: Copy PostgreSQL runtime schema
   copy:
     src: "{{ playbook_dir }}/../deploy/sql/history/schema.sql"

@@ -54,7 +54,7 @@ Regenerate it with the matching bootstrap script, then reconfigure Terraform:
   bash bootstrap-${control_plane}.sh
   terraform init -reconfigure
 
-Do not use -migrate-state unless you intentionally want to copy state between
+Do not use -migrate-state unless you mean to copy state between
 backends.
 EOF
   exit 1

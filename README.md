@@ -1,6 +1,6 @@
 # Coin-Ops Infrastructure
 
-This repository is infrastructure-only. The Coin-Ops application is frozen and deployed from existing GHCR images; app source, local app builds, app tests, and smoke stacks are intentionally not kept here.
+This repository contains the deployment infrastructure for Coin-Ops. Application images are pulled from GHCR; app source, local app builds, app tests, and smoke stacks are not kept here.
 
 ## What This Repo Owns
 
@@ -26,7 +26,7 @@ Both paths use the same image inputs resolved from `terraform/config/deploy.json
 ## Runtime Modes
 
 - `RUNTIME_BACKEND=postgres`: normal mode. PostgreSQL runtime SQL enables `pgmq`, queue wrappers, cache/session tables, and `pg_cron` cleanup jobs.
-- `RUNTIME_BACKEND=external`: rollback mode. RabbitMQ and Redis remain available in VM Compose templates for controlled fallback.
+- `RUNTIME_BACKEND=external`: rollback mode. RabbitMQ and Redis remain available in the VM Compose templates.
 
 Runtime SQL lives under `deploy/sql/` because it is a database bootstrap asset required by infrastructure, not application source.
 
@@ -73,7 +73,7 @@ make k3s-homepage
 make k3s-coinops
 ```
 
-Build the infra-owned PostgreSQL runtime image when it changes:
+Build the PostgreSQL runtime image when its Dockerfile changes:
 
 ```bash
 docker build -t coin-ops-postgres-runtime -f deploy/postgres-runtime/Dockerfile deploy/postgres-runtime
@@ -111,4 +111,4 @@ Do not commit:
 
 ## Notes
 
-Multicloud, Tailscale, Cloudflare DNS/Access, Headlamp, Homepage, CNPG, VM Compose, and k3s support are intentionally preserved. Do not reintroduce app source directories or direct browser calls to backend private IPs.
+Multicloud, Tailscale, Cloudflare DNS/Access, Headlamp, Homepage, CNPG, VM Compose, and k3s stay supported. Do not add app source directories or direct browser calls to backend private IPs.

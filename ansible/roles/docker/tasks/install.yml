@@ -1,6 +1,5 @@
 ---
-# Docker is only needed for the legacy VM Compose path. Golden images should
-# already include it; fresh VMs install it here.
+# Docker is for the legacy VM Compose path; fresh VMs install it here.
 - name: Install Docker host prerequisites on non-image-based hosts
   when: not host_uses_golden_image
   block:

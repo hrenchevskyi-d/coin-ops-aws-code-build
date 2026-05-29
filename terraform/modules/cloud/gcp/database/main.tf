@@ -1,5 +1,4 @@
-# Cloud SQL uses Private Service Access; the peering allocation is stateful and
-# intentionally protected from accidental destroy.
+# Cloud SQL uses Private Service Access; protect the peering allocation.
 # Private Service Access for CloudSQL (VPC Peering)
 resource "google_compute_global_address" "private_ip_alloc" {
   name          = "${var.project_name}-db-ip-alloc"

@@ -1,5 +1,4 @@
-# Same-origin routing is intentional: browser calls stay on /api and
-# /history-api while nginx talks to private ClusterIP services.
+# Browser uses /api and /history-api; nginx talks to ClusterIP services.
 apiVersion: v1
 kind: ConfigMap
 metadata:

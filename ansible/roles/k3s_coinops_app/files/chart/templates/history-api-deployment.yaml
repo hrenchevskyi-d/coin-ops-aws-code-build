@@ -1,5 +1,4 @@
-# History API is stateless; durable state is PostgreSQL/runtime SQL owned by
-# infra bootstrap, not this chart.
+# History API is stateless; durable state is prepared by DB bootstrap.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

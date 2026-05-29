@@ -1,5 +1,4 @@
-# Secret payload shape is shared with Ansible runtime_config. Keep key names
-# stable or all deployment paths must be updated together.
+# Secret JSON keys are consumed by ansible/roles/runtime_config.
 resource "aws_secretsmanager_secret" "db_secrets" {
   name                    = var.db_secret_name
   recovery_window_in_days = 7

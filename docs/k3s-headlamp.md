@@ -1,6 +1,6 @@
 # Headlamp
 
-Headlamp is an operator UI installed into k3s. Cloudflare Tunnel and Access remain supported for browser access, while local port-forward helpers remain available as fallback.
+Headlamp runs in k3s. Cloudflare Tunnel and Access are supported for browser access; local port-forward scripts remain available as fallback.
 
 ## Deploy
 
@@ -11,7 +11,7 @@ make k3s-cluster
 make k3s-headlamp
 ```
 
-Terraform owns Cloudflare Tunnel, Access, and DNS inputs. Ansible installs the in-cluster workload and writes helper notes under `ansible/artifacts/`.
+Terraform manages Cloudflare Tunnel, Access, and DNS inputs. Ansible installs the in-cluster workload and writes access notes under `ansible/artifacts/`.
 
 ## Access
 

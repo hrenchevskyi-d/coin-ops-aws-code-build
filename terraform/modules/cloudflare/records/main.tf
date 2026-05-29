@@ -1,5 +1,4 @@
-# Cloudflare records are thin DNS plumbing. Higher-level decisions about which
-# cloud owns a hostname live in root dns.tf/locals.tf.
+# Low-level DNS records. Hostname ownership is decided in root locals/dns.
 resource "cloudflare_record" "this" {
   for_each = {
     for key, record in var.records : key => record if record.enabled

@@ -1,6 +1,5 @@
 ---
-# Coin-Ops workload management runs from localhost using exported kubeconfig.
-# That keeps cluster changes auditable from the operator machine.
+# Workloads are applied from localhost using the exported kubeconfig.
 - name: Validate Coin-Ops k3s deployment contract
   hosts: localhost
   connection: local
@@ -20,8 +19,8 @@
         fail_msg: >-
           Coin-Ops k3s deployment requires at least one host in role_k3s_server.
 
-    # The app images are external GHCR inputs, but DB bootstrap is infra-owned.
-    # Require postgres runtime here so RabbitMQ/Redis stays a rollback-only mode.
+    # App images come from GHCR; database bootstrap stays in this repo.
+    # RabbitMQ/Redis remains rollback-only.
     - name: Assert Coin-Ops k3s runtime prerequisites
       assert:
         that:

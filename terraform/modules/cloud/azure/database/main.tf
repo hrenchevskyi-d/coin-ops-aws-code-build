@@ -1,5 +1,4 @@
-# Azure Flexible Server requires delegated subnet plus private DNS linkage.
-# Keep both protected because recreating them can orphan database connectivity.
+# Flexible Server needs delegated subnet plus private DNS linkage.
 resource "random_id" "db_name_suffix" {
   byte_length = 4
 }

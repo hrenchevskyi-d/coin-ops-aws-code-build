@@ -1,5 +1,4 @@
-# GCP routes are tag-scoped so only internal workload nodes use the gateway.
-# Public/jump hosts should not inherit private default routing by accident.
+# Tag-scoped routes keep gateway routing on internal workload nodes.
 resource "google_compute_route" "nat_route" {
   for_each = var.routes
 

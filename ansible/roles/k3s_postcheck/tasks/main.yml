@@ -71,8 +71,7 @@
   become: false
   tags: [k3s, k3s_postcheck, artifacts]
 
-# The tunneled kubeconfig is the safest default for local operations because it
-# preserves TLS verification while reaching private API endpoints through SSH.
+# Tunneled kubeconfig keeps TLS verification while using SSH for private APIs.
 - name: Write tunneled kubeconfig artifact for operator use
   template:
     dest: "{{ k3s_postcheck_local_artifact_dir }}/kubeconfig-gcp-k3s-tunneled.yaml"

@@ -1,5 +1,4 @@
-# One-shot SQL bootstrap. It is safe to recreate because SQL files use guarded
-# CREATE/ALTER statements and the Ansible task deletes the previous Job first.
+# One-shot SQL bootstrap; Ansible deletes the previous immutable Job first.
 apiVersion: batch/v1
 kind: Job
 metadata:

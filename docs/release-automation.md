@@ -6,10 +6,10 @@
 
 - `dev`: integration branch.
 - `main`: stable release branch.
-- `Shabat`: still publishes `shabat-latest` for infra-owned images.
+- `Shabat`: still publishes `shabat-latest` for deployment images.
 - tags `vX.Y.Z`: publish immutable release images.
 
-The only image currently built from this repository is `coin-ops-postgres-runtime`. Application images are frozen external GHCR inputs.
+The only image currently built from this repository is `coin-ops-postgres-runtime`. Application images are external GHCR inputs.
 
 ## Maintainer Flow
 
