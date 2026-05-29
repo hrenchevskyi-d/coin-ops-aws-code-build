@@ -150,7 +150,7 @@ headlamp-start:
 	"$(HEADLAMP_START_SCRIPT)"
 
 headlamp-token: ensure-k8s-api-tunnel
-	KUBECONFIG="$(K8S_TUNNELED_KUBECONFIG)" kubectl create token headlamp-admin -n kube-system
+	KUBECONFIG="$(K8S_TUNNELED_KUBECONFIG)" kubectl create token headlamp-admin -n headlamp
 
 ensure-k8s-api-tunnel:
 	@test -x "$(K8S_API_TUNNEL_SCRIPT)" || (echo "Missing $(K8S_API_TUNNEL_SCRIPT). Run 'make k3s-cluster' first."; exit 1)
