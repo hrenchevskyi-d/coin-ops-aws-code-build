@@ -44,6 +44,7 @@ services:
       retries: 5
 {% endif %}
 
+  # App containers are pulled from GHCR; SQL bootstrap is handled by Ansible before startup.
   history-consumer:
     image: "{{ history_consumer_image }}"
     restart: unless-stopped

@@ -1,4 +1,6 @@
 ---
+# Cloudflare Tunnel is optional Headlamp access plumbing. Disable path removes
+# the Helm release so stale tunnels do not keep serving old endpoints.
 - name: k3s-headlamp-tunnel-uninstall-release-when-disabled
   kubernetes.core.helm:
     name: "{{ k3s_headlamp_tunnel_release_name }}"
@@ -9,6 +11,8 @@
   when: not (k3s_headlamp_tunnel_enabled | bool)
   tags: [headlamp, cloudflare, tunnel, k3s]
 
+# Terraform creates the tunnel token; Ansible only consumes it. Fail early if
+# terraform apply has not run after enabling the tunnel.
 - name: k3s-headlamp-tunnel-assert-token-is-available
   assert:
     that:

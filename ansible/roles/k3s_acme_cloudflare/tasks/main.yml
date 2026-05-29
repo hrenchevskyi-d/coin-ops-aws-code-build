@@ -1,4 +1,6 @@
 ---
+# ACME DNS-01 is Cloudflare-backed so private/internal ingress can still get
+# valid certificates without exposing solver HTTP endpoints.
 - name: Validate Cloudflare secret availability for ACME TLS
   assert:
     that:

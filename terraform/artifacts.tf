@@ -1,7 +1,10 @@
+# Terraform writes local operator files consumed by Ansible; they are gitignored.
+# These artifacts are the boundary between cloud provisioning and local Ansible runs.
 module "local_operator_artifacts" {
   source = "./modules/support/local_operator_artifacts"
 
   hosts_filename = "${path.module}/config/hosts.json"
+  # hosts.json carries only runtime addresses and DB endpoints; inventories stay dynamic.
   hosts_content = jsonencode(merge(
     local.gcp_enabled ? {
       gcp = {
@@ -51,6 +54,8 @@ module "local_operator_artifacts" {
   ))
 
   ssh_config_filename = "${path.module}/config/ssh_config"
+  # The rendered SSH config bakes ProxyJump decisions per cloud so playbooks do
+  # not need to duplicate private/public address rules.
   ssh_config_content = trimspace(join("\n\n", concat(
     local.gcp_compute_enabled ? [
       for name, inst in local.gcp_hosts : trimspace(<<-EOT
@@ -112,6 +117,8 @@ module "local_operator_artifacts" {
   )))
 
   ansible_runtime_filename = "${path.module}/config/ansible-runtime.json"
+  # ansible-runtime.json contains derived values from modules, such as LB IPs
+  # and tunnel tokens, that do not belong in committed terraform/config JSON.
   ansible_runtime_content = jsonencode(merge(
     local.gcp_enabled ? {
       gcp = {

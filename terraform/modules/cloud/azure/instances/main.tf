@@ -1,4 +1,6 @@
 locals {
+  # Azure image selection supports either custom image IDs or marketplace refs.
+  # Keep both because golden images and plain Debian labs use different fields.
   fallback_sizes = {
     micro  = "Standard_B2s"
     small  = "Standard_B2s"
@@ -41,6 +43,8 @@ locals {
     )
   }
 
+  # Azure custom_data must be base64 encoded on the VM resource, so keep the
+  # assembled script as plain text here for easier plan review.
   instance_scripts = {
     for name, cfg in local.instances : name => join("\n\n", compact([
       cfg.user_init_script != "" ? templatefile("${path.root}/${cfg.user_init_script}", {

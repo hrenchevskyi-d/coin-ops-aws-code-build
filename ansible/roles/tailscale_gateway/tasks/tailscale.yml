@@ -1,4 +1,6 @@
 ---
+# --reset makes route/tag changes converge, but it also means every desired
+# Tailscale option must be declared here rather than configured manually.
 - name: Configure Tailscale subnet router
   command:
     argv:
@@ -36,6 +38,8 @@
     state: restarted
   when: tailscale_remote_route_cidrs | length > 0
 
+# Remove stale route units when topology shrinks; otherwise old cross-cloud
+# routes can survive and mask Terraform/Ansible config mistakes.
 - name: Remove gateway tailscale route unit when no remote routes are needed
   systemd:
     daemon_reload: yes

@@ -1,202 +1,35 @@
 # k3s Cluster Runbook
 
-This runbook describes the standard command sequence for a clean `k3s`
-infrastructure rollout in GCP and the shorter reconcile flows for an existing
-cluster.
+The k3s path is one of the supported deployment paths in the infra-only repository.
 
-For the broader Ansible configuration model used by these playbooks, see:
-
-- `/home/notebook/projects/coin-ops/docs/ansible-config-model.md`
-
-## What Each Playbook Does
-
-- `ansible/provision.yml`
-  Prepares the VMs themselves: packages, firewall, common OS prerequisites, and
-  host-level bootstrap requirements.
-- `ansible/k3s-cluster.yml`
-  Builds or reconciles the `k3s` control plane on the three `k3s-server` nodes.
-  This includes bootstrap, join, post-checks, and local kubeconfig/helper
-  artifact generation.
-- `ansible/k3s-headlamp.yml`
-  Installs or updates Headlamp in the cluster.
-- `ansible/k3s-homepage.yml`
-  Installs or updates Homepage on the existing ingress path.
-- `ansible/k3s-platform.yml`
-  Convenience entrypoint that runs `k3s-cluster.yml` and then
-  `k3s-headlamp.yml`.
-
-## Fresh Infrastructure Flow
-
-Use this when the VMs are new or were just recreated by Terraform.
-
-1. Create or update the infrastructure:
-
-   ```bash
-   cd /home/notebook/projects/coin-ops/terraform
-   terraform plan
-   terraform apply
-   ```
-
-2. Prepare the hosts:
-
-   ```bash
-   cd /home/notebook/projects/coin-ops
-   ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/provision.yml
-   ```
-
-3. Bootstrap or reconcile the `k3s` cluster:
-
-   ```bash
-   ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-cluster.yml
-   ```
-
-4. Optionally install Headlamp:
-
-   ```bash
-   ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-headlamp.yml
-   ```
-
-5. Or do steps 3 and 4 together:
-
-   ```bash
-   ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-platform.yml
-   ```
-
-6. Optionally install Homepage:
-
-   ```bash
-   make k3s-homepage
-   ```
-
-## Existing Cluster Reconcile Flow
-
-Use this when the VMs already exist and you only changed cluster-level
-configuration.
-
-### Reconcile just the cluster
+## Main Flow
 
 ```bash
 cd /home/notebook/projects/coin-ops
-ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-cluster.yml
-```
-
-### Reconcile just Headlamp
-
-```bash
-cd /home/notebook/projects/coin-ops
-ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-headlamp.yml
-```
-
-### Reconcile both
-
-```bash
-cd /home/notebook/projects/coin-ops
-ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-platform.yml
-```
-
-### Reconcile Homepage
-
-```bash
-cd /home/notebook/projects/coin-ops
+source local/generated-env.sh
+make k3s-cluster
+make k3s-platform
 make k3s-homepage
+make k3s-coinops
 ```
 
-## When `provision.yml` Is Required Again
+`k3s-cluster.yml` prepares the three server nodes, bootstraps the first server, joins the rest, configures packaged Traefik, and exports local operator artifacts.
 
-Re-run `ansible/provision.yml` if you:
-- recreated the VMs
-- changed base OS/firewall/package prerequisites
-- changed jump-host reachability assumptions
-- changed low-level networking or host bootstrap behavior
+## Operator Artifacts
 
-You usually do **not** need to re-run `provision.yml` for:
-- Headlamp-only changes
-- kubeconfig/helper artifact regeneration
-- most `k3s` config changes that stay within the existing hosts
+Generated files are written under `ansible/artifacts/`, including kubeconfigs and tunnel helpers. They are local, sensitive, and ignored by git.
 
-## HA API Load Balancer Note
-
-If you change the GCP HA API load balancer in Terraform, re-run:
+Use the tunneled kubeconfig for localhost-driven Kubernetes work:
 
 ```bash
-ansible-playbook -i ansible/inventory/inventory.gcp_compute.yml ansible/k3s-cluster.yml
-```
-
-This is required so:
-- the `k3s` server certificates include the HA API endpoint in `tls-san`
-- local kubeconfig artifacts and tunnel helpers are regenerated with the new
-  endpoint
-
-## Traefik Exposure Model
-
-The packaged `k3s` Traefik is customized through a `HelmChartConfig` manifest
-rendered by:
-
-- `/home/notebook/projects/coin-ops/ansible/roles/k3s_traefik`
-
-This forces Traefik into:
-
-- `DaemonSet` mode
-- `hostPort` on `80` and `443`
-- `ClusterIP` service type
-
-This is intentional. We do not want the default `LoadBalancer` Traefik service
-to allocate `NodePort`s. The external GCP public ingress load balancer is
-expected to send traffic directly to ports `80/443` on the `k3s` server nodes.
-
-## Local Operator Model
-
-Cluster application playbooks such as `ansible/k3s-homepage.yml`,
-`ansible/k3s-headlamp.yml`, and `ansible/k3s-coinops.yml` are intended to run
-from the operator machine, not from a shell on `k3s-server-1`.
-
-That model works as follows:
-
-- `ansible/k3s-cluster.yml` still bootstraps the nodes remotely
-- `k3s_postcheck` exports local kubeconfig artifacts after the cluster is ready
-- follow-up platform/application roles talk to the Kubernetes API through those
-  local kubeconfig artifacts
-- node SSH is still needed for host-level work, but ordinary Kubernetes changes
-  are meant to be driven from localhost
-
-The preferred operator kubeconfig artifact for localhost-driven cluster
-application playbooks is the tunneled variant:
-
-- `/home/notebook/projects/coin-ops/ansible/artifacts/kubeconfig-gcp-k3s-tunneled.yaml`
-
-This keeps local `kubectl`, `helm`, and `kubernetes.core` calls independent of
-private VPC routing on the operator machine. The direct cluster kubeconfig is
-still rendered for debugging or environments that already have a route to the
-internal GCP API endpoint:
-
-- `/home/notebook/projects/coin-ops/ansible/artifacts/kubeconfig-gcp-k3s.yaml`
-
-The `make k3s-headlamp`, `make k3s-homepage`, `make k3s-coinops`, and `make k3s-platform` targets automatically start the generated `k8s-api-tunnel.sh` helper when the local API tunnel is not already listening on `127.0.0.1:6443`.
-
-If those artifacts are missing, re-run `ansible/k3s-cluster.yml` before trying to
-reconcile cluster applications.
-
-For interactive `kubectl` from a new shell:
-
-```bash
-cd /home/notebook/projects/coin-ops
 make k8s-api-ready
 export KUBECONFIG=/home/notebook/projects/coin-ops/ansible/artifacts/kubeconfig-gcp-k3s-tunneled.yaml
 ```
 
-## Generated Local Artifacts
+## Traefik Model
 
-After `ansible/k3s-cluster.yml`, expect operator-local artifacts under:
+`ansible/roles/k3s_traefik` renders a `HelmChartConfig` that keeps Traefik as the cluster ingress entrypoint. Public load balancers should target node ports/host ports according to Terraform network config, not ad hoc app services.
 
-- `/home/notebook/projects/coin-ops/ansible/artifacts/kubeconfig-gcp-k3s.yaml`
-- `/home/notebook/projects/coin-ops/ansible/artifacts/kubeconfig-gcp-k3s-tunneled.yaml`
-- `/home/notebook/projects/coin-ops/ansible/artifacts/k8s-api-tunnel.sh`
-- `/home/notebook/projects/coin-ops/ansible/artifacts/k3s-bootstrap-summary.txt`
+## Reconcile Guidance
 
-After `ansible/k3s-headlamp.yml`, expect additional artifacts such as:
-
-- `/home/notebook/projects/coin-ops/ansible/artifacts/headlamp-access-summary.md`
-- `/home/notebook/projects/coin-ops/ansible/artifacts/headlamp-port-forward.sh`
-- `/home/notebook/projects/coin-ops/ansible/artifacts/headlamp-start.sh`
-
-These files are local operator helpers and should not be committed.
+Re-run `make k3s-cluster` after host recreation, k3s config changes, or load-balancer endpoint changes. Re-run only the app/platform playbooks for Headlamp, Homepage, or Coin-Ops workload changes.

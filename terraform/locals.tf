@@ -1,4 +1,7 @@
 locals {
+  # Split JSON keeps operator policy reviewable without touching Terraform logic.
+  # Later files win on duplicate keys, so keep shared defaults in earlier files
+  # and environment-specific deploy decisions in deploy.json/instances.json.
   cfg = merge(
     try(jsondecode(file("${path.module}/config/clouds.json")), {}),
     try(jsondecode(file("${path.module}/config/general.json")), {}),
@@ -31,6 +34,8 @@ locals {
   default_instance_clouds = try(tolist(local.clouds.default_instance_clouds), tolist(local.enabled_clouds))
 
   instances = lookup(local.cfg, "instances", {})
+  # Each instance can opt into a subset of clouds; missing clouds means "use the
+  # repo default cloud set" so old configs do not need per-host cloud lists.
   instance_clouds = {
     for name, cfg in local.instances : name => toset(try(tolist(lookup(cfg, "clouds", local.default_instance_clouds)), local.default_instance_clouds))
   }
@@ -71,6 +76,8 @@ locals {
   gcp_network_cfg_raw   = merge(local.default_network_cfg, lookup(local.cloud_networks, "gcp", {}))
   aws_network_cfg_raw   = merge(local.default_network_cfg, lookup(local.cloud_networks, "aws", {}))
   azure_network_cfg_raw = merge(local.default_network_cfg, lookup(local.cloud_networks, "azure", {}))
+  # If remote_routes is omitted, derive cross-cloud routes from enabled clouds.
+  # Explicit remote_routes remains the escape hatch for partial meshes or labs.
   gcp_network_cfg = merge(local.gcp_network_cfg_raw, {
     remote_routes = length(try(local.gcp_network_cfg_raw.remote_routes, [])) > 0 ? local.gcp_network_cfg_raw.remote_routes : [
       for remote_cloud, remote_cfg in {
@@ -149,7 +156,9 @@ locals {
   aws_db_profile   = try(local.database.cloud_profiles.aws, {})
   azure_db_profile = try(local.database.cloud_profiles.azure, {})
 
-  seed_secret_manager        = local.secrets_enabled && var.seed_secret_manager
+  seed_secret_manager = local.secrets_enabled && var.seed_secret_manager
+  # Reads are disabled while seeding because the secret may not exist yet.
+  # suppress_secret_manager_reads keeps plan/refresh usable during repair work.
   read_gcp_secret_backend    = local.secrets_enabled && local.secret_backend == "gcp" && !local.seed_secret_manager && !var.suppress_secret_manager_reads
   read_aws_secret_backend    = local.secrets_enabled && local.secret_backend == "aws" && !local.seed_secret_manager && !var.suppress_secret_manager_reads
   read_azure_secret_backend  = local.secrets_enabled && local.secret_backend == "azure" && !local.seed_secret_manager && !var.suppress_secret_manager_reads
@@ -182,6 +191,8 @@ locals {
     && try(local.gcp_k3s_api_lb_cfg.enabled, false)
     && length(local.gcp_k3s_server_names) > 0
   )
+  # The internal API LB is optional; when disabled, Ansible falls back to a
+  # direct server endpoint and writes a tunnel helper for local operations.
   gcp_k3s_api_lb_backends = local.gcp_k3s_api_lb_enabled ? {
     for name in local.gcp_k3s_server_names : name => local.gcp_host_details[name]
   } : {}
@@ -274,6 +285,8 @@ locals {
         if lookup(cfg, "can_ip_forward", false)
   ][0], ""))) : ""
 
+  # Prefer a dedicated gateway for routing, but keep nat/can_ip_forward as a
+  # compatibility fallback for older instance maps.
   gcp_route_host_name   = local.gcp_gateway_host_name != "" ? local.gcp_gateway_host_name : local.gcp_nat_host_name
   aws_route_host_name   = local.aws_gateway_host_name != "" ? local.aws_gateway_host_name : local.aws_nat_host_name
   azure_route_host_name = local.azure_gateway_host_name != "" ? local.azure_gateway_host_name : local.azure_nat_host_name
@@ -281,6 +294,8 @@ locals {
   private_default_route_cfg     = try(local.routing.private_default_route, null)
   private_default_route_enabled = local.private_default_route_cfg != null
 
+  # Route resources are only emitted when a route host exists. This avoids
+  # provisioning blackhole routes in single-cloud or no-gateway topologies.
   gcp_has_route_host = (
     local.gcp_route_host_name != ""
     && (
@@ -389,6 +404,8 @@ locals {
   app_domain      = try(local.deploy.app_domain, var.app_domain)
   homepage_domain = try(local.deploy.homepage.hostname, "home.${local.app_domain}")
   headlamp_cfg    = try(local.deploy.headlamp, {})
+  # Cloudflare Tunnel is only for Headlamp access. Coin-Ops ingress continues
+  # through the normal k3s/Traefik path so app routing stays observable.
   headlamp_tunnel_cfg = merge({
     enabled       = false
     namespace     = "cloudflare-tunnel"
@@ -423,6 +440,8 @@ locals {
     for name, cfg in local.gcp_instances_base : name => merge(
       cfg,
       {
+        # Prefer explicit custom images, then a configured image family, then
+        # Debian. This lets golden-image rollouts be per-host without changing modules.
         os_image = (
           try(local.gcp_images[lookup(cfg, "image_profile", local.image_profile)].os_image, "") != ""
           ? local.gcp_images[lookup(cfg, "image_profile", local.image_profile)].os_image

@@ -1,4 +1,6 @@
 ---
+# Gateway order matters: sysctl first, NAT persistence second, tailscale up last.
+# Otherwise advertised subnet routes may work before return traffic is masqueraded.
 - name: Install gateway dependencies
   include_tasks: install.yml
   tags: [tailscale]

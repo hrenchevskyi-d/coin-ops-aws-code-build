@@ -1,6 +1,6 @@
 ---
 # provision.yml - install and validate host prerequisites.
-# Run once (or re-run: idempotent).
+# Run once (or re-run: idempotent). Docker tasks only serve the VM Compose path.
 #
 #   ansible-playbook -i ansible/inventory ansible/provision.yml
 

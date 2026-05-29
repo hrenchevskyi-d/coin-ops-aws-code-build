@@ -10,7 +10,6 @@ GCP_INVENTORY := $(ANSIBLE_DIR)/inventory/inventory.gcp_compute.yml
 LOCALHOST_INVENTORY := $(ANSIBLE_DIR)/inventory/localhost.yml
 CLOUD_INVENTORIES := -i "$(AWS_INVENTORY)" -i "$(AZURE_INVENTORY)" -i "$(GCP_INVENTORY)"
 ENV_FILE := $(REPO_ROOT)/local/generated-env.sh
-COMPOSE := docker compose
 K8S_ARTIFACTS_DIR := $(ANSIBLE_DIR)/artifacts
 K8S_TUNNELED_KUBECONFIG := $(K8S_ARTIFACTS_DIR)/kubeconfig-gcp-k3s-tunneled.yaml
 HEADLAMP_START_SCRIPT := $(K8S_ARTIFACTS_DIR)/headlamp-start.sh
@@ -32,21 +31,13 @@ ANSIBLE_CMD = $(ANSIBLE_ENV)
 LOCAL_ANSIBLE_CMD = $(LOCAL_ANSIBLE_ENV)
 
 .PHONY: help \
-	local-up local-down local-logs local-ps local-restart local-config \
-	tf-check-backend tf-plan tf-apply tf-destroy-compute tf-full-destroy k8s-api-ready \
+	infra-check tf-check-backend tf-plan tf-apply tf-destroy-compute tf-full-destroy k8s-api-ready \
 	inventory-graph inventory-host ssh-host \
 	runtime-config ansible-check provision deploy k3s-cluster k3s-headlamp k3s-homepage k3s-coinops k3s-platform headlamp-start headlamp-token
 
 help:
-	@echo "Local development:"
-	@echo "  make local-up                - Run local docker compose stack"
-	@echo "  make local-down              - Stop local docker compose stack"
-	@echo "  make local-logs              - Tail local docker compose logs"
-	@echo "  make local-ps                - Show local docker compose services"
-	@echo "  make local-restart           - Rebuild and restart local docker compose stack"
-	@echo "  make local-config            - Render local docker compose config"
-	@echo ""
 	@echo "Terraform / infrastructure:"
+	@echo "  make infra-check             - Run local Terraform and Ansible static checks"
 	@echo "  make tf-check-backend        - Verify backend.active.tf matches clouds.control_plane"
 	@echo "  make tf-plan                 - Source generated env and run terraform plan"
 	@echo "  make tf-apply                - Source generated env and run terraform apply"
@@ -79,24 +70,10 @@ help:
 	@echo "  TF_APPLY_ARGS='-auto-approve'"
 	@echo "  TF_DESTROY_ARGS='-auto-approve'"
 
-local-up:
-	$(COMPOSE) up -d --build
-
-local-down:
-	$(COMPOSE) down
-
-local-logs:
-	$(COMPOSE) logs -f
-
-local-ps:
-	$(COMPOSE) ps
-
-local-restart:
-	$(COMPOSE) down
-	$(COMPOSE) up -d --build
-
-local-config:
-	$(COMPOSE) config
+infra-check:
+	cd "$(TF_DIR)" && terraform fmt -check -recursive
+	cd "$(TF_DIR)" && terraform validate
+	$(MAKE) ansible-check
 
 tf-check-backend:
 	cd "$(TF_DIR)" && bash check-backend.sh
@@ -117,6 +94,7 @@ tf-destroy-compute:
 		-target=module.azure_nat_route \
 		-target=module.local_operator_artifacts \
 		$(TF_DESTROY_ARGS)
+
 tf-full-destroy:
 	$(ENV_PREFIX) cd "$(TF_DIR)" && bash check-backend.sh && bash full-destroy.sh --yes-really-destroy-stateful $(TF_DESTROY_ARGS)
 
@@ -137,6 +115,7 @@ runtime-config:
 ansible-check:
 	$(LOCAL_ANSIBLE_ENV) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/runtime-config.yml"
 	$(ANSIBLE_ENV) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/provision.yml"
+	$(ANSIBLE_ENV) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/deploy.yml"
 	$(ANSIBLE_ENV) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/k3s-cluster.yml"
 	$(ANSIBLE_ENV) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/k3s-headlamp.yml"
 	$(ANSIBLE_ENV) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/k3s-homepage.yml"
@@ -170,6 +149,9 @@ headlamp-start:
 	@test -x "$(HEADLAMP_START_SCRIPT)" || (echo "Missing $(HEADLAMP_START_SCRIPT). Run 'make k3s-platform' first."; exit 1)
 	"$(HEADLAMP_START_SCRIPT)"
 
+headlamp-token: ensure-k8s-api-tunnel
+	KUBECONFIG="$(K8S_TUNNELED_KUBECONFIG)" kubectl create token headlamp-admin -n kube-system
+
 ensure-k8s-api-tunnel:
 	@test -x "$(K8S_API_TUNNEL_SCRIPT)" || (echo "Missing $(K8S_API_TUNNEL_SCRIPT). Run 'make k3s-cluster' first."; exit 1)
 	@if ! nc -z 127.0.0.1 6443 >/dev/null 2>&1; then \
@@ -178,7 +160,3 @@ ensure-k8s-api-tunnel:
 		sleep 1; \
 	fi
 	@nc -z 127.0.0.1 6443 >/dev/null 2>&1 || (echo "Kubernetes API tunnel is not reachable on 127.0.0.1:6443"; exit 1)
-
-headlamp-token: ensure-k8s-api-tunnel
-	@test -f "$(K8S_TUNNELED_KUBECONFIG)" || (echo "Missing $(K8S_TUNNELED_KUBECONFIG). Run 'make k3s-cluster' first."; exit 1)
-	KUBECONFIG="$(K8S_TUNNELED_KUBECONFIG)" kubectl create token headlamp-admin -n headlamp

@@ -17,6 +17,7 @@ locals {
     : jsonencode(local.fallback_rules)
   )
 
+  # One SG per role keeps source_role references provider-native and readable.
   target_roles = toset([for name, rule in local.rules : rule.target_role])
 
   flat_rules = flatten([

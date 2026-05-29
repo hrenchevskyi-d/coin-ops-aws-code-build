@@ -1,3 +1,5 @@
+# Variables are mostly bootstrap escape hatches. Day-to-day non-secret policy
+# should live in terraform/config/*.json and flow through locals.tf.
 variable "gcp_project_id" {
   type        = string
   description = "Fallback GCP project ID. The canonical value lives in terraform/config/clouds.json."

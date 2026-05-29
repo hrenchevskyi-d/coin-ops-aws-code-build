@@ -1,3 +1,5 @@
+# Cloud SQL uses Private Service Access; the peering allocation is stateful and
+# intentionally protected from accidental destroy.
 # Private Service Access for CloudSQL (VPC Peering)
 resource "google_compute_global_address" "private_ip_alloc" {
   name          = "${var.project_name}-db-ip-alloc"
@@ -47,6 +49,7 @@ resource "google_sql_database_instance" "main" {
     disk_size = var.disk_size
   }
 
+  # Provider-level protection complements lifecycle.prevent_destroy below.
   deletion_protection = true
 
   lifecycle {

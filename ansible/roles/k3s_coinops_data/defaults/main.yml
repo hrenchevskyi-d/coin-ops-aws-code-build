@@ -17,6 +17,7 @@ k3s_coinops_data_bootstrap_job_name: coinops-postgres-runtime-bootstrap
 k3s_coinops_data_registry_pull_secret_name: ghcr-pull-secret
 k3s_coinops_data_cnpg_operator_config_name: cnpg-controller-manager-config
 k3s_coinops_data_cnpg_namespace: cnpg-system
+# These files are read from deploy/sql/runtime and mounted into the bootstrap job.
 k3s_coinops_data_runtime_sql_files:
   - 00_run_all.sql
   - 01_schema.sql

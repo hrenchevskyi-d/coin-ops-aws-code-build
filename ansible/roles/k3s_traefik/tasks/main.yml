@@ -1,4 +1,6 @@
 ---
+# k3s manages packaged Traefik through HelmChartConfig files on disk. Updating
+# this file lets the built-in controller reconcile without a separate Helm run.
 - name: k3s-traefik-render-packaged-traefik-helmchartconfig
   template:
     src: traefik-config.yaml.j2

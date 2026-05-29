@@ -1,3 +1,5 @@
+# One-shot SQL bootstrap. It is safe to recreate because SQL files use guarded
+# CREATE/ALTER statements and the Ansible task deletes the previous Job first.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -25,15 +27,18 @@ spec:
               PGHOST="{{ k3s_coinops_data_cluster_name }}-rw.{{ k3s_coinops_data_namespace }}.svc.cluster.local"
               PGPORT="5432"
               PGUSER="$(cat /secrets/superuser/username)"
+              # CNPG may publish the rw Service before PostgreSQL accepts logins.
               until psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d postgres -c "SELECT 1" >/dev/null 2>&1; do
                 echo "Waiting for PostgreSQL cluster to accept connections..."
                 sleep 5
               done
+              # runtime.app_role lets SQL wrappers impersonate the least-privilege app role.
               psql -v ON_ERROR_STOP=1 -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d postgres \
                 -c "ALTER DATABASE {{ k3s_coinops_data_database_name }} SET runtime.app_role = '{{ k3s_coinops_data_app_role }}';"
-              cd /bootstrap
+              cd /bootstrap/runtime
+              # 00_run_all.sql includes sibling runtime files from this mounted directory.
               psql -v ON_ERROR_STOP=1 -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d {{ k3s_coinops_data_database_name }} \
-                -f runtime/00_run_all.sql
+                -f 00_run_all.sql
           volumeMounts:
             - name: superuser-secret
               mountPath: /secrets/superuser

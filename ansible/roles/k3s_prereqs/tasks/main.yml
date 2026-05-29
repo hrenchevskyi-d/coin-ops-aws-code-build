@@ -1,4 +1,6 @@
 ---
+# k3s is lightweight, but it still depends on Linux bridge/netfilter behavior.
+# Keep these prereqs explicit so base image changes fail early.
 - name: Install k3s prerequisite packages
   apt:
     name: "{{ k3s_prerequisite_packages }}"
@@ -35,6 +37,8 @@
   loop: "{{ k3s_sysctl_settings | dict2items }}"
   tags: [k3s, k3s_prereqs]
 
+# Kubernetes requires swap off for predictable eviction/accounting semantics.
+# Keep fstab cleanup too, or the next reboot can undo the runtime swapoff.
 - name: Disable active swap
   command: swapoff -a
   changed_when: false
@@ -54,6 +58,8 @@
     mode: "0755"
   tags: [k3s, k3s_prereqs]
 
+# UFW is absent on forwarding hosts, so this rule is conditional. Non-forwarding
+# k3s servers still need flannel UDP opened for pod networking.
 - name: Allow flannel UDP traffic through UFW when present
   community.general.ufw:
     rule: allow

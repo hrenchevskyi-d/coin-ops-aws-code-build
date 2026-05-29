@@ -1,4 +1,5 @@
 services:
+  # Internal TLS keeps app-1 to app-2 traffic encrypted on private networks.
   backend-gateway:
     image: nginx:1.27-alpine
     restart: unless-stopped

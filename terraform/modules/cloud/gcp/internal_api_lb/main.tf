@@ -1,3 +1,5 @@
+# Reusable regional TCP internal LB for k3s API and internal ingress. Health
+# port may differ from frontend port for NodePort/Traefik edge cases.
 locals {
   effective_ports       = length(var.ports) > 0 ? var.ports : [var.port]
   effective_health_port = var.health_check_port > 0 ? var.health_check_port : local.effective_ports[0]

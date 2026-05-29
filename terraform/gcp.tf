@@ -1,3 +1,5 @@
+# GCP is the richest path today: it owns optional k3s load balancers, managed DB,
+# Secret Manager, and public ingress plumbing when enabled in config.
 data "google_secret_manager_secret_version" "db_secrets" {
   count   = local.read_gcp_secret_backend ? 1 : 0
   project = local.gcp_project_id
@@ -70,6 +72,8 @@ module "gcp_database" {
   disk_size    = try(local.gcp_db_profile.disk_size, 10)
 }
 
+# GCP load balancers need a backend instance group; k3s servers are unmanaged
+# VMs, so we assemble the group explicitly from Terraform instance details.
 module "gcp_k3s_servers_group" {
   count  = (local.gcp_k3s_api_lb_enabled || local.gcp_k3s_ingress_lb_enabled || local.gcp_k3s_public_ingress_lb_enabled) ? 1 : 0
   source = "./modules/cloud/gcp/unmanaged_instance_group"
@@ -111,6 +115,8 @@ module "gcp_k3s_ingress_lb" {
   address             = try(local.gcp_k3s_ingress_lb_cfg.address, "")
 }
 
+# Public ingress is intentionally GCP-only right now. Other clouds can still be
+# tested through direct IPs or private routing until equivalent modules exist.
 module "gcp_k3s_public_ingress_lb" {
   count             = local.gcp_k3s_public_ingress_lb_enabled ? 1 : 0
   source            = "./modules/cloud/gcp/external_tcp_lb"

@@ -1,4 +1,6 @@
 ---
+# Coin-Ops workload management runs from localhost using exported kubeconfig.
+# That keeps cluster changes auditable from the operator machine.
 - name: Validate Coin-Ops k3s deployment contract
   hosts: localhost
   connection: local
@@ -18,6 +20,8 @@
         fail_msg: >-
           Coin-Ops k3s deployment requires at least one host in role_k3s_server.
 
+    # The app images are external GHCR inputs, but DB bootstrap is infra-owned.
+    # Require postgres runtime here so RabbitMQ/Redis stays a rollback-only mode.
     - name: Assert Coin-Ops k3s runtime prerequisites
       assert:
         that:
@@ -48,6 +52,7 @@
       include_role:
         name: k3s_kubeconfig_access
       tags: [runtime_config, coinops, kubeconfig]
+    # This catches stale tunneled kubeconfig artifacts before Helm/K8s writes start.
     - name: Confirm Kubernetes API is reachable from the operator machine
       kubernetes.core.k8s_info:
         kubeconfig: "{{ k3s_effective_kubeconfig_path }}"

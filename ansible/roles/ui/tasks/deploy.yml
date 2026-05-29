@@ -1,4 +1,6 @@
 ---
+# Legacy VM Compose path: UI role owns nginx gateway config plus the frozen UI
+# container. k3s uses k3s_coinops_ui instead.
 - name: Render nginx gateway config
   template:
     src: nginx.gateway.conf.j2
@@ -33,6 +35,8 @@
         chdir: "{{ ui_deploy_dir }}"
       changed_when: false
 
+# Restart is best-effort because the first deploy may not have a running UI yet;
+# the following compose up remains the authoritative converge step.
 - name: Restart UI container if config changed
   command: "docker compose -f {{ ui_compose_path }} restart ui"
   args:

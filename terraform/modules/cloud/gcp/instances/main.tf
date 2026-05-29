@@ -36,6 +36,7 @@ locals {
     )
   }
 
+  # GCP metadata rejects blank SSH usernames; trim once before composing ssh-keys.
   ssh_user = trimspace(var.username)
 
   # Pre-render startup scripts per instance.

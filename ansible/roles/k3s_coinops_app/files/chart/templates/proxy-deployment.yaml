@@ -1,3 +1,5 @@
+# Proxy reads DATABASE_URL in both modes; RabbitMQ/Redis env vars are only
+# rendered for external rollback mode.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

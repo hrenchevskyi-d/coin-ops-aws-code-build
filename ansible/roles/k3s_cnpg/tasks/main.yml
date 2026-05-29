@@ -1,4 +1,6 @@
 ---
+# CNPG is installed as a cluster operator before Coin-Ops database resources.
+# Values are passed by caller so registry pull-secret wiring stays centralized.
 - name: k3s-cnpg-install-helm-client
   include_role:
     name: k3s_helm_client

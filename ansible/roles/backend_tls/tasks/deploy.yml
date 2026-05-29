@@ -1,4 +1,6 @@
 ---
+# Legacy VM Compose path: backend_tls wraps backend HTTP services with local
+# nginx TLS for UI-to-backend traffic on private VM networks.
 - name: Render internal backend gateway config
   template:
     src: nginx.internal.conf.j2

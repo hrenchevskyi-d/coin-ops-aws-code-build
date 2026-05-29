@@ -11,9 +11,6 @@ DASHBOARD_PROJECT.md
 # Superpowers generated plans/specs — internal tooling, not for the repo
 docs/superpowers/
 
-# Compiled binary
-proxy/proxy
-
 # Local/scratch analysis and helper artifacts excluded from dev
 scripts/
 tournament/
@@ -37,11 +34,6 @@ terraform/config/ssh_config
 terraform/config/ansible-runtime.json
 ansible/vars/local.generated.json
 ansible/artifacts/
-
-# React build output
-ui-react/dist/
-ui-react/node_modules/
-ui-react/.env
 
 # Source zip
 coin-ops-intelligence.zip
@@ -69,7 +61,6 @@ hyper-v/
 terraform-guide.pdf
 ansible/group_vars/all/*.backup
 ansible/group_vars/all/secrets.yml
-runtime/__pycache__
 local/generated-env.sh
 local/generated-gcp-env.sh
 local/generated-aws-env.sh
@@ -77,6 +68,9 @@ local/generated-azure-env.sh
 packer/**/*.pkrvars.hcl
 packer/**/*.manifest.json
 packer/packer_cache/
+!packer/common/
+!packer/common/scripts/
+!packer/common/scripts/*.sh
 
 ssh_config
 coin-ops_infra_roadmap_120d8424.plan.md

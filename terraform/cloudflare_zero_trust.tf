@@ -1,3 +1,4 @@
+# Headlamp tunnel resources are optional and isolated from the main app ingress.
 resource "random_bytes" "headlamp_tunnel_secret" {
   count  = local.headlamp_tunnel_enabled ? 1 : 0
   length = 32
@@ -21,6 +22,7 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "headlamp" {
       service  = try(local.headlamp_tunnel_cfg.service, "http://headlamp.headlamp.svc.cluster.local:80")
     }
 
+    # Required catch-all: without it cloudflared may forward unknown hostnames.
     ingress_rule {
       service = "http_status:404"
     }
@@ -57,6 +59,8 @@ resource "cloudflare_zero_trust_access_policy" "headlamp" {
   decision       = "allow"
   precedence     = 1
 
+  # Non-empty allowed_emails turns Access into an allowlist. Empty means any
+  # authenticated GitHub identity can pass, which is useful for private labs.
   dynamic "include" {
     for_each = length(local.headlamp_access_allowed_emails) > 0 ? [local.headlamp_access_allowed_emails] : []
     content {

@@ -1,3 +1,5 @@
+# Secret payload shape is shared with Ansible runtime_config. Keep key names
+# stable or all deployment paths must be updated together.
 resource "aws_secretsmanager_secret" "db_secrets" {
   name                    = var.db_secret_name
   recovery_window_in_days = 7
@@ -37,9 +39,9 @@ resource "aws_secretsmanager_secret_version" "app_secrets_data" {
   secret_id = aws_secretsmanager_secret.app_secrets.id
 
   secret_string = jsonencode({
-    GHCR_TOKEN                = var.ghcr_token
-    CLOUDFLARE_API_TOKEN      = var.cloudflare_api_token
-    TAILSCALE_AUTH_KEY        = var.tailscale_auth_key
+    GHCR_TOKEN                 = var.ghcr_token
+    CLOUDFLARE_API_TOKEN       = var.cloudflare_api_token
+    TAILSCALE_AUTH_KEY         = var.tailscale_auth_key
     GITHUB_OAUTH_CLIENT_ID     = var.github_oauth_client_id
     GITHUB_OAUTH_CLIENT_SECRET = var.github_oauth_client_secret
   })

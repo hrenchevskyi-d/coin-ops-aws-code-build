@@ -1,3 +1,5 @@
+# GCP network module optionally provisions Cloud NAT. VM gateway routing is
+# handled by nat_route, so the two egress models can be toggled independently.
 locals {
   fallback_subnets = {
     internal = { cidr = "10.10.1.0/24" }
@@ -5,6 +7,8 @@ locals {
   }
   subnets = length(var.subnets) > 0 ? var.subnets : local.fallback_subnets
 
+  # Normalize optional object input so callers can pass {} without Terraform
+  # fighting map/object type differences.
   cloud_nat_cfg = jsondecode(
     length(var.cloud_nat) > 0
     ? jsonencode(var.cloud_nat)

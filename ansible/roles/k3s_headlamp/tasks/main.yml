@@ -1,4 +1,6 @@
 ---
+# Headlamp is deployed without chart-managed ingress; this role applies a common
+# ingress/cert wrapper afterward to keep TLS behavior consistent with other apps.
 - name: k3s-headlamp-install-helm-client
   include_role:
     name: k3s_helm_client
@@ -108,6 +110,8 @@
   become: false
   tags: [headlamp, k3s, artifacts]
 
+# Bounded cleanup from the old SOCKS/PAC access model; keep until existing
+# operator workstations have refreshed artifacts at least once.
 - name: k3s-headlamp-remove-obsolete-pac-helper
   file:
     path: "{{ k3s_headlamp_local_artifact_dir }}/headlamp-socks-proxy.pac"

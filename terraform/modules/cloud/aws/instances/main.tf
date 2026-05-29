@@ -57,6 +57,7 @@ locals {
   }
 }
 
+# Resolve AMIs per instance so image_profile can vary by host without another module.
 data "aws_ami" "this" {
   for_each    = local.instances
   most_recent = true

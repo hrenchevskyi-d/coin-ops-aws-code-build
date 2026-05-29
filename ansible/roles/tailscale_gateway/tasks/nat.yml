@@ -1,4 +1,6 @@
 ---
+# MASQUERADE is required for remote Tailnets that do not know this cloud VPC CIDR.
+# If you move to routed, non-SNAT paths, change this role together with routes.
 - name: Persist gateway masquerade rules
   template:
     src: coinops-gateway-nat.sh.j2

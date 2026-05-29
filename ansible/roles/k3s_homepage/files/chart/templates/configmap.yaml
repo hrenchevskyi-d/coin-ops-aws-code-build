@@ -1,3 +1,5 @@
+# Homepage config is operator UX, not application logic. Links/widgets should
+# describe the live infra surface only.
 apiVersion: v1
 kind: ConfigMap
 metadata:

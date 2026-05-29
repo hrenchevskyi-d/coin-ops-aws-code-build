@@ -1,3 +1,5 @@
+# Join config uses the bootstrap node private endpoint and token collected in
+# the current playbook run.
 server: "https://{{ hostvars[k3s_bootstrap_host].ansible_host }}:6443"
 token: "{{ hostvars[k3s_bootstrap_host].k3s_cluster_token }}"
 write-kubeconfig-mode: "{{ k3s_write_kubeconfig_mode }}"

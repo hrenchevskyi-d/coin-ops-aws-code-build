@@ -1,7 +1,0 @@
----
-galaxy_info:
-  author: coin-ops
-  description: Renders local operator-facing helper scripts and notes for k3s services.
-  license: MIT
-  min_ansible_version: "2.15"
-dependencies: []

@@ -1,7 +1,9 @@
 ---
+# Legacy VM Compose path: copy retained infra-owned SQL onto the backend host so
+# the frozen GHCR image does not need repository source mounted beside it.
 - name: Copy PostgreSQL runtime schema
   copy:
-    src: "{{ playbook_dir }}/../history/schema.sql"
+    src: "{{ playbook_dir }}/../deploy/sql/history/schema.sql"
     dest: "{{ history_schema_dest_path }}"
     owner: root
     group: root
@@ -9,7 +11,7 @@
 
 - name: Copy runtime SQL schema files
   copy:
-    src: "{{ playbook_dir }}/../runtime/"
+    src: "{{ playbook_dir }}/../deploy/sql/runtime/"
     dest: "{{ history_runtime_dir }}/"
     owner: root
     group: root
@@ -24,6 +26,8 @@
     compose_stack_compose_template: "{{ playbook_dir }}/../deploy/compose/backend-history.compose.yaml"
     compose_stack_compose_path: "{{ history_compose_path }}"
 
+# The postgres-runtime image runs as UID/GID 70. Older local volumes may have
+# root-owned files from previous images, so fix ownership before container start.
 - name: Stop PostgreSQL before repairing data directory ownership
   command: "docker compose -f {{ history_compose_path }} stop postgres"
   args:
@@ -52,6 +56,8 @@
     compose_stack_pull_retries: "{{ history_docker_compose_pull_retries }}"
     compose_stack_pull_delay: "{{ history_docker_compose_pull_delay }}"
 
+# Dependencies start before schema work. In postgres mode only Postgres is used;
+# external mode keeps RabbitMQ for rollback compatibility.
 - name: Start history dependencies first
   command: >-
     docker compose -f {{ history_compose_path }} up -d

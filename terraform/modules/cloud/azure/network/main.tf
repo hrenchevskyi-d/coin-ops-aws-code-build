@@ -1,3 +1,5 @@
+# Azure network creation has eventual consistency gaps; short waits below make
+# subnet and delegation creation more reliable during fresh applies.
 locals {
   fallback_subnets = {
     internal = { cidr = "10.10.1.0/24" }
@@ -21,6 +23,7 @@ resource "azurerm_virtual_network" "this" {
   address_space       = [var.vpc_cidr]
 }
 
+# Azure can accept a VNet create before subnet delegation APIs can see it.
 resource "time_sleep" "after_virtual_network" {
   create_duration = "20s"
 
@@ -35,6 +38,7 @@ resource "azurerm_subnet" "this" {
   address_prefixes     = [each.value.cidr]
   service_endpoints    = each.key == "database" ? ["Microsoft.Storage"] : null
 
+  # The database subnet must be delegated before PostgreSQL Flexible Server can attach.
   dynamic "delegation" {
     for_each = each.key == "database" ? [1] : []
     content {

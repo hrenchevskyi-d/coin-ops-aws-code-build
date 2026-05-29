@@ -1,3 +1,5 @@
+# Managed database resources are protected by prevent_destroy. Destroy flows
+# must be explicit because DB loss is not a normal infrastructure cleanup.
 resource "random_id" "db_name_suffix" {
   byte_length = 4
 }
@@ -30,6 +32,8 @@ resource "aws_security_group_rule" "backend_to_database" {
   source_security_group_id = var.backend_security_group_id
 }
 
+# Random suffix avoids name reuse collisions after protected DB resources are
+# manually removed or restored from snapshots.
 resource "aws_db_subnet_group" "database" {
   name       = "${var.project_name}-db-subnets-${random_id.db_name_suffix.hex}"
   subnet_ids = var.subnet_ids

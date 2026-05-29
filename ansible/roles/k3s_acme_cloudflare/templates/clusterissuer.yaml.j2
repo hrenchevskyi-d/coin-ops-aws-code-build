@@ -1,3 +1,5 @@
+# ClusterIssuer is cluster-scoped because multiple namespaces request certs.
+# The Cloudflare token Secret still lives in cert-manager namespace.
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:

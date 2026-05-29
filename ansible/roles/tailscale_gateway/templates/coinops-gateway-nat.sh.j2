@@ -1,3 +1,5 @@
+# NAT script is systemd-managed so iptables rules survive reboot and package
+# restarts without relying on manual shell history.
 #!/bin/bash
 set -euo pipefail
 IFACE=$(ip route show default | awk '/default/ { print $5 }' | head -1)

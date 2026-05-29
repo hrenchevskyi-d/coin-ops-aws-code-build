@@ -14,6 +14,8 @@ locals {
 
   target_roles = toset([for _, rule in local.rules : rule.target_role])
 
+  # Flatten protocol/port lists into Azure NSG rules. Priority is derived from
+  # index to keep generated names deterministic across providers.
   flat_rules = flatten([
     for rule_name, rule in local.rules : [
       for proto in rule.protocols :

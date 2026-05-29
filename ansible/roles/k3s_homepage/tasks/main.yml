@@ -1,3 +1,5 @@
+# Homepage uses a local chart copy because the config is repo-owned operator UI,
+# not an external application release.
 - name: k3s-homepage-install-helm-client
   include_role:
     name: k3s_helm_client

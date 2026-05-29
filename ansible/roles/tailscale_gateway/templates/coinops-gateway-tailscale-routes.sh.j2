@@ -1,3 +1,5 @@
+# Host routes send remote cloud CIDRs into tailscale0. Remove the unit when the
+# topology has no remote routes so stale routes do not linger.
 #!/bin/bash
 set -euo pipefail
 {% for cidr in tailscale_remote_route_cidrs %}

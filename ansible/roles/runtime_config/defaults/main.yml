@@ -1,4 +1,6 @@
 ---
+# Resolve repo_root for both normal playbooks and ad-hoc role syntax checks.
+# COINOPS_REPO_ROOT wins so operators can run from another working directory.
 repo_root: >-
   {{
     lookup('env', 'COINOPS_REPO_ROOT')
@@ -10,6 +12,8 @@ repo_root: >-
     )
   }}
 
+# Runtime config is the single merge point between Terraform JSON, generated metadata, env overrides, and secrets.
+# Keep this role public in playbooks; later roles read the facts it materializes.
 deploy_defaults: "{{ (lookup('file', repo_root ~ '/ansible/vars/deploy-config.yml') | from_yaml) | default({}, true) }}"
 infra_config_dir: "{{ repo_root ~ '/terraform/config' }}"
 infra_config_clouds: "{{ lookup('file', infra_config_dir ~ '/clouds.json') | from_json }}"
@@ -21,6 +25,8 @@ infra_config_dns_file: "{{ lookup('file', infra_config_dir ~ '/dns.json') | from
 infra_config_secrets_file: "{{ lookup('file', infra_config_dir ~ '/secrets.json') | from_json }}"
 infra_config_instances_file: "{{ lookup('file', infra_config_dir ~ '/instances.json') | from_json }}"
 infra_networks_file: "{{ lookup('file', infra_config_dir ~ '/networks.json') | from_json }}"
+# Split files are combined here to give Ansible the same view Terraform has.
+# combine(..., recursive=True) preserves nested defaults while allowing overrides.
 infra_config: >-
   {{
     infra_config_clouds
@@ -117,6 +123,8 @@ local_generated_config: >-
     ((local_generated_config_text | trim | length) > 0)
     | ternary((local_generated_config_text | from_json), {})
   }}
+# Precedence: committed JSON -> optional Ansible overrides -> generated local artifacts.
+# Generated artifacts are last because Terraform knows live IPs, DB endpoints, and LB addresses.
 deploy_config: "{{ json_deploy_config | combine(deploy_defaults, recursive=True) | combine(local_generated_config, recursive=True) }}"
 
 runtime_metadata_path: "{{ repo_root ~ '/terraform/config/ansible-runtime.json' }}"
@@ -127,6 +135,8 @@ runtime_metadata: >-
     | ternary((runtime_metadata_text | from_json), {})
   }}
 
+# cloud can be forced for localhost plays; dynamic inventory groups are used
+# otherwise. The fallback order keeps old GCP-only commands working.
 my_cloud: "{{ cloud | default('gcp' if 'gcp' in groups else ('aws' if 'aws' in groups else ('azure' if 'azure' in groups else ''))) }}"
 cloud_runtime_metadata: "{{ runtime_metadata.get(my_cloud, {}) }}"
 backend_hosts_for_cloud: "{{ groups.get('role_app_backend', []) | intersect(groups.get(my_cloud, [])) }}"
@@ -166,6 +176,8 @@ infra_instance_key: >-
     )
   }}
 host_instance_config: "{{ infra_instances.get(infra_instance_key, {}) }}"
+# Only workload nodes get ProxyJump. Jump/gateway hosts must stay directly
+# reachable or the first provisioning pass can deadlock itself.
 ansible_ssh_common_args: >-
   {{
     '-o ProxyJump=coinops-' ~ my_cloud ~ '-' ~ jump_host
@@ -186,6 +198,8 @@ cloud_image_profiles: "{{ infra_images.get(my_cloud, {}) }}"
 base_image_profile_name: "{{ infra_general.get('image_profile', 'debian-12') }}"
 base_image_profile_config: "{{ cloud_image_profiles.get(base_image_profile_name, {}) }}"
 host_image_profile_config: "{{ cloud_image_profiles.get(host_image_profile, {}) }}"
+# Golden-image detection is intentionally config-based, not cloud-image-name
+# based, so each provider can express baked images differently.
 host_uses_golden_image: >-
   {{
     host_image_profile == 'coinops-app-host'

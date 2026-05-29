@@ -1,3 +1,5 @@
+# Local files are generated handoff artifacts for the operator machine. They
+# are intentionally outside remote state consumers and are gitignored.
 resource "local_file" "hosts" {
   filename = var.hosts_filename
   content  = var.hosts_content

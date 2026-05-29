@@ -1,3 +1,5 @@
+# External TCP LB publishes selected frontend ports to the same backend group.
+# TLS is terminated in-cluster by Traefik/cert-manager, not by this LB.
 resource "google_compute_address" "this" {
   name         = "${var.name}-ip"
   region       = var.region

@@ -1,4 +1,6 @@
 ---
+# Persist forwarding sysctls in a dedicated file so cloud images or package
+# upgrades do not silently reset subnet routing prerequisites.
 - name: Ensure gateway sysctl settings are present
   ansible.posix.sysctl:
     name: "{{ item.key }}"

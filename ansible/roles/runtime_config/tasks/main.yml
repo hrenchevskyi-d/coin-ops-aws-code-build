@@ -1,4 +1,6 @@
 ---
+# Keep secret lookup on the operator machine. Remote hosts should receive only
+# rendered runtime values, never direct cloud credentials.
 - name: Materialize cloud secret backend selection
   set_fact:
     secret_backend: "{{ lookup('env', 'COINOPS_SECRET_BACKEND') | default(local_generated_config.get('secret_backend', deploy_defaults.get('secret_backend', infra_clouds.get('secret_backend', infra_clouds.get('control_plane', 'gcp')))), true) }}"
@@ -45,6 +47,8 @@
       Re-run the bootstrap that creates the local Terraform service-account artifact.
   when: secret_backend == 'gcp'
 
+# Probe auth before lookup so failures point to the local key/ADC problem, not
+# to a later empty secret value.
 - name: Probe GCP secret backend authentication before lookup
   command:
     argv:
@@ -76,6 +80,8 @@
       app_secret_name: "{{ app_secret_name }}"
   when: lookup('env', 'DEBUG_SECRET_LOOKUP') | default('false', true) | bool
 
+# Azure needs a real Key Vault URL because the CLI calls below read by vault
+# name while the docs/operators usually reason about the URL. Validate both.
 - name: Validate Azure secret backend inputs
   assert:
     that:
@@ -134,6 +140,8 @@
   become: false
   when: secret_backend == 'azure'
 
+# GCP/AWS lookups return either parsed mappings or JSON strings depending on
+# collection versions; normalize later instead of assuming one shape here.
 - name: Materialize runtime secret payloads from GCP or AWS
   set_fact:
     db_secrets_raw: >-
@@ -208,6 +216,8 @@
   no_log: "{{ not (lookup('env', 'DEBUG_SECRET_LOOKUP') | default('false', true) | bool) }}"
   when: secret_backend == 'azure'
 
+# Keep no_log here even in debug mode: this is the point where both DB and app
+# secret payloads are fully materialized in memory.
 - name: Materialize runtime secret maps
   set_fact:
     db_secrets: "{{ db_secrets_raw if (db_secrets_raw is mapping) else (db_secrets_raw | from_json) }}"

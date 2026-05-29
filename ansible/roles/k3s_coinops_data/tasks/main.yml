@@ -1,4 +1,6 @@
 ---
+# CNPG operator resources live separately from app data resources. Keeping the
+# namespaces distinct makes operator upgrades safer than app chart upgrades.
 - name: k3s-coinops-data-ensure-cnpg-namespace
   kubernetes.core.k8s:
     kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
@@ -19,6 +21,9 @@
   when: k3s_coinops_data_enabled | bool
   tags: [coinops, k3s, cnpg, data]
 
+# Bounded migration cleanup: old CNPG config used a ConfigMap before the chart
+# moved to Secret-based pull settings. Keep only until all existing clusters have
+# reconciled once after the Secret migration.
 - name: k3s-coinops-data-remove-legacy-cnpg-operator-configmap
   kubernetes.core.k8s:
     kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
@@ -58,6 +63,8 @@
   when: k3s_coinops_data_enabled | bool
   tags: [coinops, k3s, data]
 
+# This renders Secret, ConfigMap, and CNPG Cluster together so credentials, SQL
+# bootstrap files, and database ownership stay in one reconciliation boundary.
 - name: k3s-coinops-data-apply-cluster-resources
   kubernetes.core.k8s:
     kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
@@ -80,6 +87,8 @@
   when: k3s_coinops_data_enabled | bool
   tags: [coinops, k3s, data]
 
+# Jobs are immutable in Kubernetes. Delete first so SQL changes can be applied
+# repeatedly without changing the job name or leaving stale pods behind.
 - name: k3s-coinops-data-delete-previous-bootstrap-job
   kubernetes.core.k8s:
     kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
@@ -99,6 +108,8 @@
   when: k3s_coinops_data_enabled | bool
   tags: [coinops, k3s, data]
 
+# Completion is the handoff point to app Helm charts: services may exist before
+# schemas/functions are installed, so wait for the bootstrap job explicitly.
 - name: k3s-coinops-data-wait-for-bootstrap-job
   kubernetes.core.k8s_info:
     kubeconfig: "{{ k3s_effective_kubeconfig_path }}"

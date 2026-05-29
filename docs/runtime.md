@@ -1,117 +1,37 @@
-# Runtime Layer Operator Runbook
+# Runtime SQL Operator Notes
 
-This document keeps only the operator-facing runtime steps that are still useful
-for the current PostgreSQL runtime path.
+The repository keeps only the database bootstrap assets needed by infrastructure:
 
-## Postgres image requirements
+- `deploy/sql/history/schema.sql`
+- `deploy/sql/runtime/*.sql`
 
-The runtime layer depends on two extensions:
+These files are consumed by VM Compose and k3s CNPG deployments. They are not application source.
 
-- `pg_cron` — scheduled TTL reap of `runtime.cache` and `runtime.session`.
-- `pgmq` — queue primitives used by the sibling branch.
+## Postgres Image Requirements
 
-Neither ships in the stock `postgres:16-alpine` image referenced by
-`deploy/compose/backend-history.compose.yaml` today, so a custom image is
-required. Per ADR §9.1, the chosen base is
-an Ubuntu PostgreSQL 16 runtime with `pg_cron` installed from Ubuntu's
-package repositories and the `pgmq` extension files copied from Tembo's
-`pg16-pgmq` image. The image keeps the `postgres` user on uid/gid `70`
-so existing data volumes created by `postgres:16-alpine` remain reusable
-during the rollout. The project-owned image definition lives at
-`deploy/postgres-runtime/Dockerfile` and is published as
-`coin-ops-postgres-runtime`.
+PostgreSQL runtime mode requires:
 
-At a minimum, whichever image is used, the Postgres process must start
-with:
+- `pg_cron` for scheduled cleanup jobs
+- `pgmq` for queue primitives
 
-```conf
-shared_preload_libraries = 'pg_cron'
-cron.database_name       = 'cognitor'   # required — launcher bgworker binds to exactly this DB
-```
+The infra-owned image definition is `deploy/postgres-runtime/Dockerfile`, published as `coin-ops-postgres-runtime`. The server must start with `shared_preload_libraries = 'pg_cron'` and `cron.database_name` set to the application database name.
 
-`shared_preload_libraries` can only be changed via `postgresql.conf` (or
-an equivalent `-c` command-line flag) and requires a server restart;
-`CREATE EXTENSION` alone is not enough for `pg_cron`. With the current
-Tembo `pg16-pgmq` base, `pgmq` is loaded by `CREATE EXTENSION pgmq` and
-must not be listed as a preload library.
+## Bootstrap Order
 
-### Why `cron.database_name` is not optional
+1. Apply the history schema from `deploy/sql/history/schema.sql`.
+2. Set the application role GUC before loading runtime wrappers:
 
-pg_cron ships as two moving parts: the `cron` schema (holding `cron.job`,
-the functions, etc.) lives in whichever database the extension was
-installed in, but the **launcher** is a single bgworker process that
-connects to exactly one database — the one named by `cron.database_name`.
-If that GUC points at a DB that does not have `pg_cron` installed,
-`cron.job` rows register successfully from anywhere, but nothing ever
-fires. Our jobs use `cron.schedule_in_database(..., current_database())`,
-which only pins the *execution* database of each job body; it does not
-change which DB the launcher watches. So on this project both must align:
-install `pg_cron` in `cognitor` and set `cron.database_name = 'cognitor'`.
-Smoke test 15 catches this misconfiguration end-to-end.
+   ```sql
+   ALTER DATABASE cognitor SET runtime.app_role = 'cognitor';
+   ```
 
-## One-time bootstrap
+3. Apply runtime SQL from `deploy/sql/runtime`.
 
-Run as a superuser, or as a role with `CREATE EXTENSION` privilege. From
-the repository root:
+`deploy/sql/runtime/00_run_all.sql` includes sibling files from its working directory. Ansible and k3s run it from that staged runtime SQL directory.
 
-```bash
-# 1. Pin the application role the cache/session wrappers will GRANT EXECUTE to.
-psql "$DATABASE_URL" -c "ALTER DATABASE $PGDATABASE SET runtime.app_role = 'cognitor_app';"
+## Operational Notes
 
-# 2. Apply the schema, wrappers, and pg_cron schedules.
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f runtime/00_run_all.sql
-
-# 3. Verify.
-psql "$DATABASE_URL" \
-  -c "SELECT jobname, schedule, active FROM cron.job WHERE jobname LIKE 'runtime-%';"
-```
-
-Step 1 must happen **before** step 2. The wrappers in
-`runtime/07_cache_wrappers.sql` are `SECURITY DEFINER` and revoke
-`EXECUTE` from `PUBLIC` unconditionally; they only grant `EXECUTE` to the
-role named by the `runtime.app_role` GUC. If the GUC is unset at load
-time, the REVOKE runs, the GRANT is skipped, and the proxy will get
-permission-denied on its first `runtime.cache_*` call. Recover by
-setting the GUC and re-running `runtime/07_cache_wrappers.sql`.
-
-`runtime/00_run_all.sql` uses `\i` with repository-relative paths and
-must be run from the repo root.
-
-## Running the smoke tests
-
-```bash
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f runtime/tests/test_runtime.sql
-```
-
-Eight `PASS` notices confirm that:
-
-- `cache_set` / `cache_get` / `cache_delete` round-trip correctly.
-- `cache_get` filters expired rows before the reaper runs.
-- `cache_reap` physically removes expired rows.
-- `runtime.session_*` round-trip correctly.
-- `runtime.cache` and `runtime.session` are both `UNLOGGED`.
-- All three `runtime-*` jobs are registered in `cron.job` and active.
-- `runtime-cache-reap` actually fires — an already-expired sentinel row is
-  physically deleted by the pg_cron launcher within ~90 s (test 15).
-
-A single `FAIL` raises an exception and stops the script. Test 15 adds
-up to ~90 s of wall time because it polls for the reaper to run; the
-other tests complete in under a second combined.
-
-## Known behaviour
-
-- On the first boot of a fresh data directory, the temporary init server may
-  log one `FATAL: database "cognitor" does not exist` from the `pg_cron`
-  launcher before `POSTGRES_DB` is created. The official entrypoint then
-  creates `cognitor`, restarts PostgreSQL, and the final server starts
-  `pg_cron` normally.
-
-- `runtime-dlq-reap` (nightly at 03:00 UTC) calls `runtime.dlq_reap_expired()`,
-  which is defined on the queue side of the runtime layer
-  (`runtime/05_dlq.sql`). pg_cron stores scheduled commands as plain text and
-  does not validate them at schedule time, so the job is registered
-  successfully regardless of whether the function exists — only the firing
-  will error if it is missing. With the full bootstrap applied via
-  `runtime/00_run_all.sql` the function is present and the job succeeds; the
-  caveat is documented here in case the cache layer is ever bootstrapped in
-  isolation.
+- VM Compose deploy copies SQL to `/opt/cognitor/history` before starting backend services.
+- k3s deploy creates a ConfigMap and runs a CNPG bootstrap Job.
+- `RUNTIME_BACKEND=external` bypasses PostgreSQL queue/session primitives and is retained only for rollback.
+- Re-run the SQL bootstrap after runtime SQL changes as part of a controlled deployment, not as a standalone app migration flow.

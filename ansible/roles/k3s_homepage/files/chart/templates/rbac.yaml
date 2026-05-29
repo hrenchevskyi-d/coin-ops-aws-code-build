@@ -1,3 +1,5 @@
+# Homepage needs read-only cluster visibility for widgets. Keep verbs limited to
+# get/list so the dashboard cannot mutate cluster state.
 {{- if .Values.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -18,6 +20,7 @@ rules:
   - apiGroups: ["gateway.networking.k8s.io"]
     resources: ["httproutes", "gateways"]
     verbs: ["get", "list"]
+  # Metrics API is optional; widgets degrade if metrics-server is absent.
   - apiGroups: ["metrics.k8s.io"]
     resources: ["nodes", "pods"]
     verbs: ["get", "list"]

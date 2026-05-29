@@ -1,4 +1,6 @@
 ---
+# compose_stack is a helper for the legacy VM Compose rollback path. It should
+# not be used by k3s roles; k3s workloads are reconciled through Kubernetes APIs.
 - name: Prepare compose stack
   include_tasks: prepare.yml
 

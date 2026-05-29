@@ -1,4 +1,6 @@
 ---
+# UI chart deploys the frozen UI image and same-origin nginx routing. TLS/Ingress
+# are delegated to the shared ingress endpoint role.
 - name: k3s-coinops-ui-install-helm-client
   include_role:
     name: k3s_helm_client
@@ -65,6 +67,8 @@
   when: k3s_coinops_ui_enabled | bool
   tags: [coinops, k3s, ui]
 
+# Ingress is applied after the Service exists so certificate readiness checks
+# can bind to the same endpoint used by operators.
 - name: k3s-coinops-ui-configure-ingress-and-certificate
   include_role:
     name: k3s_ingress_endpoint

@@ -1,4 +1,6 @@
 ---
+# Resolve kubeconfig once per role run. Localhost prefers generated artifacts;
+# remote hosts prefer /etc/rancher/k3s/k3s.yaml with a rendered fallback.
 - name: Decide whether kubeconfig access runs in local operator mode
   set_fact:
     k3s_kubeconfig_access_use_local_artifact: "{{ inventory_hostname in k3s_kubeconfig_access_controller_hosts }}"
@@ -55,6 +57,8 @@
     - not k3s_remote_kubeconfig_stat.stat.exists
     - k3s_remote_fallback_local_cluster_kubeconfig_stat.stat.exists | default(false)
 
+# Remote fallback rewrites the local artifact to the target host's API address.
+# This keeps delegated k8s tasks usable even if /etc/rancher/k3s is unavailable.
 - name: Render remote fallback kubeconfig
   template:
     src: remote-fallback-kubeconfig.yaml.j2

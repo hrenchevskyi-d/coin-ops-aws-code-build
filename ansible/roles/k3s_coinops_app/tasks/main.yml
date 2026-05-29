@@ -1,4 +1,6 @@
 ---
+# App workloads are deployed from frozen GHCR images through a repo-owned chart.
+# This role manages Kubernetes shape, not application source.
 - name: k3s-coinops-app-install-helm-client
   include_role:
     name: k3s_helm_client
@@ -20,6 +22,8 @@
   when: k3s_coinops_app_enabled | bool
   tags: [coinops, k3s, app, helm]
 
+# Namespaces are configurable per component so proxy/API/consumer can later be
+# isolated without changing the chart resource templates.
 - name: k3s-coinops-app-ensure-component-namespaces
   kubernetes.core.k8s:
     kubeconfig: "{{ k3s_effective_kubeconfig_path }}"

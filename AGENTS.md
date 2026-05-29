@@ -2,68 +2,62 @@
 
 ## Project Structure & Module Organization
 
-This repo is a distributed Polymarket dashboard. `ui-react/` contains the main React/Vite UI. `ui/` is the legacy static UI. `proxy/` contains the Go live-data proxy. `history/` contains the FastAPI history API, RabbitMQ consumer, and PostgreSQL schema. `ansible/` and `terraform/` own VM provisioning and deployment. `deploy/compose/` contains per-node Docker Compose stacks. Supporting docs live in `docs/`.
+This repository now owns infrastructure only. Terraform lives in `terraform/`, Ansible in `ansible/`, VM Compose templates in `deploy/compose/`, retained PostgreSQL bootstrap SQL in `deploy/sql/`, and the infra-owned PostgreSQL runtime image in `deploy/postgres-runtime/`. Operator docs live in `docs/` plus the top-level runbook files.
+
+Application source is intentionally absent. Deployments consume frozen GHCR images through `IMAGE_REGISTRY`, `IMAGE_TAG`, and the image defaults resolved by Ansible.
 
 ## Build, Test, and Development Commands
 
-Frontend:
+Infrastructure checks:
 
 ```bash
-cd ui-react
-npm install
-npm run dev      # Vite dev server
-npm run lint     # TypeScript no-emit check
-npm run build    # production build
+cd terraform
+terraform fmt -check -recursive
+terraform validate
+
+cd /home/notebook/projects/coin-ops
+make ansible-check
 ```
 
-Go proxy:
+Deployment:
 
 ```bash
-cd proxy
-make run         # local go run
-make build       # Linux amd64 binary
+source local/generated-env.sh
+make tf-check-backend
+make tf-plan
+make tf-apply
+make provision
+make deploy
+make k3s-platform
+make k3s-coinops
 ```
 
-Python history services:
+PostgreSQL runtime image, when changed:
 
 ```bash
-cd history
-pip install -r requirements.txt
-python main.py       # history API
-python consumer.py   # RabbitMQ consumer
-```
-
-Infrastructure:
-
-```bash
-ansible-galaxy collection install -r ansible/requirements.yml
-ansible-playbook -i ansible/inventory ansible/provision.yml
-ansible-playbook -i ansible/inventory ansible/deploy.yml
-IMAGE_TAG=v0.1.0 ansible-playbook -i ansible/inventory ansible/deploy.yml
+docker build -t coin-ops-postgres-runtime -f deploy/postgres-runtime/Dockerfile deploy/postgres-runtime
 ```
 
 ## Coding Style & Naming Conventions
 
-Use TypeScript for React UI code and keep components in `ui-react/src/`. Prefer existing Tailwind and glass-dashboard conventions. Go code should follow `gofmt` and small, explicit functions. Python code should use clear snake_case names and keep service responsibilities separated between `main.py` and `consumer.py`. YAML files should use two-space indentation.
+Use Terraform `fmt` defaults. YAML files use two-space indentation. Ansible task names should describe the operator action, not implementation trivia. Keep comments short and helpful for an intern reading the deployment flow. Do not reintroduce local application build or test paths.
 
 ## Testing Guidelines
 
-There is no full automated test suite yet. Minimum verification before committing UI changes is `npm run lint` and `npm run build` in `ui-react/`. For Go changes, run `go test ./...` (or `go test -v -race ./...` when touching concurrency/state behavior) and `go build ./...` from `proxy/`. For deployment changes, prefer Ansible dry-run/checks where practical and inspect affected Compose files manually.
+Minimum verification for infrastructure changes is Terraform format/validate and Ansible syntax checks. For Compose template changes, render through Ansible or inspect the rendered YAML with `docker compose config -q` on a target host. For k3s changes, run the relevant playbook against a staging or lab cluster when static checks are not enough.
 
 ## Commit & Pull Request Guidelines
 
-Use concise, imperative commit messages, for example `Add top-level project README` or `Simplify market history chart rendering`. Keep unrelated artifacts out of commits. Pull requests should include a short summary, affected services, verification commands, and screenshots for UI changes. Deployment changes should mention whether they affect fresh installs, upgrades, or both.
+Use concise, imperative commit messages. Pull requests should include affected infrastructure areas, verification commands, and any required live-environment follow-up. Mention whether changes affect fresh installs, upgrades, or both.
 
 ## Security & Configuration Tips
 
-Never commit real credentials. Use `.env`, Ansible variables, and generated env files for secrets. Keep local VM images, tfstate backups, and Hyper-V artifacts ignored. Be careful with container networking: inside containers, `localhost` means the container itself, not the VM host.
+Never commit real credentials, generated env files, kubeconfigs, tfstate, or local cloud keys. Use cloud secret managers, generated local env files, and ignored Terraform artifacts. Container images are pulled from GHCR; do not add app source or local image builds back into this repo.
 
 ## Architecture Notes
 
-Terraform creates VMs, Ansible configures and deploys them, Docker packages runtime services, RabbitMQ decouples ingestion, PostgreSQL stores history, and Redis stores short-lived UI session state.
+Terraform creates cloud resources and generated operator metadata. Ansible configures hosts, deploys VM Compose stacks, and installs k3s workloads. PostgreSQL stores history and runtime state; `RUNTIME_BACKEND=external` keeps RabbitMQ/Redis rollback support only.
 
-Node-03 is the browser-facing gateway. Frontend runtime URLs should stay same-origin (`/api` and `/history-api`) so nginx can reverse-proxy to node-02 and node-01. Do not reintroduce direct browser calls to `172.31.1.10:8000` or `172.31.1.11:8080` unless intentionally debugging CORS.
+Frontend URLs stay same-origin (`/api` and `/history-api`) so nginx can reverse-proxy to backend services. Do not reintroduce direct browser calls to private backend IPs unless intentionally debugging CORS.
 
-Container images are built by GitHub Actions and pushed to GHCR. Default deploys use `shabat-latest`; production-style or demo release deploys should use `IMAGE_TAG=vX.Y.Z`. SemVer tags are repository-level release tags: use patch for fixes, minor for compatible features, and major for breaking changes.
-
-TLS is controlled by `APP_DOMAIN` and `TLS_MODE`. Local lab HTTPS defaults to `APP_DOMAIN=coinops.test` and `TLS_MODE=selfsigned`; browsers will warn unless the generated certificate or a local CA is trusted.
+Multicloud, Tailscale subnet routing, Cloudflare DNS/Access, Headlamp, Homepage, CNPG, VM Compose, and k3s are all supported infrastructure concerns and should remain intact.

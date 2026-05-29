@@ -1,4 +1,6 @@
 ---
+# Join nodes depend on the bootstrap host's in-memory token from this run. If you
+# start at --tags k3s_join, run bootstrap first or read the token manually.
 - name: Assert that the bootstrap token is available
   assert:
     that:
@@ -45,6 +47,8 @@
   when: k3s_version | length == 0
   tags: [k3s, k3s_join]
 
+# Capture diagnostics before failing because get-k3s.sh errors are often terse
+# while systemd/journal holds the useful TLS, token, or endpoint message.
 - name: Show k3s service status when join installation fails
   command: systemctl status k3s --no-pager --full
   register: k3s_join_status
@@ -80,6 +84,8 @@
     state: started
   tags: [k3s, k3s_join]
 
+# Joining nodes also skip reinstall once k3s exists; restart is the reconcile
+# path for endpoint, token, or kubelet argument changes.
 - name: Restart joining k3s service when configuration changes
   systemd:
     name: k3s

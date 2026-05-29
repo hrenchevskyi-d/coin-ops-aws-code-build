@@ -38,6 +38,8 @@ resource "google_compute_firewall" "rule" {
     }
   }
 
+  # Rules may target source CIDRs or source role tags. Use nulls so Terraform
+  # omits the unused branch rather than sending empty lists to the API.
   source_ranges = lookup(each.value, "source_cidrs", null)
   source_tags   = lookup(each.value, "source_role", null) != null ? [each.value.source_role] : null
   target_tags   = lookup(each.value, "target_tags", null) != null ? each.value.target_tags : (lookup(each.value, "target_role", null) != null ? [each.value.target_role] : null)

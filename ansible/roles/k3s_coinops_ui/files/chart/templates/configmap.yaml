@@ -1,3 +1,5 @@
+# Same-origin routing is intentional: browser calls stay on /api and
+# /history-api while nginx talks to private ClusterIP services.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -23,6 +25,7 @@ data:
             return 200 '{"status":"ok"}';
         }
 
+        # Keep frontend runtime config simple by preserving same-origin API paths.
         location /api/ {
             proxy_pass http://{{ .Values.ui.proxyServiceName }}.{{ .Values.ui.proxyServiceNamespace }}.svc.cluster.local:{{ .Values.ui.proxyServicePort }}/;
             proxy_http_version 1.1;

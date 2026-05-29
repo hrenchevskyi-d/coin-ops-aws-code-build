@@ -1,330 +1,114 @@
-# Coin-Ops
+# Coin-Ops Infrastructure
 
-Coin-Ops is a distributed Polymarket dashboard. The current infrastructure path is multi-cloud-ready: Terraform creates cloud networking, managed PostgreSQL, secret storage, and VMs; Ansible provisions/deploys Docker Compose service stacks; runtime secrets come from the configured cloud secret backend rather than a repo `.env`.
+This repository is infrastructure-only. The Coin-Ops application is frozen and deployed from existing GHCR images; app source, local app builds, app tests, and smoke stacks are intentionally not kept here.
 
-Current infrastructure and operator workflow truth lives in [runbook.md](runbook.md), [CONTEXT.md](CONTEXT.md), [NEXT_PHASE_PLAN.md](NEXT_PHASE_PLAN.md), and [MULTI_CLOUD_SCOPE.md](MULTI_CLOUD_SCOPE.md).
+## What This Repo Owns
 
-## Status Snapshot
-
-| Topic | Current repo state on `dev` | Next planned step |
-| --- | --- | --- |
-| Runtime backend | `postgres` is the PostgreSQL-native path; `external` remains an explicit fallback mode | Monitor and optimize PostgreSQL runtime load |
-| Runtime queue assets | Proxy and consumer use `pgmq` queue SQL, DLQ, and `LISTEN/NOTIFY` via `runtime/` schema | Keep deploy wiring aligned with runtime mode |
-| Frontend contract | same-origin `/api` and `/history-api` | keep the same HTTP contract |
-| Deployment shape | Docker Compose on role-based VMs via Ansible | keep role naming and cloud placement explicit |
-| Image publishing | `Shabat` -> `shabat-latest`, `dev` -> `dev-latest`, tags -> `vX.Y.Z` | use moving branch tags for integration/demo deploys and tags for pinned releases |
-| Validation | PR checks run on pull requests into `dev` | extend the test pyramid beyond the current baseline over time |
-
-## Deployment Topology
-
-> **Note:** The runtime mode is now PostgreSQL-native (`RUNTIME_BACKEND=postgres`). The fallback RabbitMQ/Redis mode (`RUNTIME_BACKEND=external`) is retained for controlled rollback only.
-
-| Role | Runtime services |
+| Path | Purpose |
 | --- | --- |
-| `app-1` | nginx gateway, React SPA |
-| `app-2` | history consumer, history API, Go proxy, local PostgreSQL fallback |
-
-## Current Data Flow
-
-| Path | Flow | Purpose |
-| --- | --- | --- |
-| Live path | Browser -> `/api` -> Go proxy -> external APIs -> Browser | fast live market data |
-| Write path | Go proxy -> PostgreSQL (pgmq) -> Python consumer -> PostgreSQL | async persistence |
-| History path | Browser -> `/history-api` -> FastAPI -> PostgreSQL -> Browser | chart time series |
-| Session path | Browser -> `/api/state` -> PostgreSQL (UNLOGGED) | short-lived UI state |
-
-The browser does not call backend private IPs directly. The `app-1` gateway keeps the frontend same-origin by reverse-proxying `/api` and `/history-api` to the backend role.
-
-## Roadmap Status
-
-### Already adopted on `dev`
-
-- `dev` is the intended integration branch
-- PR checks exist in `.github/workflows/pr-checks.yml`
-- GHCR publishing for `dev-latest` exists in `.github/workflows/docker-images.yml`
-- PostgreSQL queue-side runtime SQL and `runtime_consumer.py` exist under `runtime/`
-
-### Current runtime wiring
-
-- added `RUNTIME_BACKEND=external|postgres` wiring to proxy and consumer startup paths
-- switched proxy event publishing from RabbitMQ to `runtime.enqueue_event(...)`
-- added PostgreSQL worker routing inside `history/consumer.py` via `RUNTIME_BACKEND`
-- wired runtime schema/bootstrap into Ansible and Compose
-- moved Redis-backed session state into PostgreSQL runtime primitives (live caches remain in-process)
-- keeps RabbitMQ and Redis available only when `RUNTIME_BACKEND=external` is selected
-
-## Tech Stack
-
-| Layer | Tech |
-| --- | --- |
-| Frontend | React, Vite, TypeScript, Tailwind, Recharts |
-| Live gateway | Go |
-| History API and current consumer | Python, FastAPI, pgmq (pika for fallback) |
-| Queue | PostgreSQL `pgmq` (RabbitMQ for fallback) |
-| Database | PostgreSQL |
-| Session/runtime state | PostgreSQL `UNLOGGED` tables (Redis for fallback) |
-| Containers | Docker, Docker Compose |
-| Infrastructure | Terraform for cloud provisioning, Ansible for deployment |
-| Web server | nginx |
-
-## Repository Layout
-
-```text
-.
-|-- ansible/          # provisioning and deployment automation
-|-- deploy/compose/   # role/service Docker Compose templates
-|-- docs/             # current operator notes
-|-- history/          # FastAPI history API, consumer (pika fallback), schema
-|-- proxy/            # Go live-data proxy
-|-- runtime/          # PostgreSQL runtime queue SQL and pgmq-backed consumer assets
-|-- terraform/        # VM and network provisioning
-|-- ui/               # older static UI
-`-- ui-react/         # main React/Vite frontend
-```
-
-## Container Images
-
-Each application service has its own Dockerfile.
-
-| Image | Dockerfile | Runtime shape |
-| --- | --- | --- |
-| Go proxy | `proxy/Dockerfile` | multi-stage build, `golang:1.22-alpine` builder, `scratch` runtime |
-| History API | `history/Dockerfile.api` | `python:3.12-slim-bookworm` |
-| History consumer | `history/Dockerfile.consumer` | `python:3.12-slim-bookworm` |
-| UI | `ui-react/Dockerfile` | `node:22-bookworm-slim` builder, `nginx:alpine` runtime |
-
-Official images are used for PostgreSQL. The queue-side PostgreSQL runtime SQL requires `pgmq` to be available in PostgreSQL. RabbitMQ and Redis images are also available if the `external` fallback mode is used.
+| `terraform/` | Cloud resources, remote-state bootstrap, multicloud networking, Cloudflare, secret-manager seeding, generated operator metadata |
+| `ansible/` | Host provisioning, VM Compose deploys, k3s platform/app deploys, runtime config materialization |
+| `deploy/compose/` | Jinja Docker Compose templates rendered by Ansible on VM targets |
+| `deploy/sql/` | Retained PostgreSQL history/runtime bootstrap SQL used by infra deploys |
+| `deploy/postgres-runtime/` | PostgreSQL 16 runtime image with `pg_cron` and `pgmq` |
+| `packer/` | Optional golden-image build definitions for pre-baked app hosts |
+| `docs/` | Operator runbooks |
 
 ## Deployment Model
 
-Application images are built by GitHub Actions and pushed to GitHub Container Registry.
+Two deployment paths remain supported:
 
-```text
-push to Shabat
-  -> publish shabat-latest
+- VM Compose: `ansible/provision.yml` and `ansible/deploy.yml` render Compose stacks and pull GHCR images onto app hosts.
+- k3s: `ansible/k3s-platform.yml`, `ansible/k3s-homepage.yml`, and `ansible/k3s-coinops.yml` install platform and application workloads into the cluster.
 
-push to dev
-  -> publish dev-latest
+Both paths use the same image inputs resolved from `terraform/config/deploy.json`, generated metadata, cloud secrets, and optional environment overrides.
 
-push tag vX.Y.Z
-  -> publish immutable release images
+## Runtime Modes
 
-Ansible deploy
-  -> renders role/service Compose files and runtime config
-  -> Docker Compose pulls tagged images
-  -> containers start on app-1 and app-2
-```
+- `RUNTIME_BACKEND=postgres`: normal mode. PostgreSQL runtime SQL enables `pgmq`, queue wrappers, cache/session tables, and `pg_cron` cleanup jobs.
+- `RUNTIME_BACKEND=external`: rollback mode. RabbitMQ and Redis remain available in VM Compose templates for controlled fallback.
 
-## Branches and Release Tags
+Runtime SQL lives under `deploy/sql/` because it is a database bootstrap asset required by infrastructure, not application source.
 
-Current branch and publishing model:
-
-- `feature/*` -> PR -> `dev`
-- `dev` is the integration branch
-- `main` remains stable/release-oriented
-- `Shabat` publishes moving `shabat-latest`
-- `dev` publishes moving `dev-latest`
-- `vX.Y.Z` publishes immutable release tags
-
-Release tags are automated from Conventional Commit style squash merge titles on `main`. See [Release Automation](docs/release-automation.md) for the version bump rules and maintainer workflow.
-
-## Public Gateway and TLS
-
-`app-1` is the browser-facing gateway. It serves the React UI and reverse-proxies the backend paths:
-
-```text
-https://coinops.test/              -> React UI
-https://coinops.test/api/*         -> app-2 proxy
-https://coinops.test/history-api/* -> app-2 history API
-```
-
-For local lab HTTPS, keep `APP_DOMAIN=coinops.test`, `TLS_MODE=selfsigned`, and add this hosts entry on the machine running the browser:
-
-```text
-<app-1-public-ip> coinops.test
-```
-
-## Secrets and Runtime Configuration
-
-Secrets are not baked into images. The infrastructure path retrieves runtime secrets through Ansible from the configured `clouds.secret_backend` in `terraform/config/clouds.json`: GCP Secret Manager or AWS Secrets Manager today. The normal operator workflow no longer depends on a repo `.env` file.
-
-Managed PostgreSQL metadata is generated by Terraform into `terraform/config/ansible-runtime.json` for every enabled cloud. GCP uses Cloud SQL, AWS uses RDS PostgreSQL, and Ansible renders `DATABASE_URL` from that metadata plus the active secret backend.
-
-Current runtime env highlights:
-
-- proxy: `DATABASE_URL`, `RUNTIME_BACKEND=postgres`, `PORT`
-- history: `DATABASE_URL`, `RUNTIME_BACKEND=postgres`, `POSTGRES_*`, `PORT`
-- ui: `PROXY_URL=/api`, `HISTORY_URL=/history-api`
-
-Legacy mode env variables (if `RUNTIME_BACKEND=external`):
-
-- proxy: `RABBITMQ_URL`, `REDIS_URL`
-- history: `RABBITMQ_URL`
-
-## Deployment Commands
-
-Prepare the generated local environment first:
+## Operator Quick Start
 
 ```bash
-source local/generated-gcp-env.sh
+cd /home/notebook/projects/coin-ops
+source local/generated-env.sh
+make tf-check-backend
+make runtime-config
 ```
 
-For the local root `docker compose` flow, use a plain Compose `.env` file and the root `Makefile` convenience targets:
+Run static checks:
 
 ```bash
-cp .env.compose.example .env
-make local-up
+cd terraform
+terraform fmt -check -recursive
+terraform validate
+
+cd /home/notebook/projects/coin-ops
+make ansible-check
 ```
 
-Equivalent direct Compose command:
+Apply infrastructure:
 
 ```bash
-docker compose up --build
+make tf-plan
+make tf-apply
 ```
 
-This local flow is a developer convenience stack for the default root Compose setup. It does not replace the VM-based Terraform + Ansible deployment flow.
-
-Install pinned Ansible collections:
+Deploy VM Compose path:
 
 ```bash
-ansible-galaxy collection install -r ansible/requirements.yml
+make provision
+make deploy
 ```
 
-Provision infrastructure:
+Deploy k3s path:
 
 ```bash
-terraform -chdir=terraform plan
-terraform -chdir=terraform apply
+make k3s-cluster
+make k3s-platform
+make k3s-homepage
+make k3s-coinops
 ```
 
-For recovery and teardown details, including stateful full destroy and
-`suppress_secret_manager_reads=true`, use the infrastructure docs in
-[runbook.md](runbook.md) and [terraform/README.md](terraform/README.md).
-
-Install host dependencies and Docker:
+Build the infra-owned PostgreSQL runtime image when it changes:
 
 ```bash
-ansible-playbook -i ansible/inventory ansible/provision.yml
+docker build -t coin-ops-postgres-runtime -f deploy/postgres-runtime/Dockerfile deploy/postgres-runtime
 ```
 
-Deploy application containers:
+## Configuration
 
-```bash
-ansible-playbook -i ansible/inventory ansible/deploy.yml
-```
+Canonical non-secret configuration is split across `terraform/config/*.json`:
 
-Current moving-tag deploys:
+- `clouds.json`: enabled clouds, control plane, secret backend, provider account metadata
+- `general.json`: project name, region profile, username, SSH port, base image profile
+- `instances.json`: VM layout and roles
+- `networks.json`: VPC/VNet CIDRs, subnets, firewall rules, Tailscale route policy
+- `deploy.json`: image registry/tag, TLS, runtime backend, k3s app settings
+- `database.json`: database engine and cloud profiles
+- `dns.json`: Cloudflare zone/account and DNS defaults
+- `secrets.json`: secret manager object names
 
-```bash
-IMAGE_TAG=shabat-latest ansible-playbook -i ansible/inventory ansible/deploy.yml
-IMAGE_TAG=dev-latest ansible-playbook -i ansible/inventory ansible/deploy.yml
-```
+Terraform generates local operator metadata such as `terraform/config/hosts.json`, `terraform/config/ssh_config`, and `terraform/config/ansible-runtime.json`. Ansible `runtime_config` is the only supported merge point for config, generated metadata, environment overrides, and secrets.
 
-Pinned release deploy:
+## Generated Files and Secrets
 
-```bash
-IMAGE_TAG=v0.1.0 ansible-playbook -i ansible/inventory ansible/deploy.yml
-```
+Do not commit:
 
-## Local Development
+- `terraform/backend.active.tf`
+- `terraform/local.generated.auto.tfvars.json`
+- `terraform/config/hosts.json`
+- `terraform/config/ssh_config`
+- `terraform/config/ansible-runtime.json`
+- `terraform/sa-key.json`
+- `ansible/vars/local.generated.json`
+- `ansible/artifacts/`
+- `local/generated-*.sh`
+- tfstate, kubeconfigs, private keys, and cloud credentials
 
-Quick local Compose workflow:
+## Notes
 
-```bash
-cp .env.compose.example .env
-make local-up
-```
-
-Open the app at `http://localhost:5000`.
-
-Useful local commands:
-
-```bash
-make local-logs
-make local-ps
-make local-down
-make local-restart
-make local-config
-```
-
-Frontend:
-
-```bash
-cd ui-react
-npm install
-npm run dev
-npm run lint
-npm run build
-```
-
-Go proxy:
-
-```bash
-cd proxy
-make run
-make build
-```
-
-Python history services:
-
-```bash
-cd history
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python main.py
-python consumer.py
-```
-
-Queue-side PostgreSQL runtime assets:
-
-```bash
-psql "$DATABASE_URL" -f runtime/00_run_all.sql
-python runtime/runtime_consumer.py
-```
-
-Fast Python unit tests for both the current `external` path and the PostgreSQL runtime target:
-
-```bash
-cd <repo-root>
-python -m venv venv
-source venv/bin/activate
-pip install -r history/requirements-dev.txt
-python -m pytest tests/python/unit
-```
-
-If you are already in `history/`, either `cd ..` first or run `python -m pytest ../tests/python/unit`.
-
-The fast `pytest` suite lives under `tests/python/unit`. Keep PostgreSQL-backed integration coverage separate from these unit tests.
-
-PostgreSQL-backed integration tests for `history/main.py` and the queue-side PostgreSQL consumer in `runtime/runtime_consumer.py` (requires Docker):
-
-```bash
-cd <repo-root>
-python -m venv venv
-source venv/bin/activate
-pip install -r history/requirements-dev.txt
-python -m pytest tests/python/integration -v
-```
-
-These integration tests boot an ephemeral runtime-ready PostgreSQL container (`quay.io/tembo/pg16-pgmq@sha256:7f80d046257d585d1af9d19cf28bd355a4b854b0a7d643c02ebbe6b84457868a` by default, override with `COINOPS_TEST_POSTGRES_IMAGE`), apply `history/schema.sql` plus `runtime/00_run_all.sql`, and validate real history read/write behavior through the actual PostgreSQL queue path.
-
-They do not replace the broader runtime smoke tests in `runtime/tests/test_runtime.sql`; cache/session `pg_cron` coverage still lives there.
-
-## External Data Sources
-
-| Source | Data |
-| --- | --- |
-| `gamma-api.polymarket.com` | live market metadata |
-| `data-api.polymarket.com` | whale leaderboard and positions |
-| `api.coingecko.com` | BTC and ETH prices |
-| `bank.gov.ua` | USD/UAH reference rate |
-
-These are public unauthenticated APIs, so live behavior depends on upstream availability and rate limits.
-
-## More Detail
-
-- [runbook.md](runbook.md) is the current infrastructure operator workflow.
-- [MULTI_CLOUD_SCOPE.md](MULTI_CLOUD_SCOPE.md) defines the current GCP/AWS support boundary.
-- [docs/runtime.md](docs/runtime.md) covers PostgreSQL runtime operator steps.
-- [docs/release-automation.md](docs/release-automation.md) covers SemVer release automation.
+Multicloud, Tailscale, Cloudflare DNS/Access, Headlamp, Homepage, CNPG, VM Compose, and k3s support are intentionally preserved. Do not reintroduce app source directories or direct browser calls to backend private IPs.

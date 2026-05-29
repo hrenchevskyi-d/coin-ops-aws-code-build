@@ -1,3 +1,5 @@
+# k3s nodes are plain compute instances, so load balancers need this unmanaged
+# group as their backend adapter.
 resource "google_compute_instance_group" "this" {
   name      = var.name
   zone      = var.zone

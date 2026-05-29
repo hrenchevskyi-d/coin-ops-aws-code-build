@@ -1,4 +1,6 @@
 ---
+# cert-manager owns CRDs cluster-wide. Install it before any role renders
+# Certificate resources or ClusterIssuer objects.
 - name: k3s-cert-manager-install-helm-client
   include_role:
     name: k3s_helm_client

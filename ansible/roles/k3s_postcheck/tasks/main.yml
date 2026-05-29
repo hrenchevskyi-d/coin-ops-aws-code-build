@@ -1,4 +1,6 @@
 ---
+# Postcheck validates the control plane and writes operator artifacts. It runs on
+# the bootstrap node because that node always has the native kubeconfig.
 - name: Read k3s node list
   kubernetes.core.k8s_info:
     kubeconfig: /etc/rancher/k3s/k3s.yaml
@@ -44,6 +46,8 @@
   register: k3s_kubeconfig_raw
   tags: [k3s, k3s_postcheck]
 
+# Prefer Terraform's API LB endpoint when present; direct ansible_host remains
+# the fallback for single-cloud labs without the internal load balancer.
 - name: Determine preferred Kubernetes API endpoint for operator artifacts
   set_fact:
     k3s_operator_api_endpoint: "{{ cloud_runtime_metadata.get('k3s_api_endpoint', '') | default(ansible_host, true) }}"
@@ -67,6 +71,8 @@
   become: false
   tags: [k3s, k3s_postcheck, artifacts]
 
+# The tunneled kubeconfig is the safest default for local operations because it
+# preserves TLS verification while reaching private API endpoints through SSH.
 - name: Write tunneled kubeconfig artifact for operator use
   template:
     dest: "{{ k3s_postcheck_local_artifact_dir }}/kubeconfig-gcp-k3s-tunneled.yaml"

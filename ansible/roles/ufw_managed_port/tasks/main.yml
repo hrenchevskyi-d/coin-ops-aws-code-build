@@ -1,4 +1,6 @@
 ---
+# Small helper role for opening/removing a single UFW TCP port. Keep firewall
+# intent in caller vars; this role only applies the requested state.
 - name: Allow managed UFW port
   community.general.ufw:
     rule: allow

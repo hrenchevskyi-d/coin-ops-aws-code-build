@@ -1,3 +1,5 @@
+# Bootstrap server starts the embedded datastore quorum. Join servers render a
+# different config pointing back to this node.
 cluster-init: true
 write-kubeconfig-mode: "{{ k3s_write_kubeconfig_mode }}"
 node-name: "{{ inventory_hostname }}"

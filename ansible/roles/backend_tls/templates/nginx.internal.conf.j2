@@ -1,3 +1,5 @@
+# Legacy VM Compose internal TLS gateway. It terminates HTTPS from UI host and
+# forwards to backend containers over localhost.
 server {
     listen {{ internal_tls_port }} ssl;
     http2 on;

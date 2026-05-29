@@ -1,3 +1,5 @@
+# Shared ingress wrapper used by Headlamp, Homepage, and Coin-Ops UI so TLS and
+# class-name behavior stay consistent across add-ons.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -12,6 +14,7 @@ metadata:
 spec:
   ingressClassName: {{ k3s_ingress_endpoint_class_name }}
 {% if k3s_ingress_endpoint_tls_enabled | bool %}
+  # TLS secret is created by cert-manager; Ingress only references it.
   tls:
     - hosts:
         - {{ k3s_ingress_endpoint_host }}

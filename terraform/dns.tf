@@ -36,6 +36,7 @@ locals {
   headlamp_private_ip    = local.gcp_k3s_ingress_lb_enabled ? try(module.gcp_k3s_ingress_lb[0].ip_address, "") : ""
   headlamp_tunnel_target = local.headlamp_tunnel_enabled ? "${cloudflare_zero_trust_tunnel_cloudflared.headlamp[0].id}.cfargotunnel.com" : ""
   homepage_public_ip     = local.gcp_k3s_public_ingress_lb_enabled ? try(module.gcp_k3s_public_ingress_lb[0].ip_address, "") : ""
+  # DNS is intentionally tied to the k3s ingress path; app images are not built here.
   cloudflare_dns_records = {
     root_a = {
       enabled         = local.dns_enabled && local.gcp_k3s_public_ingress_lb_enabled

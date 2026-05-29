@@ -1,3 +1,5 @@
+# Consumer only runs when enabled by values. It shares runtime config with proxy
+# so rollback mode and postgres mode stay aligned.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

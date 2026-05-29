@@ -1,6 +1,6 @@
 ---
-# deploy.yml — deploy all services.
-# Safe to re-run on every code push.
+# deploy.yml — legacy VM Compose deploy path.
+# Safe to re-run when this rollback path is intentionally kept.
 #
 #   ansible-playbook -i ansible/inventory ansible/deploy.yml
 

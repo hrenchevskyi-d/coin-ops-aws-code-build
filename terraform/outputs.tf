@@ -1,3 +1,5 @@
+# Outputs expose operator-facing endpoints and generated file paths only.
+# Sensitive runtime values stay in cloud secret backends or gitignored artifacts.
 output "gcp_instance_ips" {
   description = "GCP instance IP addresses"
   value       = try(module.gcp_instances[0].instance_ips, {})

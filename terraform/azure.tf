@@ -1,3 +1,7 @@
+# Azure follows the same module contract as AWS/GCP, but Key Vault lookup needs
+# the shared vault data source before secret reads can happen.
+# Key Vault is shared infra, not created just to read secrets. Reads are gated
+# so local plans can run before bootstrap/seed flows are complete.
 data "azurerm_key_vault" "shared" {
   count               = local.read_azure_secret_backend ? 1 : 0
   name                = local.azure_key_vault_name
@@ -55,6 +59,8 @@ module "azure_instances" {
   location            = local.azure_location
 }
 
+# Azure route tables point at a VirtualAppliance IP. The appliance is the same
+# gateway/NAT host selected from instances.json.
 module "azure_nat_route" {
   count               = local.azure_compute_enabled && local.azure_has_route_host ? 1 : 0
   source              = "./modules/cloud/azure/nat_route"

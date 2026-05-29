@@ -1,4 +1,6 @@
 ---
+# Runtime-config playbook is a cheap validation path for config/secrets merge
+# behavior without touching remote hosts.
 - name: Inspect resolved runtime configuration
   hosts: localhost
   connection: local

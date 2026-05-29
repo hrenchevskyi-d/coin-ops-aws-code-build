@@ -1,4 +1,6 @@
 ---
+# Headlamp is managed from localhost through the exported kubeconfig, matching
+# the local-operator model used by other k3s add-ons.
 - name: Validate Headlamp deployment contract
   hosts: localhost
   connection: local

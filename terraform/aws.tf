@@ -1,3 +1,6 @@
+# AWS resources are optional. count guards keep disabled clouds from requiring
+# credentials or reading secrets during local-only Terraform plans.
+# Secret data reads are skipped while seeding or repairing secret managers.
 data "aws_secretsmanager_secret_version" "db_secrets" {
   count     = local.read_aws_secret_backend ? 1 : 0
   secret_id = local.db_secret_name
@@ -43,6 +46,8 @@ module "aws_instances" {
   project_name        = local.project_name
 }
 
+# Route through a VM/gateway only when topology asks for cross-cloud or private
+# default routes. This is separate from AWS managed NAT on purpose.
 module "aws_nat_route" {
   count                    = local.aws_compute_enabled && local.aws_has_route_host ? 1 : 0
   source                   = "./modules/cloud/aws/nat_route"

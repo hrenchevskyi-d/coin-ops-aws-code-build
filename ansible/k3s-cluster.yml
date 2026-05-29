@@ -1,4 +1,6 @@
 ---
+# This playbook intentionally builds a three-server control plane only.
+# Single-node experiments should use a separate lab playbook/config.
 - name: Validate k3s cluster contract
   hosts: localhost
   connection: local
@@ -42,6 +44,7 @@
     - common
     - k3s_prereqs
 
+# Sorting makes the bootstrap node deterministic across dynamic inventories.
 - name: Bootstrap the first k3s server
   hosts: "{{ groups.get('role_k3s_server', ['localhost']) | sort | first }}"
   become: yes
@@ -84,6 +87,7 @@
   roles:
     - k3s_traefik
 
+# Postcheck also writes local kubeconfig artifacts used by later localhost roles.
 - name: Validate the finished cluster and export kubeconfig
   hosts: "{{ groups.get('role_k3s_server', ['localhost']) | sort | first }}"
   become: yes

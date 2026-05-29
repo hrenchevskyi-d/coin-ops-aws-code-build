@@ -1,4 +1,6 @@
 ---
+# Certificate and Ingress are separate because cert-manager reconciliation can
+# lag behind Ingress creation; callers decide whether to wait for Ready.
 - name: Apply ingress endpoint certificate
   kubernetes.core.k8s:
     kubeconfig: "{{ k3s_effective_kubeconfig_path }}"

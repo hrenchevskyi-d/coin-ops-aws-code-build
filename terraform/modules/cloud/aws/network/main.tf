@@ -1,9 +1,12 @@
+# AWS network keeps public and private route tables separate. Extra routes
+# are attached later by nat_route so base VPC creation remains simple.
 locals {
   fallback_subnets = {
     internal = { cidr = "10.10.1.0/24" }
     external = { cidr = "10.10.2.0/24", public = true }
   }
-  subnets         = length(var.subnets) > 0 ? var.subnets : local.fallback_subnets
+  subnets = length(var.subnets) > 0 ? var.subnets : local.fallback_subnets
+  # public=true is the only flag that receives Internet Gateway routing here.
   public_subnets  = { for name, cfg in local.subnets : name => cfg if lookup(cfg, "public", false) }
   private_subnets = { for name, cfg in local.subnets : name => cfg if !lookup(cfg, "public", false) }
 }

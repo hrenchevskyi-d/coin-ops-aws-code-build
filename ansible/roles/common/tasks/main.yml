@@ -1,4 +1,6 @@
 ---
+# Common runs on both fresh VMs and baked images. Guard heavy package work with
+# host_uses_golden_image so image-based hosts are validated, not rebuilt.
 - name: Set stable system hostname from cloud and instance key
   hostname:
     name: "{{ my_cloud }}-{{ infra_instance_key }}"
@@ -8,6 +10,8 @@
     path: /usr/sbin/ufw
   register: ufw_binary
 
+# Forwarders use provider route tables and iptables/Tailscale rules; UFW can
+# drop forwarded packets even when host-local ports look correct.
 - name: Determine whether this host forwards traffic
   set_fact:
     common_is_forwarder: "{{ host_instance_config.get('can_ip_forward', false) | bool }}"
@@ -45,6 +49,8 @@
         executable: /bin/bash
       changed_when: false
 
+    # Some older images left duplicate Docker apt entries behind. Normalize
+    # before apt update so unrelated provisioning does not fail on repo conflicts.
     - name: Normalize Docker APT sources before refreshing apt
       shell: |
         set -euo pipefail

@@ -1,6 +1,7 @@
 ---
 history_deploy_dir: /opt/cognitor/history
 history_compose_path: "{{ history_deploy_dir }}/compose.yaml"
+# SQL is shipped from deploy/sql so the repo can stay infrastructure-only.
 history_schema_dest_path: "{{ history_deploy_dir }}/schema.sql"
 history_runtime_dir: "{{ history_deploy_dir }}/runtime"
 history_runtime_schema_files:

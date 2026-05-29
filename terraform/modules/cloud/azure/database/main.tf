@@ -1,3 +1,5 @@
+# Azure Flexible Server requires delegated subnet plus private DNS linkage.
+# Keep both protected because recreating them can orphan database connectivity.
 resource "random_id" "db_name_suffix" {
   byte_length = 4
 }
@@ -22,6 +24,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "this" {
   }
 }
 
+# public_network_access_enabled=false keeps DB access inside the VNet/private DNS path.
 resource "azurerm_postgresql_flexible_server" "this" {
   name                          = "${var.project_name}-db-${random_id.db_name_suffix.hex}"
   resource_group_name           = var.resource_group_name

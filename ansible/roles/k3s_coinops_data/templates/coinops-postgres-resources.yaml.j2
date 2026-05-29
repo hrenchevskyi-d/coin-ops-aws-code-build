@@ -1,3 +1,5 @@
+# Registry credentials are rendered by Ansible from the selected secret backend;
+# no image-building credentials should be committed to the repo.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -27,6 +29,8 @@ stringData:
   username: "{{ k3s_coinops_data_app_user }}"
   password: "{{ db_password }}"
 ---
+# Runtime SQL is infra-owned bootstrap data. It is mounted into a one-shot job,
+# not copied into application images.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -35,9 +39,11 @@ metadata:
 data:
 {% for filename in k3s_coinops_data_runtime_sql_files %}
   {{ filename }}: |
-{{ lookup('file', repo_root ~ '/runtime/' ~ filename) | indent(4, true) }}
+{{ lookup('file', repo_root ~ '/deploy/sql/runtime/' ~ filename) | indent(4, true) }}
 {% endfor %}
 ---
+# CNPG creates the primary database and owner; the follow-up bootstrap job adds
+# extensions/functions that initdb cannot express cleanly.
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:

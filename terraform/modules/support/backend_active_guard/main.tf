@@ -1,3 +1,5 @@
+# Guard module fails planning when backend.active.tf is absent. This prevents
+# accidental local-state plans after a bootstrap file was removed.
 locals {
   backend_active_present = fileexists(var.backend_active_tf_path)
 }
