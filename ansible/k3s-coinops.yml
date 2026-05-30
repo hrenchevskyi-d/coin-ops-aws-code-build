@@ -1,6 +1,6 @@
 ---
 # Workloads are applied from localhost using the exported kubeconfig.
-- name: Validate Coin-Ops k3s deployment contract
+- name: Validate Coin-Ops k3s prerequisites
   hosts: localhost
   connection: local
   gather_facts: false
@@ -36,7 +36,7 @@
           secret backend, and a postgres_runtime_image whose tag starts with a
           PostgreSQL major version such as 16-shabat-latest.
 
-- name: Install Coin-Ops on k3s from the local operator machine
+- name: Install Coin-Ops on k3s
   hosts: localhost
   connection: local
   become: false
@@ -51,8 +51,8 @@
       include_role:
         name: k3s_kubeconfig_access
       tags: [runtime_config, coinops, kubeconfig]
-    # This catches stale tunneled kubeconfig artifacts before Helm/K8s writes start.
-    - name: Confirm Kubernetes API is reachable from the operator machine
+    # Catch a stale tunneled kubeconfig before Helm/K8s writes start.
+    - name: Confirm Kubernetes API is reachable from localhost
       kubernetes.core.k8s_info:
         kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
         api_version: v1

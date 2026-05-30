@@ -1,9 +1,8 @@
 ---
 # `kubernetes.core` roles in this repo can run in two modes:
 # 1. Remote node mode: use the native kubeconfig on a k3s server.
-# 2. Local operator mode: use the kubeconfig artifact rendered by k3s_postcheck.
-# The second mode is now the preferred way to manage cluster resources because
-# it keeps day-to-day Kubernetes operations on the operator machine.
+# 2. Local mode: use the kubeconfig rendered by k3s_postcheck.
+# Local mode is preferred for application and add-on playbooks.
 k3s_kubeconfig_access_controller_hosts:
   - localhost
   - 127.0.0.1

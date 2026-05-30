@@ -26,7 +26,7 @@ If you changed Compose templates, render them through the owning Ansible role or
 ## Infrastructure Areas
 
 - `terraform/`: cloud resources, remote-state bootstrap scripts, generated local metadata, Cloudflare, and multicloud networking.
-- `ansible/`: host provisioning, VM Compose deploys, k3s platform roles, runtime configuration, and operator artifacts.
+- `ansible/`: host provisioning, VM Compose deploys, k3s platform roles, runtime config, and local access files.
 - `deploy/compose/`: Jinja-rendered VM Compose templates. Do not run these raw.
 - `deploy/sql/`: retained PostgreSQL schema/runtime bootstrap SQL used by VM Compose and k3s CNPG deployments.
 - `deploy/postgres-runtime/`: PostgreSQL 16 image with `pg_cron` and `pgmq` support.

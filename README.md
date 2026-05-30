@@ -6,7 +6,7 @@ This repository contains the deployment infrastructure for Coin-Ops. Application
 
 | Path | Purpose |
 | --- | --- |
-| `terraform/` | Cloud resources, remote-state bootstrap, multicloud networking, Cloudflare, secret-manager seeding, generated operator metadata |
+| `terraform/` | Cloud resources, remote-state bootstrap, multicloud networking, Cloudflare, secret-manager seeding, generated local files |
 | `ansible/` | Host provisioning, VM Compose deploys, k3s platform/app deploys, runtime config materialization |
 | `deploy/compose/` | Jinja Docker Compose templates rendered by Ansible on VM targets |
 | `deploy/sql/` | Retained PostgreSQL history/runtime bootstrap SQL used by infra deploys |
@@ -92,7 +92,7 @@ Canonical non-secret configuration is split across `terraform/config/*.json`:
 - `dns.json`: Cloudflare zone/account and DNS defaults
 - `secrets.json`: secret manager object names
 
-Terraform generates local operator metadata such as `terraform/config/hosts.json`, `terraform/config/ssh_config`, and `terraform/config/ansible-runtime.json`. Ansible `runtime_config` is the only supported merge point for config, generated metadata, environment overrides, and secrets.
+Terraform writes local files such as `terraform/config/hosts.json`, `terraform/config/ssh_config`, and `terraform/config/ansible-runtime.json`. Ansible `runtime_config` merges config, generated data, environment overrides, and secrets.
 
 ## Generated Files and Secrets
 

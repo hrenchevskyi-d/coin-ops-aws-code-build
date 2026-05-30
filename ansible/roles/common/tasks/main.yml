@@ -171,7 +171,7 @@
       register: timezone_check
       changed_when: false
 
-    - name: Assert golden-image timezone contract
+    - name: Assert golden-image timezone
       assert:
         that:
           - timezone_check.stdout == 'UTC'

@@ -1,5 +1,5 @@
 services:
-  # UI image is frozen in GHCR; nginx config is rendered by the ui role.
+  # UI image is pulled from GHCR; nginx config is rendered by the ui role.
   ui:
     image: "{{ ui_image }}"
     restart: unless-stopped

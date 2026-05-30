@@ -1,6 +1,6 @@
 ---
 # Headlamp is managed from localhost through the exported kubeconfig.
-- name: Validate Headlamp deployment contract
+- name: Validate Headlamp prerequisites
   hosts: localhost
   connection: local
   gather_facts: no
@@ -19,7 +19,7 @@
         fail_msg: >-
           Headlamp deployment requires at least one host in role_k3s_server.
 
-- name: Install Headlamp and prepare operator access artifacts from the local operator machine
+- name: Install Headlamp and write local access files
   hosts: localhost
   connection: local
   become: false

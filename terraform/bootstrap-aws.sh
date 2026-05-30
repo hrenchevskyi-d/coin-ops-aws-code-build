@@ -30,7 +30,7 @@ fi
 
 # Bootstrap script to set up AWS environment for Terraform.
 # This prepares AWS as a possible full control-plane by creating state storage,
-# native S3 lockfile support, IAM credentials, and local operator credentials.
+# native S3 lockfile support, IAM credentials, and local AWS env files.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"

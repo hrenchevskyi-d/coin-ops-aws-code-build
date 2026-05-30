@@ -11,7 +11,7 @@ make k3s-cluster
 make k3s-headlamp
 ```
 
-Terraform manages Cloudflare Tunnel, Access, and DNS inputs. Ansible installs the in-cluster workload and writes access notes under `ansible/artifacts/`.
+Terraform manages Cloudflare Tunnel, Access, and DNS inputs. Ansible installs the in-cluster workload and writes notes under `ansible/artifacts/`.
 
 ## Access
 

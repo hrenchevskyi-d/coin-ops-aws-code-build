@@ -1,3 +1,3 @@
 # k3s_postcheck
 
-Validates the `k3s` cluster state and renders admin kubeconfig and access artifacts.
+Validates the `k3s` cluster and writes local kubeconfig/access files.

@@ -1,6 +1,5 @@
 ---
-# Postcheck validates the control plane and writes operator artifacts. It runs on
-# the bootstrap node because that node always has the native kubeconfig.
+# Postcheck runs on the bootstrap node because it always has the native kubeconfig.
 - name: Read k3s node list
   kubernetes.core.k8s_info:
     kubeconfig: /etc/rancher/k3s/k3s.yaml
@@ -48,12 +47,12 @@
 
 # Prefer Terraform's API LB endpoint when present; direct ansible_host remains
 # the fallback for single-cloud labs without the internal load balancer.
-- name: Determine preferred Kubernetes API endpoint for operator artifacts
+- name: Choose Kubernetes API endpoint for local kubeconfigs
   set_fact:
     k3s_operator_api_endpoint: "{{ cloud_runtime_metadata.get('k3s_api_endpoint', '') | default(ansible_host, true) }}"
   tags: [k3s, k3s_postcheck]
 
-- name: Ensure local artifact directory exists
+- name: Ensure local output directory exists
   file:
     path: "{{ k3s_postcheck_local_artifact_dir }}"
     state: directory
@@ -62,7 +61,7 @@
   become: false
   tags: [k3s, k3s_postcheck, artifacts]
 
-- name: Write kubeconfig artifact for operator use
+- name: Write local kubeconfig
   template:
     dest: "{{ k3s_postcheck_local_artifact_dir }}/kubeconfig-gcp-k3s.yaml"
     src: kubeconfig-gcp-k3s.yaml.j2
@@ -72,7 +71,7 @@
   tags: [k3s, k3s_postcheck, artifacts]
 
 # Tunneled kubeconfig keeps TLS verification while using SSH for private APIs.
-- name: Write tunneled kubeconfig artifact for operator use
+- name: Write tunneled kubeconfig
   template:
     dest: "{{ k3s_postcheck_local_artifact_dir }}/kubeconfig-gcp-k3s-tunneled.yaml"
     src: kubeconfig-gcp-k3s-tunneled.yaml.j2
@@ -81,7 +80,7 @@
   become: false
   tags: [k3s, k3s_postcheck, artifacts]
 
-- name: Write Kubernetes API tunnel helper
+- name: Write Kubernetes API tunnel script
   template:
     dest: "{{ k3s_postcheck_local_artifact_dir }}/k8s-api-tunnel.sh"
     src: k8s-api-tunnel.sh.j2

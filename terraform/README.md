@@ -42,7 +42,7 @@ The repository still keeps the multicloud design and related configuration, but
 its current active access path no longer uses the old Tailscale subnet-router
 gateway.
 
-Current contract:
+Current layout:
 - `jump-host`: public bastion for operator SSH access into private nodes
 - private workload nodes: reached through `ProxyJump` via `jump-host`
 - cloud-native NAT: outbound internet access for private subnets without public

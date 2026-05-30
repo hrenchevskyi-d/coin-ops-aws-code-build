@@ -1,3 +1,3 @@
 # compose_stack
 
-Reusable helper role for Compose-based services. It handles project directory creation, compose rendering, validation, pull, up, health checks, and image pruning through task-level entrypoints.
+Reusable role for Compose-based services: render, validate, pull, up, health check, and prune.

@@ -1,7 +1,7 @@
 ---
 galaxy_info:
   author: coin-ops
-  description: Deploys Headlamp, its RBAC, ingress, and local operator helper artifacts.
+  description: Deploys Headlamp, RBAC, ingress, and local access scripts.
   license: MIT
   min_ansible_version: "2.16"
 dependencies: []

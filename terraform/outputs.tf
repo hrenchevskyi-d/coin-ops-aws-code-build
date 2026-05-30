@@ -15,7 +15,7 @@ output "azure_instance_ips" {
 }
 
 output "hosts_file" {
-  description = "Path to the generated hosts.json artifact for operator/debugging use"
+  description = "Path to the generated hosts.json file for local debugging"
   value       = module.local_operator_artifacts.hosts_filename
 }
 

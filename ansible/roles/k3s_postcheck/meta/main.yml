@@ -1,7 +1,7 @@
 ---
 galaxy_info:
   author: coin-ops
-  description: Validate a k3s cluster and export operator artifacts.
+  description: Validate a k3s cluster and export local access files.
   license: MIT
   min_ansible_version: "2.16"
 dependencies: []

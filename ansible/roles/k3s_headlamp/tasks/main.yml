@@ -59,7 +59,7 @@
     ) >= 1
   tags: [headlamp, k3s]
 
-- name: k3s-headlamp-apply-operator-rbac
+- name: k3s-headlamp-apply-admin-rbac
   kubernetes.core.k8s:
     kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     state: present
@@ -101,7 +101,7 @@
   when: k3s_headlamp_ingress_enabled | bool
   tags: [headlamp, k3s]
 
-- name: k3s-headlamp-ensure-local-artifact-directory
+- name: k3s-headlamp-ensure-local-output-directory
   file:
     path: "{{ k3s_headlamp_local_artifact_dir }}"
     state: directory
@@ -110,9 +110,8 @@
   become: false
   tags: [headlamp, k3s, artifacts]
 
-# Bounded cleanup from the old SOCKS/PAC access model; keep until existing
-# operator workstations have refreshed artifacts at least once.
-- name: k3s-headlamp-remove-obsolete-pac-helper
+# Cleanup from the old SOCKS/PAC access model. Remove after workstations refresh.
+- name: k3s-headlamp-remove-obsolete-pac-file
   file:
     path: "{{ k3s_headlamp_local_artifact_dir }}/headlamp-socks-proxy.pac"
     state: absent
@@ -120,7 +119,7 @@
   become: false
   tags: [headlamp, k3s, artifacts]
 
-- name: k3s-headlamp-write-port-forward-helper
+- name: k3s-headlamp-write-port-forward-script
   template:
     src: headlamp-port-forward.sh.j2
     dest: "{{ k3s_headlamp_local_artifact_dir }}/headlamp-port-forward.sh"
@@ -129,7 +128,7 @@
   become: false
   tags: [headlamp, k3s, artifacts]
 
-- name: k3s-headlamp-write-start-helper
+- name: k3s-headlamp-write-start-script
   template:
     src: headlamp-start.sh.j2
     dest: "{{ k3s_headlamp_local_artifact_dir }}/headlamp-start.sh"

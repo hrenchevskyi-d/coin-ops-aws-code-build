@@ -1,6 +1,6 @@
 ---
 # Optional k3s dashboard. Kept separate from the Coin-Ops app deploy.
-- name: Validate Homepage deployment contract
+- name: Validate Homepage prerequisites
   hosts: localhost
   connection: local
   gather_facts: false
@@ -19,7 +19,7 @@
         fail_msg: >-
           Homepage deployment requires at least one host in role_k3s_server.
 
-- name: Install Homepage and public ingress routing from the local operator machine
+- name: Install Homepage and public ingress routing
   hosts: localhost
   connection: local
   become: false

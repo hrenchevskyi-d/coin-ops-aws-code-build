@@ -3,5 +3,5 @@ API endpoint: https://{{ ansible_host }}:6443
 HA API endpoint: https://{{ k3s_operator_api_endpoint }}:6443
 Kubeconfig: {{ k3s_postcheck_local_artifact_dir }}/kubeconfig-gcp-k3s.yaml
 Tunneled kubeconfig: {{ k3s_postcheck_local_artifact_dir }}/kubeconfig-gcp-k3s-tunneled.yaml
-API tunnel helper: {{ k3s_postcheck_local_artifact_dir }}/k8s-api-tunnel.sh
+API tunnel script: {{ k3s_postcheck_local_artifact_dir }}/k8s-api-tunnel.sh
 Access model: connect to private nodes through the configured jump-host SSH path.

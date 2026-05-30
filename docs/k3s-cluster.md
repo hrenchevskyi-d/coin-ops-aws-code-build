@@ -13,7 +13,7 @@ make k3s-homepage
 make k3s-coinops
 ```
 
-`k3s-cluster.yml` prepares the three server nodes, bootstraps the first server, joins the rest, configures packaged Traefik, and exports local operator artifacts.
+`k3s-cluster.yml` prepares the three server nodes, bootstraps the first server, joins the rest, configures packaged Traefik, and writes local access files.
 
 ## Operator Artifacts
 

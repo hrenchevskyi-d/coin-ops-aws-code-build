@@ -66,8 +66,7 @@
   when: k3s_coinops_ui_enabled | bool
   tags: [coinops, k3s, ui]
 
-# Ingress is applied after the Service exists so certificate readiness checks
-# can bind to the same endpoint used by operators.
+# Apply Ingress after Service so certificate checks use the final endpoint.
 - name: k3s-coinops-ui-configure-ingress-and-certificate
   include_role:
     name: k3s_ingress_endpoint

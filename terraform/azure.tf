@@ -1,4 +1,4 @@
-# Azure mirrors the cloud module contract; Key Vault is looked up before secret reads.
+# Azure follows the shared cloud module layout; Key Vault is looked up before secret reads.
 # Gate Key Vault reads so bootstrap and local plans can run before seeding.
 data "azurerm_key_vault" "shared" {
   count               = local.read_azure_secret_backend ? 1 : 0

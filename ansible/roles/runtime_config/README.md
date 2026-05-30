@@ -6,4 +6,4 @@ Builds the effective runtime configuration for playbooks and roles from:
 - Terraform runtime metadata
 - secret backend payloads
 
-This role is the single source of truth for derived Ansible runtime variables.
+This role resolves the Ansible runtime variables used by the playbooks.

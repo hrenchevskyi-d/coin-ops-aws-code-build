@@ -1,6 +1,6 @@
 ---
-# Helm is installed on the operator/controller context used by these roles. The
-# script is idempotent through creates=/usr/local/bin/helm.
+# Helm is installed on the controller used by these roles.
+# creates=/usr/local/bin/helm keeps the install idempotent.
 - name: Download Helm installation script
   get_url:
     url: "{{ k3s_helm_client_install_script_url }}"

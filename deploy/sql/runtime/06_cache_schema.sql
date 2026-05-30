@@ -7,7 +7,7 @@
 --                       need a shared, crash-truncated cache. NOT a drop-in
 --                       replacement for the proxy's whales/prices caches:
 --                       those live in sync.RWMutex-guarded memory in
---                       the frozen proxy image today, and moving them into Postgres
+--                       the current proxy image today, and moving them into Postgres
 --                       is out of scope for #18.
 --   • runtime.session — replaces the proxy's only current Redis use, the
 --                       `session:{sid}` KV written by /state (see

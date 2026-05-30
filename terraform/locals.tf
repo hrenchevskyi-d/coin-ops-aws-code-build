@@ -1,5 +1,5 @@
 locals {
-  # Split JSON keeps operator policy reviewable without touching Terraform logic.
+  # Split JSON keeps deployment settings reviewable without touching Terraform logic.
   # Later files win on duplicate keys, so keep shared defaults in earlier files
   # and environment-specific deploy decisions in deploy.json/instances.json.
   cfg = merge(
@@ -191,8 +191,7 @@ locals {
     && try(local.gcp_k3s_api_lb_cfg.enabled, false)
     && length(local.gcp_k3s_server_names) > 0
   )
-  # The internal API LB is optional; when disabled, Ansible falls back to a
-  # direct server endpoint and writes a tunnel helper for local operations.
+  # Without the internal API LB, Ansible uses a direct server endpoint and SSH tunnel.
   gcp_k3s_api_lb_backends = local.gcp_k3s_api_lb_enabled ? {
     for name in local.gcp_k3s_server_names : name => local.gcp_host_details[name]
   } : {}

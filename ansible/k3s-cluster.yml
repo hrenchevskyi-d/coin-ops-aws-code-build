@@ -1,6 +1,6 @@
 ---
 # Three-server k3s control plane. Use a separate lab config for single-node tests.
-- name: Validate k3s cluster contract
+- name: Validate k3s cluster prerequisites
   hosts: localhost
   connection: local
   gather_facts: no
@@ -86,7 +86,7 @@
   roles:
     - k3s_traefik
 
-# Postcheck also writes local kubeconfig artifacts used by later localhost roles.
+# Postcheck writes kubeconfigs used by later localhost roles.
 - name: Validate the finished cluster and export kubeconfig
   hosts: "{{ groups.get('role_k3s_server', ['localhost']) | sort | first }}"
   become: yes

@@ -15,15 +15,15 @@ Ingress load balancer IP: `{{ headlamp_access_ip }}`
 Cloudflare Tunnel is configured in code but not yet active in runtime metadata. Until Terraform has created the tunnel token and DNS, use the port-forward fallback below.
 {% endif %}
 
-Kubeconfig helper:
+Kubeconfig:
 
 `{{ k3s_headlamp_local_artifact_dir }}/kubeconfig-gcp-k3s-tunneled.yaml`
 
-Port-forward helper:
+Port-forward script:
 
 `{{ k3s_headlamp_local_artifact_dir }}/headlamp-port-forward.sh`
 
-Combined fallback helper:
+Fallback script:
 
 `{{ k3s_headlamp_local_artifact_dir }}/headlamp-start.sh`
 

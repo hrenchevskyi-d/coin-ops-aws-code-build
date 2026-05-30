@@ -1,11 +1,10 @@
 ---
-# Resolve kubeconfig once per role run. Localhost prefers generated artifacts;
-# remote hosts prefer /etc/rancher/k3s/k3s.yaml with a rendered fallback.
-- name: Decide whether kubeconfig access runs in local operator mode
+# Resolve kubeconfig once. Localhost uses the exported file; remote hosts use /etc/rancher/k3s/k3s.yaml.
+- name: Decide whether to use the local kubeconfig
   set_fact:
     k3s_kubeconfig_access_use_local_artifact: "{{ inventory_hostname in k3s_kubeconfig_access_controller_hosts }}"
 
-- name: Check for operator kubeconfig artifact on controller
+- name: Check for local kubeconfig on controller
   delegate_to: localhost
   become: false
   stat:
@@ -13,17 +12,17 @@
   register: k3s_local_cluster_kubeconfig_stat
   when: k3s_kubeconfig_access_use_local_artifact
 
-- name: Fail when local operator kubeconfig artifact is missing
+- name: Fail when local kubeconfig is missing
   fail:
     msg: >-
-      Local Kubernetes operator mode requires the generated kubeconfig artifact
+      Local Kubernetes access requires the generated kubeconfig
       at {{ k3s_kubeconfig_access_local_cluster_kubeconfig_path }}.
-      Re-run ansible/k3s-cluster.yml to regenerate the operator artifacts.
+      Re-run ansible/k3s-cluster.yml to regenerate local access files.
   when:
     - k3s_kubeconfig_access_use_local_artifact
     - not (k3s_local_cluster_kubeconfig_stat.stat.exists | default(false))
 
-- name: Set effective kubeconfig path for local operator mode
+- name: Set effective kubeconfig path for local mode
   set_fact:
     k3s_effective_kubeconfig_path: "{{ k3s_kubeconfig_access_local_cluster_kubeconfig_path }}"
   when:
@@ -36,7 +35,7 @@
   register: k3s_remote_kubeconfig_stat
   when: not k3s_kubeconfig_access_use_local_artifact
 
-- name: Check for operator kubeconfig artifact on controller for remote fallback
+- name: Check for local kubeconfig on controller for remote fallback
   delegate_to: localhost
   become: false
   stat:
@@ -46,7 +45,7 @@
     - not k3s_kubeconfig_access_use_local_artifact
     - not k3s_remote_kubeconfig_stat.stat.exists
 
-- name: Read operator kubeconfig artifact from controller
+- name: Read local kubeconfig from controller
   delegate_to: localhost
   become: false
   slurp:
@@ -57,7 +56,6 @@
     - not k3s_remote_kubeconfig_stat.stat.exists
     - k3s_remote_fallback_local_cluster_kubeconfig_stat.stat.exists | default(false)
 
-# Remote fallback rewrites the local artifact to the target host's API address.
 # Fallback for delegated k8s tasks when /etc/rancher/k3s is unavailable.
 - name: Render remote fallback kubeconfig
   template:
