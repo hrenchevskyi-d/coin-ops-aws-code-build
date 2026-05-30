@@ -57,6 +57,44 @@ enabled_clouds_set = set(enabled_clouds)
 if not enabled_clouds:
     raise SystemExit("At least one enabled cloud is required.")
 
+def remove_hcl_block(content, start):
+    line_start = content.rfind("\n", 0, start) + 1
+    open_brace = content.find("{", start)
+    if open_brace == -1:
+        return content
+    depth = 0
+    in_string = False
+    escape = False
+    for pos in range(open_brace, len(content)):
+        char = content[pos]
+        if in_string:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                line_end = content.find("\n", pos)
+                line_end = len(content) if line_end == -1 else line_end + 1
+                return content[:line_start] + content[line_end:]
+    return content
+
+def remove_required_provider(content, provider_name):
+    match = re.search(rf"(?m)^\s*{re.escape(provider_name)}\s*=\s*\{{", content)
+    return remove_hcl_block(content, match.start()) if match else content
+
+def remove_provider_block(content, provider_name):
+    match = re.search(rf'(?m)^provider\s+"{re.escape(provider_name)}"\s*\{{', content)
+    return remove_hcl_block(content, match.start()) if match else content
+
 clouds_path = terraform_dir / "config" / "clouds.json"
 clouds_data = json.loads(clouds_path.read_text(encoding="utf-8"))
 clouds_data.setdefault("clouds", {})["enabled"] = enabled_clouds
@@ -85,38 +123,6 @@ for name in ("gcp", "aws", "azure"):
         locals_content,
     )
 locals_path.write_text(locals_content, encoding="utf-8")
-
-gcp_path = terraform_dir / "gcp.tf"
-gcp_content = gcp_path.read_text(encoding="utf-8")
-gcp_content = gcp_content.replace(
-    "next_hop_ip      = module.gcp_instances[0].instance_ips[local.gcp_route_host_name].private_ip",
-    'next_hop_ip      = try(module.gcp_instances[0].instance_ips[local.gcp_route_host_name].private_ip, "")',
-)
-gcp_path.write_text(gcp_content, encoding="utf-8")
-
-aws_path = terraform_dir / "aws.tf"
-aws_content = aws_path.read_text(encoding="utf-8")
-aws_content = aws_content.replace(
-    "nat_network_interface_id = module.aws_instances[0].instance_primary_network_interface_ids[local.aws_route_host_name]",
-    'nat_network_interface_id = try(module.aws_instances[0].instance_primary_network_interface_ids[local.aws_route_host_name], "")',
-)
-aws_content = aws_content.replace(
-    'backend_security_group_id = module.aws_security_groups[0].sg_ids["app-backend"]',
-    'backend_security_group_id = try(module.aws_security_groups[0].sg_ids["app-backend"], "")',
-)
-aws_path.write_text(aws_content, encoding="utf-8")
-
-aws_network_outputs_path = terraform_dir / "modules" / "cloud" / "aws" / "network" / "outputs.tf"
-aws_network_outputs = aws_network_outputs_path.read_text(encoding="utf-8")
-aws_network_outputs = aws_network_outputs.replace(
-    "value       = { for name in keys(local.private_subnets) : name => aws_subnet.subnet[name].id }",
-    "value       = { for name, subnet in aws_subnet.subnet : name => subnet.id if contains(keys(local.private_subnets), name) }",
-)
-aws_network_outputs = aws_network_outputs.replace(
-    "value       = [for name in keys(local.private_subnets) : aws_subnet.subnet[name].id]",
-    "value       = [for name, subnet in aws_subnet.subnet : subnet.id if contains(keys(local.private_subnets), name)]",
-)
-aws_network_outputs_path.write_text(aws_network_outputs, encoding="utf-8")
 
 if "azure" not in enabled_clouds_set:
     shutil.rmtree(terraform_dir / "modules" / "cloud" / "azure", ignore_errors=True)
@@ -161,26 +167,8 @@ module "azure_secrets" {
 
     providers_path = terraform_dir / "providers.tf"
     providers = providers_path.read_text(encoding="utf-8")
-    providers = providers.replace(
-        """    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 4.0"
-    }
-""",
-        "",
-    )
-    providers = re.sub(
-        r"\n\s*azurerm\s*=\s*\{\s*\n\s*source\s*=\s*\"hashicorp/azurerm\"\s*\n\s*version\s*=\s*\"[^\"]+\"\s*\n\s*\}",
-        "",
-        providers,
-        flags=re.MULTILINE,
-    )
-    providers = re.sub(
-        r"\nprovider\s+\"azurerm\"\s*\{\s*(?:features\s*\{\s*\}\s*)?(?:[^\n]*\n)*?\}\s*\n",
-        "\n",
-        providers,
-        flags=re.MULTILINE,
-    )
+    providers = remove_required_provider(providers, "azurerm")
+    providers = remove_provider_block(providers, "azurerm")
     providers_path.write_text(providers, encoding="utf-8")
 
     azurerm_refs = [

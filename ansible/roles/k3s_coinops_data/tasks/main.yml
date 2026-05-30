@@ -17,6 +17,7 @@
     kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     state: present
     definition: "{{ lookup('template', 'cnpg-operator-config.yaml.j2') | from_yaml_all | list }}"
+  no_log: true
   when: k3s_coinops_data_enabled | bool
   tags: [coinops, k3s, cnpg, data]
 
@@ -66,6 +67,7 @@
     kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     state: present
     definition: "{{ lookup('template', 'coinops-postgres-resources.yaml.j2') | from_yaml_all | list }}"
+  no_log: true
   when: k3s_coinops_data_enabled | bool
   tags: [coinops, k3s, data]
 

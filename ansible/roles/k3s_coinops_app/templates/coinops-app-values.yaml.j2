@@ -1,13 +1,8 @@
-# Ansible renders secrets and generated endpoints into Helm values.
+# Ansible creates Secrets before Helm runs; values keep only references.
 runtimeBackend: {{ k3s_coinops_app_runtime_backend | to_json }}
 imagePullSecretName: {{ k3s_coinops_app_registry_pull_secret_name | to_json }}
-imagePullSecretDockerConfigJson: {{ {'auths': {image_registry_host: {'username': registry_username, 'password': registry_token, 'auth': ((registry_username ~ ':' ~ registry_token) | b64encode)}}} | to_json | b64encode | to_json }}
 secret:
   name: {{ k3s_coinops_app_database_secret_name | to_json }}
-  databaseUrl: {{ k3s_coinops_app_database_url | to_json }}
-  # RabbitMQ/Redis URLs stay populated for external rollback mode only.
-  rabbitmqUrl: {{ k3s_coinops_app_rabbitmq_url | to_json }}
-  redisUrl: {{ k3s_coinops_app_redis_url | to_json }}
 proxy:
   namespace: {{ k3s_coinops_app_proxy_namespace | to_json }}
   name: {{ k3s_coinops_app_proxy_name | to_json }}

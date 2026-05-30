@@ -57,16 +57,15 @@ output "database_endpoints" {
 }
 
 output "public_endpoints" {
-  description = "Cloud-specific public UI endpoints. DNS is created only for dns.primary_cloud; non-primary clouds are tested by direct public IP."
-  value = {
-    for cloud, ip in local.ui_public_ips : cloud => {
-      public_ip  = ip
-      direct_url = format("https://%s", ip)
-      dns_name   = cloud == local.dns_primary_cloud ? local.app_domain : null
-      dns_url    = cloud == local.dns_primary_cloud ? format("https://%s", local.app_domain) : null
+  description = "Public application endpoints for the k3s ingress path."
+  value = local.gcp_k3s_public_ingress_lb_enabled ? {
+    gcp = {
+      public_ip  = local.coinops_public_ip
+      direct_url = format("https://%s", local.coinops_public_ip)
+      dns_name   = local.coinops_domain
+      dns_url    = format("https://%s", local.coinops_domain)
     }
-    if lookup(local.cloud_has_ui, cloud, false)
-  }
+  } : {}
 }
 
 output "control_plane_cloud" {

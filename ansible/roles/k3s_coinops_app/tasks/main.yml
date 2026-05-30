@@ -6,6 +6,13 @@
   when: k3s_coinops_app_enabled | bool
   tags: [coinops, k3s, app, helm]
 
+- name: k3s-coinops-app-clear-staged-helm-chart
+  file:
+    path: "{{ k3s_coinops_app_chart_staging_dir }}"
+    state: absent
+  when: k3s_coinops_app_enabled | bool
+  tags: [coinops, k3s, app, helm]
+
 - name: k3s-coinops-app-stage-helm-chart
   copy:
     src: "{{ k3s_coinops_app_chart_source_dir }}/"
@@ -17,7 +24,7 @@
   template:
     src: coinops-app-values.yaml.j2
     dest: "{{ k3s_coinops_app_chart_values_path }}"
-    mode: "0644"
+    mode: "0600"
   when: k3s_coinops_app_enabled | bool
   tags: [coinops, k3s, app, helm]
 
@@ -39,6 +46,15 @@
   when: k3s_coinops_app_enabled | bool
   tags: [coinops, k3s, app]
 
+- name: k3s-coinops-app-apply-runtime-secrets
+  kubernetes.core.k8s:
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
+    state: present
+    definition: "{{ lookup('template', 'coinops-app-secrets.yaml.j2') | from_yaml_all | list }}"
+  no_log: true
+  when: k3s_coinops_app_enabled | bool
+  tags: [coinops, k3s, app, secrets]
+
 - name: k3s-coinops-app-install-or-upgrade-release
   kubernetes.core.helm:
     name: "{{ k3s_coinops_app_release_name }}"
@@ -46,11 +62,20 @@
     release_namespace: "{{ k3s_coinops_app_namespace }}"
     create_namespace: true
     kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
-    wait: true
+    wait: false
     values_files:
       - "{{ k3s_coinops_app_chart_values_path }}"
   when: k3s_coinops_app_enabled | bool
   tags: [coinops, k3s, app, helm]
+
+- name: k3s-coinops-app-reapply-runtime-secrets-after-helm-upgrade
+  kubernetes.core.k8s:
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
+    state: present
+    definition: "{{ lookup('template', 'coinops-app-secrets.yaml.j2') | from_yaml_all | list }}"
+  no_log: true
+  when: k3s_coinops_app_enabled | bool
+  tags: [coinops, k3s, app, secrets]
 
 - name: k3s-coinops-app-read-proxy-deployment-status
   kubernetes.core.k8s_info:

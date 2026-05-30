@@ -86,6 +86,44 @@ target_cloud = sys.argv[2]
 clouds = json.loads((terraform_dir / "config" / "clouds.json").read_text(encoding="utf-8")).get("clouds", {})
 enabled_clouds = set(clouds.get("enabled", []))
 
+def remove_hcl_block(content, start):
+    line_start = content.rfind("\n", 0, start) + 1
+    open_brace = content.find("{", start)
+    if open_brace == -1:
+        return content
+    depth = 0
+    in_string = False
+    escape = False
+    for pos in range(open_brace, len(content)):
+        char = content[pos]
+        if in_string:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                line_end = content.find("\n", pos)
+                line_end = len(content) if line_end == -1 else line_end + 1
+                return content[:line_start] + content[line_end:]
+    return content
+
+def remove_required_provider(content, provider_name):
+    match = re.search(rf"(?m)^\s*{re.escape(provider_name)}\s*=\s*\{{", content)
+    return remove_hcl_block(content, match.start()) if match else content
+
+def remove_provider_block(content, provider_name):
+    match = re.search(rf'(?m)^provider\s+"{re.escape(provider_name)}"\s*\{{', content)
+    return remove_hcl_block(content, match.start()) if match else content
+
 locals_path = terraform_dir / "locals.tf"
 locals_content = locals_path.read_text(encoding="utf-8")
 for name in ("gcp", "aws", "azure"):
@@ -149,26 +187,8 @@ module "azure_secrets" {
 
     providers_path = terraform_dir / "providers.tf"
     providers = providers_path.read_text(encoding="utf-8")
-    providers = providers.replace(
-        """    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 4.0"
-    }
-""",
-        "",
-    )
-    providers = re.sub(
-        r"\n\s*azurerm\s*=\s*\{\s*\n\s*source\s*=\s*\"hashicorp/azurerm\"\s*\n\s*version\s*=\s*\"[^\"]+\"\s*\n\s*\}",
-        "",
-        providers,
-        flags=re.MULTILINE,
-    )
-    providers = re.sub(
-        r"\nprovider\s+\"azurerm\"\s*\{\s*(?:features\s*\{\s*\}\s*)?(?:[^\n]*\n)*?\}\s*\n",
-        "\n",
-        providers,
-        flags=re.MULTILINE,
-    )
+    providers = remove_required_provider(providers, "azurerm")
+    providers = remove_provider_block(providers, "azurerm")
     providers_path.write_text(providers, encoding="utf-8")
 
     azurerm_refs = [

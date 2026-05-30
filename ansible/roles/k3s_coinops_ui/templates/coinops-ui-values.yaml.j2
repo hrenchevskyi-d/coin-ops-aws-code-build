@@ -2,7 +2,6 @@ ui:
   name: {{ k3s_coinops_ui_app_name | to_json }}
   serviceAccountName: "coinops-ui"
   imagePullSecretName: {{ k3s_coinops_ui_registry_pull_secret_name | to_json }}
-  imagePullSecretDockerConfigJson: {{ {'auths': {image_registry_host: {'username': registry_username, 'password': registry_token, 'auth': ((registry_username ~ ':' ~ registry_token) | b64encode)}}} | to_json | b64encode | to_json }}
   image: {{ k3s_coinops_ui_image | to_json }}
   servicePort: {{ k3s_coinops_ui_service_port }}
   proxyServiceName: {{ k3s_coinops_ui_proxy_service_name | to_json }}

@@ -1,11 +1,7 @@
 runtimeBackend: postgres
 imagePullSecretName: ghcr-pull-secret
-imagePullSecretDockerConfigJson: ""
 secret:
   name: coinops-app-secrets
-  databaseUrl: ""
-  rabbitmqUrl: ""
-  redisUrl: ""
 proxy:
   name: coinops-proxy
   serviceAccountName: coinops-proxy
