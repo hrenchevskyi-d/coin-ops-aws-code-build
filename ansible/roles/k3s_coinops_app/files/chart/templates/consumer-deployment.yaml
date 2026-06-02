@@ -18,6 +18,8 @@ spec:
 {{ include "coinops-app.labels" . | indent 8 }}
         app.kubernetes.io/name: {{ .Values.consumer.name }}
     spec:
+      securityContext:
+{{ toYaml .Values.consumer.podSecurityContext | indent 8 }}
       serviceAccountName: {{ .Values.consumer.serviceAccountName }}
       imagePullSecrets:
         - name: {{ .Values.imagePullSecretName }}
@@ -41,6 +43,12 @@ spec:
                   key: RABBITMQ_URL
             {{- end }}
           securityContext:
-            allowPrivilegeEscalation: false
+{{ toYaml .Values.consumer.securityContext | indent 12 }}
           resources:
 {{ toYaml .Values.consumer.resources | indent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

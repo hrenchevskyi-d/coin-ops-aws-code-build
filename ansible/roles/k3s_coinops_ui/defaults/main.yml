@@ -29,3 +29,24 @@ k3s_coinops_ui_resources:
   limits:
     cpu: 100m
     memory: 64Mi
+
+
+k3s_coinops_ui_namespace_labels:
+  pod-security.kubernetes.io/audit: restricted
+  pod-security.kubernetes.io/audit-version: latest
+  pod-security.kubernetes.io/warn: restricted
+  pod-security.kubernetes.io/warn-version: latest
+k3s_coinops_ui_pod_security_enforce: false
+k3s_coinops_ui_pod_security_enforce_version: latest
+k3s_coinops_ui_container_port: 8080
+k3s_coinops_ui_run_as_user: 101
+k3s_coinops_ui_run_as_group: 101
+k3s_coinops_ui_autoscaling_enabled: true
+k3s_coinops_ui_autoscaling_min_replicas: 1
+k3s_coinops_ui_autoscaling_max_replicas: 3
+k3s_coinops_ui_autoscaling_target_cpu_utilization: 70
+k3s_coinops_ui_pdb_enabled: true
+k3s_coinops_ui_pdb_min_available: 1
+
+k3s_coinops_ui_wait_retries: 6
+k3s_coinops_ui_wait_delay: 5

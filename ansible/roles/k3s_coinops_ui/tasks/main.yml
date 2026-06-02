@@ -49,6 +49,7 @@
       kind: Namespace
       metadata:
         name: "{{ k3s_coinops_ui_namespace }}"
+        labels: "{{ k3s_coinops_ui_namespace_labels | combine((k3s_coinops_ui_pod_security_enforce | bool) | ternary({\"pod-security.kubernetes.io/enforce\": \"restricted\", \"pod-security.kubernetes.io/enforce-version\": k3s_coinops_ui_pod_security_enforce_version}, {})) }}"
   when: k3s_coinops_ui_enabled | bool
   tags: [coinops, k3s, ui]
 
@@ -69,6 +70,7 @@
     create_namespace: true
     kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     wait: false
+    force: true
     values_files:
       - "{{ k3s_coinops_ui_chart_values_path }}"
   when: k3s_coinops_ui_enabled | bool
@@ -91,8 +93,8 @@
     namespace: "{{ k3s_coinops_ui_namespace }}"
     name: "{{ k3s_coinops_ui_app_name }}"
   register: k3s_coinops_ui_deployment_info
-  retries: 30
-  delay: 10
+  retries: "{{ k3s_coinops_ui_wait_retries }}"
+  delay: "{{ k3s_coinops_ui_wait_delay }}"
   until: >-
     (
       k3s_coinops_ui_deployment_info.resources | default([]) | length

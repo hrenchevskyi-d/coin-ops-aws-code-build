@@ -49,6 +49,121 @@
   when: k3s_coinops_data_enabled | bool
   tags: [coinops, k3s, cnpg, data]
 
+- name: k3s-coinops-data-install-cert-manager-for-backup-plugin
+  include_role:
+    name: k3s_cert_manager
+  when:
+    - k3s_coinops_data_enabled | bool
+    - k3s_coinops_data_backup_enabled | bool
+  tags: [coinops, k3s, cnpg, data, backup, cert_manager]
+
+- name: k3s-coinops-data-read-cnpg-operator-deployments
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
+    api_version: apps/v1
+    kind: Deployment
+    namespace: "{{ k3s_coinops_data_cnpg_namespace }}"
+  register: k3s_coinops_data_cnpg_operator_deployments
+  retries: "{{ k3s_coinops_data_wait_retries }}"
+  delay: "{{ k3s_coinops_data_wait_delay }}"
+  until: (k3s_coinops_data_cnpg_operator_deployments.resources | default([]) | length) > 0
+  when:
+    - k3s_coinops_data_enabled | bool
+    - k3s_coinops_data_backup_enabled | bool
+  tags: [coinops, k3s, cnpg, data, backup]
+
+- name: k3s-coinops-data-resolve-cnpg-operator-images
+  set_fact:
+    k3s_coinops_data_cnpg_operator_images: >-
+      {{
+        k3s_coinops_data_cnpg_operator_deployments.resources
+        | default([])
+        | map(attribute="spec.template.spec.containers")
+        | flatten
+        | map(attribute="image")
+        | list
+      }}
+  when:
+    - k3s_coinops_data_enabled | bool
+    - k3s_coinops_data_backup_enabled | bool
+  tags: [coinops, k3s, cnpg, data, backup]
+
+- name: k3s-coinops-data-assert-cnpg-plugin-compatible-version
+  assert:
+    that:
+      - >-
+        (
+          k3s_coinops_data_cnpg_operator_images
+          | select("regex", ":(1\.(2[6-9]|[3-9][0-9])|[2-9][0-9]*\.)")
+          | list
+          | length
+        ) > 0
+    fail_msg: >-
+      CNPG Barman Cloud Plugin backups require CloudNativePG 1.26 or newer.
+      Upgrade the CNPG chart before enabling k3s_coinops_data_backup_enabled.
+      Found operator images: {{ k3s_coinops_data_cnpg_operator_images | default([]) }}.
+  when:
+    - k3s_coinops_data_enabled | bool
+    - k3s_coinops_data_backup_enabled | bool
+  tags: [coinops, k3s, cnpg, data, backup]
+
+- name: k3s-coinops-data-apply-barman-cloud-plugin
+  kubernetes.core.k8s:
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
+    state: present
+    definition: "{{ lookup('url', k3s_coinops_data_barman_plugin_manifest_url, split_lines=False) | from_yaml_all | list }}"
+    namespace: "{{ k3s_coinops_data_cnpg_namespace }}"
+  when:
+    - k3s_coinops_data_enabled | bool
+    - k3s_coinops_data_backup_enabled | bool
+  tags: [coinops, k3s, cnpg, data, backup]
+
+- name: k3s-coinops-data-wait-for-barman-cloud-plugin
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
+    api_version: apps/v1
+    kind: Deployment
+    namespace: "{{ k3s_coinops_data_cnpg_namespace }}"
+    name: "{{ k3s_coinops_data_barman_plugin_deployment_name }}"
+  register: k3s_coinops_data_barman_plugin_deployment
+  retries: "{{ k3s_coinops_data_wait_retries }}"
+  delay: "{{ k3s_coinops_data_wait_delay }}"
+  until: >-
+    (k3s_coinops_data_barman_plugin_deployment.resources | default([]) | length) > 0 and
+    (k3s_coinops_data_barman_plugin_deployment.resources[0].status.availableReplicas | default(0) | int) >= 1
+  when:
+    - k3s_coinops_data_enabled | bool
+    - k3s_coinops_data_backup_enabled | bool
+  tags: [coinops, k3s, cnpg, data, backup]
+
+- name: k3s-coinops-data-assert-backup-destination-metadata
+  assert:
+    that:
+      - k3s_coinops_data_backup_destination_path | length > 0
+    fail_msg: >-
+      CNPG backup is enabled, but Terraform runtime metadata does not include
+      cnpg_backup.destination_path. Run Terraform apply, then confirm
+      terraform/config/ansible-runtime.json contains .gcp.cnpg_backup.destination_path.
+  when:
+    - k3s_coinops_data_enabled | bool
+    - k3s_coinops_data_backup_enabled | bool
+  tags: [coinops, k3s, cnpg, data, backup]
+
+- name: k3s-coinops-data-assert-backup-gcs-credentials
+  assert:
+    that:
+      - cnpg_backup_gcs_credentials | length > 0
+    fail_msg: >-
+      CNPG backup is enabled, but CNPG_BACKUP_GCS_CREDENTIALS is missing from
+      the resolved app secret payload. Re-run Terraform apply with the GCP backup
+      resources enabled so a fresh coinops-app-secrets version is written, then
+      confirm Secret Manager has an enabled latest version for coinops-app-secrets.
+  no_log: "{{ not (lookup('env', 'DEBUG_SECRET_LOOKUP') | default('false', true) | bool) }}"
+  when:
+    - k3s_coinops_data_enabled | bool
+    - k3s_coinops_data_backup_enabled | bool
+  tags: [coinops, k3s, cnpg, data, backup]
+
 - name: k3s-coinops-data-ensure-namespace
   kubernetes.core.k8s:
     kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
@@ -58,16 +173,37 @@
       kind: Namespace
       metadata:
         name: "{{ k3s_coinops_data_namespace }}"
+        labels: "{{ k3s_coinops_data_namespace_labels | combine((k3s_coinops_data_pod_security_enforce | bool) | ternary({\"pod-security.kubernetes.io/enforce\": \"restricted\", \"pod-security.kubernetes.io/enforce-version\": k3s_coinops_data_pod_security_enforce_version}, {})) }}"
   when: k3s_coinops_data_enabled | bool
   tags: [coinops, k3s, data]
 
-# Apply credentials, SQL ConfigMap, and CNPG Cluster in the same step.
+# Apply Secrets separately so Kubernetes errors for non-secret resources are visible.
+- name: k3s-coinops-data-apply-cluster-secrets
+  kubernetes.core.k8s:
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
+    state: present
+    definition: >-
+      {{
+        lookup('template', 'coinops-postgres-resources.yaml.j2')
+        | from_yaml_all
+        | selectattr('kind', 'equalto', 'Secret')
+        | list
+      }}
+  no_log: true
+  when: k3s_coinops_data_enabled | bool
+  tags: [coinops, k3s, data, secrets]
+
 - name: k3s-coinops-data-apply-cluster-resources
   kubernetes.core.k8s:
     kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     state: present
-    definition: "{{ lookup('template', 'coinops-postgres-resources.yaml.j2') | from_yaml_all | list }}"
-  no_log: true
+    definition: >-
+      {{
+        lookup('template', 'coinops-postgres-resources.yaml.j2')
+        | from_yaml_all
+        | rejectattr('kind', 'equalto', 'Secret')
+        | list
+      }}
   when: k3s_coinops_data_enabled | bool
   tags: [coinops, k3s, data]
 
@@ -79,8 +215,8 @@
     namespace: "{{ k3s_coinops_data_namespace }}"
     name: "{{ k3s_coinops_data_cluster_name }}-rw"
   register: k3s_coinops_data_rw_service
-  retries: 60
-  delay: 10
+  retries: "{{ k3s_coinops_data_wait_retries }}"
+  delay: "{{ k3s_coinops_data_wait_delay }}"
   until: (k3s_coinops_data_rw_service.resources | default([]) | length) > 0
   when: k3s_coinops_data_enabled | bool
   tags: [coinops, k3s, data]
@@ -115,8 +251,8 @@
     namespace: "{{ k3s_coinops_data_namespace }}"
     name: "{{ k3s_coinops_data_bootstrap_job_name }}"
   register: k3s_coinops_data_bootstrap_job
-  retries: 10
-  delay: 10
+  retries: "{{ k3s_coinops_data_wait_retries }}"
+  delay: "{{ k3s_coinops_data_wait_delay }}"
   until: >-
     (
       k3s_coinops_data_bootstrap_job.resources | default([]) | length

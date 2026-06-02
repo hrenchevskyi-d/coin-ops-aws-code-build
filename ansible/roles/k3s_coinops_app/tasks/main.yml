@@ -39,6 +39,7 @@
       kind: Namespace
       metadata:
         name: "{{ item }}"
+        labels: "{{ k3s_coinops_app_namespace_labels | combine((k3s_coinops_app_pod_security_enforce | bool) | ternary({\"pod-security.kubernetes.io/enforce\": \"restricted\", \"pod-security.kubernetes.io/enforce-version\": k3s_coinops_app_pod_security_enforce_version}, {})) }}"
   loop:
     - "{{ k3s_coinops_app_proxy_namespace }}"
     - "{{ k3s_coinops_app_history_api_namespace }}"
@@ -85,8 +86,8 @@
     namespace: "{{ k3s_coinops_app_proxy_namespace }}"
     name: "{{ k3s_coinops_app_proxy_name }}"
   register: k3s_coinops_app_proxy_deployment_info
-  retries: 30
-  delay: 10
+  retries: "{{ k3s_coinops_app_wait_retries }}"
+  delay: "{{ k3s_coinops_app_wait_delay }}"
   until: >-
     (
       k3s_coinops_app_proxy_deployment_info.resources | default([]) | length
@@ -105,8 +106,8 @@
     namespace: "{{ k3s_coinops_app_history_api_namespace }}"
     name: "{{ k3s_coinops_app_history_api_name }}"
   register: k3s_coinops_app_history_api_deployment_info
-  retries: 30
-  delay: 10
+  retries: "{{ k3s_coinops_app_wait_retries }}"
+  delay: "{{ k3s_coinops_app_wait_delay }}"
   until: >-
     (
       k3s_coinops_app_history_api_deployment_info.resources | default([]) | length
@@ -126,8 +127,8 @@
     namespace: "{{ k3s_coinops_app_consumer_namespace }}"
     name: "{{ k3s_coinops_app_consumer_name }}"
   register: k3s_coinops_app_consumer_deployment_info
-  retries: 30
-  delay: 10
+  retries: "{{ k3s_coinops_app_wait_retries }}"
+  delay: "{{ k3s_coinops_app_wait_delay }}"
   until: >-
     (
       k3s_coinops_app_consumer_deployment_info.resources | default([]) | length

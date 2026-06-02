@@ -44,3 +44,9 @@ variable "github_oauth_client_secret" {
   type      = string
   sensitive = true
 }
+
+variable "cnpg_backup_gcs_credentials" {
+  type      = string
+  sensitive = true
+  default   = ""
+}

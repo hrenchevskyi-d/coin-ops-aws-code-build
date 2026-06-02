@@ -1,0 +1,18 @@
+{{- range $component := list .Values.proxy .Values.historyApi .Values.consumer }}
+{{- if $component.podDisruptionBudget.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $component.name }}
+  namespace: {{ $component.namespace }}
+  labels:
+{{ include "coinops-app.labels" $ | indent 4 }}
+    app.kubernetes.io/name: {{ $component.name }}
+spec:
+  minAvailable: {{ $component.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $component.name }}
+{{- end }}
+{{- end }}

@@ -227,4 +227,5 @@
     registry_token: "{{ app_secrets.GHCR_TOKEN | default('', true) }}"
     cloudflare_api_token: "{{ app_secrets.CLOUDFLARE_API_TOKEN | default('', true) }}"
     tailscale_auth_key: "{{ app_secrets[tailscale_auth_key_secret_name] | default('', true) }}"
+    cnpg_backup_gcs_credentials: "{{ app_secrets.CNPG_BACKUP_GCS_CREDENTIALS | default('', true) }}"
   no_log: true

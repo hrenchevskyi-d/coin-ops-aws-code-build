@@ -18,6 +18,8 @@ spec:
 {{ include "coinops-app.labels" . | indent 8 }}
         app.kubernetes.io/name: {{ .Values.proxy.name }}
     spec:
+      securityContext:
+{{ toYaml .Values.proxy.podSecurityContext | indent 8 }}
       serviceAccountName: {{ .Values.proxy.serviceAccountName }}
       imagePullSecrets:
         - name: {{ .Values.imagePullSecretName }}
@@ -62,7 +64,12 @@ spec:
             initialDelaySeconds: 15
             periodSeconds: 20
           securityContext:
-            allowPrivilegeEscalation: false
-            runAsNonRoot: true
+{{ toYaml .Values.proxy.securityContext | indent 12 }}
           resources:
 {{ toYaml .Values.proxy.resources | indent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

@@ -7,3 +7,15 @@ k3s_traefik_deployment_kind: DaemonSet
 k3s_traefik_service_type: ClusterIP
 k3s_traefik_web_host_port: 80
 k3s_traefik_websecure_host_port: 443
+
+k3s_traefik_middlewares_manifest_path: /var/lib/rancher/k3s/server/manifests/k3s-traefik-middlewares.yaml
+k3s_traefik_security_headers_middleware_name: security-headers
+k3s_traefik_rate_limit_middleware_name: rate-limit
+k3s_traefik_rate_limit_average: 100
+k3s_traefik_rate_limit_period: 1m
+k3s_traefik_rate_limit_burst: 50
+k3s_traefik_hsts_seconds: 31536000
+k3s_traefik_hsts_include_subdomains: true
+k3s_traefik_hsts_preload: true
+k3s_traefik_frame_options: SAMEORIGIN
+k3s_traefik_referrer_policy: no-referrer

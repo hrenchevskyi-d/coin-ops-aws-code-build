@@ -2,12 +2,37 @@ runtimeBackend: postgres
 imagePullSecretName: ghcr-pull-secret
 secret:
   name: coinops-app-secrets
+networkPolicy:
+  uiNamespace: coinops-ui
+  dataNamespace: coinops-data
 proxy:
+  namespace: coinops-proxy
   name: coinops-proxy
   serviceAccountName: coinops-proxy
   image: ""
   servicePort: 8080
   replicas: 1
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 70
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
   resources:
     requests:
       cpu: 25m
@@ -16,11 +41,33 @@ proxy:
       cpu: 250m
       memory: 128Mi
 historyApi:
+  namespace: coinops-history-api
   name: coinops-history-api
   serviceAccountName: coinops-history-api
   image: ""
   servicePort: 8000
   replicas: 1
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 10002
+    runAsGroup: 10001
+    fsGroup: 10001
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 70
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
   resources:
     requests:
       cpu: 25m
@@ -29,10 +76,32 @@ historyApi:
       cpu: 250m
       memory: 256Mi
 consumer:
+  namespace: coinops-history-consumer
   name: coinops-history-consumer
   serviceAccountName: coinops-history-consumer
   image: ""
   replicas: 1
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 10003
+    runAsGroup: 10001
+    fsGroup: 10001
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 70
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
   resources:
     requests:
       cpu: 10m

@@ -136,6 +136,7 @@ runtime_metadata: >-
 # otherwise. The fallback order keeps old GCP-only commands working.
 my_cloud: "{{ cloud | default('gcp' if 'gcp' in groups else ('aws' if 'aws' in groups else ('azure' if 'azure' in groups else ''))) }}"
 cloud_runtime_metadata: "{{ runtime_metadata.get(my_cloud, {}) }}"
+cnpg_backup_metadata: "{{ cloud_runtime_metadata.get('cnpg_backup', {}) }}"
 backend_hosts_for_cloud: "{{ groups.get('role_app_backend', []) | intersect(groups.get(my_cloud, [])) }}"
 gateway_hosts_for_cloud: "{{ groups.get('role_gateway', []) | intersect(groups.get(my_cloud, [])) }}"
 backend_host: >-
@@ -223,6 +224,7 @@ rabbitmq_password: ""
 registry_token: ""
 cloudflare_api_token: ""
 tailscale_auth_key: ""
+cnpg_backup_gcs_credentials: ""
 
 rabbitmq_user: cognitor
 database_metadata: "{{ cloud_runtime_metadata.get('database', {}) }}"

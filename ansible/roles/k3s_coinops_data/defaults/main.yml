@@ -28,3 +28,36 @@ k3s_coinops_data_runtime_sql_files:
   - 06_cache_schema.sql
   - 07_cache_wrappers.sql
   - 08_cron.sql
+
+
+k3s_coinops_data_namespace_labels:
+  pod-security.kubernetes.io/audit: restricted
+  pod-security.kubernetes.io/audit-version: latest
+  pod-security.kubernetes.io/warn: restricted
+  pod-security.kubernetes.io/warn-version: latest
+k3s_coinops_data_pod_security_enforce: false
+k3s_coinops_data_pod_security_enforce_version: latest
+
+k3s_coinops_data_backup_enabled: '{{ cnpg_backup_metadata.get("enabled", false) | bool }}'
+k3s_coinops_data_backup_destination_path: '{{ cnpg_backup_metadata.get("destination_path", "") }}'
+k3s_coinops_data_backup_schedule: '{{ cnpg_backup_metadata.get("schedule", "0 0 2 * * *") }}'
+k3s_coinops_data_backup_retention_policy: '{{ cnpg_backup_metadata.get("retention_policy", "30d") }}'
+k3s_coinops_data_backup_credentials_secret_name: coinops-cnpg-gcs-backup
+k3s_coinops_data_backup_credentials_secret_key: gcsCredentials
+k3s_coinops_data_backup_objectstore_name: coinops-postgres-gcs
+k3s_coinops_data_backup_scheduled_name: coinops-postgres-daily
+k3s_coinops_data_barman_plugin_name: barman-cloud.cloudnative-pg.io
+k3s_coinops_data_barman_plugin_manifest_url: https://github.com/cloudnative-pg/plugin-barman-cloud/releases/download/v0.12.0/manifest.yaml
+k3s_coinops_data_barman_plugin_deployment_name: barman-cloud
+
+# CNPG instance managers call the Kubernetes API during bootstrap/reconciliation.
+# k3s defaults the kubernetes.default Service IP to 10.43.0.1, but
+# NetworkPolicy enforcement can see the translated control-plane endpoint too.
+k3s_coinops_data_kubernetes_api_service_cidr: 10.43.0.1/32
+k3s_coinops_data_kubernetes_api_endpoint_cidr: "{{ cloud_subnets.get('internal', {}).get('cidr', '10.20.1.0/24') }}"
+
+k3s_coinops_data_bootstrap_run_as_user: 10004
+k3s_coinops_data_bootstrap_run_as_group: 10004
+
+k3s_coinops_data_wait_retries: 6
+k3s_coinops_data_wait_delay: 5

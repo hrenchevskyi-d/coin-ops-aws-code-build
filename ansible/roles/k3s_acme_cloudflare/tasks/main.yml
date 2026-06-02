@@ -29,8 +29,8 @@
     kind: ClusterIssuer
     name: "{{ k3s_acme_cloudflare_cluster_issuer_name }}"
   register: acme_clusterissuer_info
-  retries: 30
-  delay: 10
+  retries: "{{ k3s_acme_cloudflare_wait_retries }}"
+  delay: "{{ k3s_acme_cloudflare_wait_delay }}"
   until: >-
     (
       acme_clusterissuer_info.resources | default([]) | length

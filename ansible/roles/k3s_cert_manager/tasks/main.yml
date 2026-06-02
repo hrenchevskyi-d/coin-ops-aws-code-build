@@ -18,3 +18,7 @@
         enabled: true
       prometheus:
         enabled: false
+  register: k3s_cert_manager_helm_result
+  retries: "{{ k3s_cert_manager_helm_retries }}"
+  delay: "{{ k3s_cert_manager_helm_delay }}"
+  until: k3s_cert_manager_helm_result is succeeded

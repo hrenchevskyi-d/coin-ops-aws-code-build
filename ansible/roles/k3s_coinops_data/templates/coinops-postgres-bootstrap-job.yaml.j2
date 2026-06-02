@@ -13,11 +13,24 @@ spec:
         app.kubernetes.io/name: {{ k3s_coinops_data_bootstrap_job_name }}
     spec:
       restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: {{ k3s_coinops_data_bootstrap_run_as_user }}
+        runAsGroup: {{ k3s_coinops_data_bootstrap_run_as_group }}
+        fsGroup: {{ k3s_coinops_data_bootstrap_run_as_group }}
+        seccompProfile:
+          type: RuntimeDefault
       imagePullSecrets:
         - name: {{ k3s_coinops_data_registry_pull_secret_name }}
       containers:
         - name: bootstrap
           image: {{ k3s_coinops_data_postgres_image }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           command:
             - /bin/bash
             - -ec
@@ -45,6 +58,8 @@ spec:
             - name: runtime-bootstrap
               mountPath: /bootstrap
               readOnly: true
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: superuser-secret
           secret:
@@ -57,3 +72,5 @@ spec:
               - key: {{ filename }}
                 path: runtime/{{ filename }}
 {% endfor %}
+        - name: tmp
+          emptyDir: {}

@@ -8,3 +8,12 @@
     mode: "0644"
   when: k3s_traefik_enabled | bool
   tags: [k3s, traefik]
+
+
+- name: k3s-traefik-render-packaged-traefik-middlewares
+  template:
+    src: traefik-middlewares.yaml.j2
+    dest: "{{ k3s_traefik_middlewares_manifest_path }}"
+    mode: "0644"
+  when: k3s_traefik_enabled | bool
+  tags: [k3s, traefik]

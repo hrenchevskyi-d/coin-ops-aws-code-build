@@ -50,7 +50,12 @@ make k3s-homepage
 make k3s-coinops
 ```
 
-The local kubeconfig and helper scripts are generated under `ansible/artifacts/`. They are sensitive and must not be committed.
+The local kubeconfig and helper scripts are generated under `ansible/artifacts/`. They are sensitive and must not be committed. For an operator shell, run:
+
+```bash
+source ansible/artifacts/k8s-operator-env.sh
+kubectl get nodes
+```
 
 ## Runtime SQL
 
@@ -80,3 +85,7 @@ Override with `IMAGE_REGISTRY`, `IMAGE_TAG`, or `POSTGRES_RUNTIME_IMAGE` only fo
 ## Destroy and Repair
 
 Use `terraform/full-destroy.sh --yes-really-destroy-stateful` for deliberate full teardown. It works from a temporary Terraform copy and leaves checked-in files untouched. Use `terraform/repair-refresh.sh` for refresh-only state repair when secret backend reads or provider cleanup need isolation.
+
+## k3s CNPG Backups
+
+GCS backup provisioning, status checks, and test-namespace restore drills are documented in docs/k3s-cnpg-backups.md.

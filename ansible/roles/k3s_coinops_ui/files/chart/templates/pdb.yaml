@@ -1,0 +1,14 @@
+{{- if .Values.ui.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Values.ui.name }}
+  labels:
+{{ include "coinops-ui.labels" . | indent 4 }}
+    app.kubernetes.io/name: {{ .Values.ui.name }}
+spec:
+  minAvailable: {{ .Values.ui.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.ui.name }}
+{{- end }}

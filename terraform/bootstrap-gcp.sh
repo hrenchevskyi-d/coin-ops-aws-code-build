@@ -142,6 +142,18 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --account="$BOOTSTRAP_ACCOUNT" \
     --member="serviceAccount:${SA_EMAIL}" \
+    --role="roles/iam.serviceAccountAdmin" \
+    --condition=None > /dev/null
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --account="$BOOTSTRAP_ACCOUNT" \
+    --member="serviceAccount:${SA_EMAIL}" \
+    --role="roles/iam.serviceAccountKeyAdmin" \
+    --condition=None > /dev/null
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --account="$BOOTSTRAP_ACCOUNT" \
+    --member="serviceAccount:${SA_EMAIL}" \
     --role="roles/compute.securityAdmin"
 
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \

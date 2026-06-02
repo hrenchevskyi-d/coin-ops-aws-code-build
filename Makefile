@@ -12,6 +12,7 @@ CLOUD_INVENTORIES := -i "$(AWS_INVENTORY)" -i "$(AZURE_INVENTORY)" -i "$(GCP_INV
 ENV_FILE := $(REPO_ROOT)/local/generated-env.sh
 K8S_ARTIFACTS_DIR := $(ANSIBLE_DIR)/artifacts
 K8S_TUNNELED_KUBECONFIG := $(K8S_ARTIFACTS_DIR)/kubeconfig-gcp-k3s-tunneled.yaml
+K8S_OPERATOR_ENV := $(K8S_ARTIFACTS_DIR)/k8s-operator-env.sh
 HEADLAMP_START_SCRIPT := $(K8S_ARTIFACTS_DIR)/headlamp-start.sh
 K8S_API_TUNNEL_SCRIPT := $(K8S_ARTIFACTS_DIR)/k8s-api-tunnel.sh
 VENV_PYTHON := $(REPO_ROOT)/.venv/bin/python
@@ -31,7 +32,7 @@ ANSIBLE_CMD = $(ANSIBLE_ENV)
 LOCAL_ANSIBLE_CMD = $(LOCAL_ANSIBLE_ENV)
 
 .PHONY: help \
-	infra-check tf-check-backend tf-plan tf-apply tf-destroy-compute tf-full-destroy k8s-api-ready \
+	infra-check tf-check-backend tf-plan tf-apply tf-destroy-compute tf-full-destroy k8s-api-ready kubectl k8s-env \
 	inventory-graph inventory-host ssh-host \
 	runtime-config ansible-check provision deploy k3s-cluster k3s-headlamp k3s-homepage k3s-coinops k3s-platform headlamp-start headlamp-token
 
@@ -64,6 +65,8 @@ help:
 	@echo "  make k3s-platform            - Run ansible/k3s-platform.yml against GCP dynamic inventory"
 	@echo "  make headlamp-start          - Start Headlamp access"
 	@echo "  make headlamp-token          - Print a Headlamp login token"
+	@echo "  make k8s-env                 - Print the source command for kubectl access"
+	@echo "  make kubectl ARGS='get ns'   - Run kubectl through the generated tunnel"
 	@echo ""
 	@echo "Optional variables:"
 	@echo "  LIMIT=role_app_backend       - Pass --limit to provision/deploy"
@@ -144,6 +147,14 @@ k3s-platform: ensure-k8s-api-tunnel
 	$(ANSIBLE_CMD) ansible-playbook -i "$(LOCALHOST_INVENTORY)" -i "$(GCP_INVENTORY)" "$(ANSIBLE_DIR)/k3s-platform.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
 
 k8s-api-ready: ensure-k8s-api-tunnel
+
+k8s-env:
+	@test -f "$(K8S_OPERATOR_ENV)" || (echo "Missing $(K8S_OPERATOR_ENV). Run 'make k3s-cluster' first."; exit 1)
+	@echo "source $(K8S_OPERATOR_ENV)"
+
+kubectl: ensure-k8s-api-tunnel
+	@if [ -z "$(ARGS)" ]; then echo "ARGS is required, for example: make kubectl ARGS='get nodes'"; exit 1; fi
+	KUBECONFIG="$(K8S_TUNNELED_KUBECONFIG)" kubectl $(ARGS)
 
 headlamp-start:
 	@test -x "$(HEADLAMP_START_SCRIPT)" || (echo "Missing $(HEADLAMP_START_SCRIPT). Run 'make k3s-platform' first."; exit 1)

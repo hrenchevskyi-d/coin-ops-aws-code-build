@@ -149,6 +149,20 @@ locals {
   db_secret_name   = try(local.secret_names.db, "coinops-db-secrets")
   app_secret_name  = try(local.secret_names.app, "coinops-app-secrets")
 
+  cnpg_backup_cfg = merge({
+    enabled        = true
+    bucket_name    = ""
+    path           = "coinops-postgres"
+    retention_days = 30
+    schedule       = "0 0 2 * * *"
+  }, try(local.deploy.cnpg_backup, {}))
+  cnpg_backup_enabled     = local.gcp_enabled && local.secrets_enabled && local.secret_backend == "gcp" && try(local.cnpg_backup_cfg.enabled, true)
+  cnpg_backup_bucket_name = try(local.cnpg_backup_cfg.bucket_name, "") != "" ? local.cnpg_backup_cfg.bucket_name : lower("${local.project_name}-${substr(md5(local.gcp_project_id), 0, 8)}-cnpg-backups")
+  cnpg_backup_path        = trim(try(local.cnpg_backup_cfg.path, "coinops-postgres"), "/")
+  cnpg_backup_destination = "gs://${local.cnpg_backup_bucket_name}/${local.cnpg_backup_path}"
+  cnpg_backup_schedule    = try(local.cnpg_backup_cfg.schedule, "0 0 2 * * *")
+  cnpg_backup_retention   = "${try(local.cnpg_backup_cfg.retention_days, 30)}d"
+
   db_name          = try(local.database.name, "cognitor")
   db_username      = try(local.database.username, "cognitor")
   db_port          = try(local.database.port, 5432)
@@ -529,6 +543,7 @@ locals {
   effective_github_oauth_client_secret = (
     local.seed_secret_manager ? var.github_oauth_client_secret : try(local.active_app_secrets.GITHUB_OAUTH_CLIENT_SECRET, var.github_oauth_client_secret)
   )
+  effective_cnpg_backup_gcs_credentials = try(base64decode(google_service_account_key.cnpg_backup[0].private_key), try(local.active_app_secrets.CNPG_BACKUP_GCS_CREDENTIALS, ""))
   headlamp_tunnel_enabled = (
     try(local.headlamp_cfg.enabled, true)
     && try(local.headlamp_tunnel_cfg.enabled, false)

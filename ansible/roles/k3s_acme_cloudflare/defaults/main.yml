@@ -13,3 +13,6 @@ k3s_acme_cloudflare_directory_url: >-
 # opt-in debug mode via COINOPS_DEBUG_ACME=true when diagnosing localhost
 # execution issues.
 k3s_acme_cloudflare_hide_secret_task_output: "{{ not ((lookup('env', 'COINOPS_DEBUG_ACME') | default('false', true)) | bool) }}"
+
+k3s_acme_cloudflare_wait_retries: 6
+k3s_acme_cloudflare_wait_delay: 5

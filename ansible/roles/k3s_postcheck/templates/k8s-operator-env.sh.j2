@@ -1,0 +1,18 @@
+# Source this file from the repository root to use kubectl/helm without
+# repeating KUBECONFIG. It also starts the private k3s API SSH tunnel when
+# 127.0.0.1:6443 is not already reachable.
+
+export KUBECONFIG="{{ k3s_postcheck_local_artifact_dir }}/kubeconfig-gcp-k3s-tunneled.yaml"
+
+if ! nc -z 127.0.0.1 6443 >/dev/null 2>&1; then
+  nohup "{{ k3s_postcheck_local_artifact_dir }}/k8s-api-tunnel.sh" >/tmp/coinops-k8s-api-tunnel.log 2>&1 &
+  sleep 1
+fi
+
+if ! nc -z 127.0.0.1 6443 >/dev/null 2>&1; then
+  echo "Kubernetes API tunnel is not reachable on 127.0.0.1:6443." >&2
+  echo "Check /tmp/coinops-k8s-api-tunnel.log for SSH errors." >&2
+  return 1 2>/dev/null || exit 1
+fi
+
+echo "KUBECONFIG=${KUBECONFIG}"

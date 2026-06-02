@@ -27,6 +27,20 @@ type: kubernetes.io/basic-auth
 stringData:
   username: "{{ k3s_coinops_data_app_user }}"
   password: "{{ db_password }}"
+{% if k3s_coinops_data_backup_enabled | bool %}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ k3s_coinops_data_backup_credentials_secret_name }}
+  namespace: {{ k3s_coinops_data_namespace }}
+  labels:
+    cnpg.io/reload: "true"
+type: Opaque
+stringData:
+  {{ k3s_coinops_data_backup_credentials_secret_key }}: |
+{{ (cnpg_backup_gcs_credentials if cnpg_backup_gcs_credentials is string else (cnpg_backup_gcs_credentials | to_json)) | indent(4, true) }}
+{% endif %}
 ---
 # Runtime SQL is mounted into the one-shot bootstrap job.
 apiVersion: v1
@@ -55,6 +69,20 @@ spec:
   postgresGID: {{ k3s_coinops_data_postgres_gid }}
   imagePullSecrets:
     - name: {{ k3s_coinops_data_registry_pull_secret_name }}
+{% if k3s_coinops_data_backup_enabled | bool %}
+  plugins:
+    - name: {{ k3s_coinops_data_barman_plugin_name }}
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: {{ k3s_coinops_data_backup_objectstore_name }}
+{% endif %}
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          cnpg.io/cluster: {{ k3s_coinops_data_cluster_name }}
   superuserSecret:
     name: {{ k3s_coinops_data_superuser_secret_name }}
   bootstrap:
@@ -70,3 +98,129 @@ spec:
       - pg_cron
     parameters:
       cron.database_name: "{{ k3s_coinops_data_database_name }}"
+
+{% if k3s_coinops_data_backup_enabled | bool %}
+---
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: {{ k3s_coinops_data_backup_objectstore_name }}
+  namespace: {{ k3s_coinops_data_namespace }}
+spec:
+  retentionPolicy: {{ k3s_coinops_data_backup_retention_policy | quote }}
+  configuration:
+    destinationPath: {{ k3s_coinops_data_backup_destination_path | quote }}
+    googleCredentials:
+      applicationCredentials:
+        name: {{ k3s_coinops_data_backup_credentials_secret_name }}
+        key: {{ k3s_coinops_data_backup_credentials_secret_key }}
+    wal:
+      compression: gzip
+    data:
+      compression: gzip
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: {{ k3s_coinops_data_backup_scheduled_name }}
+  namespace: {{ k3s_coinops_data_namespace }}
+spec:
+  cluster:
+    name: {{ k3s_coinops_data_cluster_name }}
+  schedule: {{ k3s_coinops_data_backup_schedule | quote }}
+  backupOwnerReference: self
+  method: plugin
+  pluginConfiguration:
+    name: {{ k3s_coinops_data_barman_plugin_name }}
+{% endif %}
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: coinops-data-default-deny
+  namespace: {{ k3s_coinops_data_namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: coinops-data-allowed-egress
+  namespace: {{ k3s_coinops_data_namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ k3s_coinops_data_namespace }}
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - ipBlock:
+            cidr: {{ k3s_coinops_data_kubernetes_api_service_cidr }}
+      ports:
+        - protocol: TCP
+          port: 443
+    - to:
+        - ipBlock:
+            cidr: {{ k3s_coinops_data_kubernetes_api_endpoint_cidr }}
+      ports:
+        - protocol: TCP
+          port: 6443
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: coinops-postgres-allowed-ingress
+  namespace: {{ k3s_coinops_data_namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: {{ k3s_coinops_data_cluster_name }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: coinops-proxy
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: coinops-history-api
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: coinops-history-consumer
+      ports:
+        - protocol: TCP
+          port: 5432
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ k3s_coinops_data_cnpg_namespace }}
+      ports:
+        - protocol: TCP
+          port: 8000

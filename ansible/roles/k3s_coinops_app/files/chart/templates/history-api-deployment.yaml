@@ -18,6 +18,8 @@ spec:
 {{ include "coinops-app.labels" . | indent 8 }}
         app.kubernetes.io/name: {{ .Values.historyApi.name }}
     spec:
+      securityContext:
+{{ toYaml .Values.historyApi.podSecurityContext | indent 8 }}
       serviceAccountName: {{ .Values.historyApi.serviceAccountName }}
       imagePullSecrets:
         - name: {{ .Values.imagePullSecretName }}
@@ -48,6 +50,12 @@ spec:
             initialDelaySeconds: 15
             periodSeconds: 20
           securityContext:
-            allowPrivilegeEscalation: false
+{{ toYaml .Values.historyApi.securityContext | indent 12 }}
           resources:
 {{ toYaml .Values.historyApi.resources | indent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

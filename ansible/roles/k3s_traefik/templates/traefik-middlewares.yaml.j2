@@ -1,0 +1,25 @@
+# Edge security middlewares for packaged k3s Traefik.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ k3s_traefik_security_headers_middleware_name }}
+  namespace: {{ k3s_traefik_chart_namespace }}
+spec:
+  headers:
+    customFrameOptionsValue: {{ k3s_traefik_frame_options | quote }}
+    contentTypeNosniff: true
+    stsSeconds: {{ k3s_traefik_hsts_seconds }}
+    stsIncludeSubdomains: {{ (k3s_traefik_hsts_include_subdomains | bool) | ternary(true, false) }}
+    stsPreload: {{ (k3s_traefik_hsts_preload | bool) | ternary(true, false) }}
+    referrerPolicy: {{ k3s_traefik_referrer_policy | quote }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ k3s_traefik_rate_limit_middleware_name }}
+  namespace: {{ k3s_traefik_chart_namespace }}
+spec:
+  rateLimit:
+    average: {{ k3s_traefik_rate_limit_average }}
+    period: {{ k3s_traefik_rate_limit_period }}
+    burst: {{ k3s_traefik_rate_limit_burst }}

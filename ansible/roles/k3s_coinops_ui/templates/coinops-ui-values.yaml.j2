@@ -4,11 +4,33 @@ ui:
   imagePullSecretName: {{ k3s_coinops_ui_registry_pull_secret_name | to_json }}
   image: {{ k3s_coinops_ui_image | to_json }}
   servicePort: {{ k3s_coinops_ui_service_port }}
+  containerPort: {{ k3s_coinops_ui_container_port }}
   proxyServiceName: {{ k3s_coinops_ui_proxy_service_name | to_json }}
   proxyServiceNamespace: {{ k3s_coinops_ui_proxy_service_namespace | to_json }}
   proxyServicePort: {{ k3s_coinops_ui_proxy_service_port }}
   historyServiceName: {{ k3s_coinops_ui_history_service_name | to_json }}
   historyServiceNamespace: {{ k3s_coinops_ui_history_service_namespace | to_json }}
   historyServicePort: {{ k3s_coinops_ui_history_service_port }}
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: {{ k3s_coinops_ui_run_as_user }}
+    runAsGroup: {{ k3s_coinops_ui_run_as_group }}
+    fsGroup: {{ k3s_coinops_ui_run_as_group }}
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  autoscaling:
+    enabled: {{ k3s_coinops_ui_autoscaling_enabled | bool | to_json }}
+    minReplicas: {{ k3s_coinops_ui_autoscaling_min_replicas }}
+    maxReplicas: {{ k3s_coinops_ui_autoscaling_max_replicas }}
+    targetCPUUtilizationPercentage: {{ k3s_coinops_ui_autoscaling_target_cpu_utilization }}
+  podDisruptionBudget:
+    enabled: {{ k3s_coinops_ui_pdb_enabled | bool | to_json }}
+    minAvailable: {{ k3s_coinops_ui_pdb_min_available }}
   resources:
 {{ k3s_coinops_ui_resources | to_nice_yaml(indent=2) | indent(4, true) }}

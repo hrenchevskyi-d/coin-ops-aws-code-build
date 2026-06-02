@@ -1,0 +1,55 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.ui.name }}-default-deny
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.ui.name }}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Values.ui.name }}-allowed-traffic
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.ui.name }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: TCP
+          port: {{ .Values.ui.containerPort }}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.ui.proxyServiceNamespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.ui.proxyServicePort }}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.ui.historyServiceNamespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.ui.historyServicePort }}

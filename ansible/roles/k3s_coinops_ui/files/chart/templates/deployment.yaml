@@ -17,13 +17,30 @@ spec:
 {{ include "coinops-ui.labels" . | indent 8 }}
         app.kubernetes.io/name: {{ .Values.ui.name }}
     spec:
+      securityContext:
+{{ toYaml .Values.ui.podSecurityContext | indent 8 }}
       serviceAccountName: {{ .Values.ui.serviceAccountName }}
       imagePullSecrets:
         - name: {{ .Values.ui.imagePullSecretName }}
+      initContainers:
+        - name: copy-ui-assets
+          image: {{ .Values.ui.image }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - cp -a /usr/share/nginx/html/. /workdir/
+          securityContext:
+{{ toYaml .Values.ui.securityContext | indent 12 }}
+          volumeMounts:
+            - name: ui-html
+              mountPath: /workdir
       containers:
         - name: ui
           image: {{ .Values.ui.image }}
           imagePullPolicy: IfNotPresent
+          securityContext:
+{{ toYaml .Values.ui.securityContext | indent 12 }}
           env:
             - name: PROXY_URL
               value: /api
@@ -33,7 +50,7 @@ spec:
 {{ toYaml .Values.ui.resources | indent 12 }}
           ports:
             - name: http
-              containerPort: 80
+              containerPort: {{ .Values.ui.containerPort }}
               protocol: TCP
           readinessProbe:
             httpGet:
@@ -52,7 +69,23 @@ spec:
               mountPath: /etc/nginx/conf.d/default.conf
               subPath: default.conf
               readOnly: true
+            - name: ui-html
+              mountPath: /usr/share/nginx/html
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: nginx-run
+              mountPath: /var/run
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: nginx-config
           configMap:
             name: {{ .Values.ui.name }}-nginx
+        - name: ui-html
+          emptyDir: {}
+        - name: nginx-cache
+          emptyDir: {}
+        - name: nginx-run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}

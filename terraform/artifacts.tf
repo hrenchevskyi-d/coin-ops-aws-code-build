@@ -18,6 +18,13 @@ module "local_operator_artifacts" {
           user    = local.db_username
           managed = try(module.gcp_database[0].private_ip, "") != ""
         }
+        cnpg_backup = {
+          enabled          = local.cnpg_backup_enabled
+          bucket           = local.cnpg_backup_bucket_name
+          destination_path = local.cnpg_backup_destination
+          schedule         = local.cnpg_backup_schedule
+          retention_policy = local.cnpg_backup_retention
+        }
       }
     } : {},
     local.aws_enabled ? {
@@ -134,6 +141,13 @@ module "local_operator_artifacts" {
           name    = local.db_name
           user    = local.db_username
           managed = try(module.gcp_database[0].private_ip, "") != ""
+        }
+        cnpg_backup = {
+          enabled          = local.cnpg_backup_enabled
+          bucket           = local.cnpg_backup_bucket_name
+          destination_path = local.cnpg_backup_destination
+          schedule         = local.cnpg_backup_schedule
+          retention_policy = local.cnpg_backup_retention
         }
       }
     } : {},

@@ -22,8 +22,14 @@ Generated kubeconfigs and tunnel scripts are written under `ansible/artifacts/`.
 Use the tunneled kubeconfig for localhost-driven Kubernetes work:
 
 ```bash
-make k8s-api-ready
-export KUBECONFIG=/home/notebook/projects/coin-ops/ansible/artifacts/kubeconfig-gcp-k3s-tunneled.yaml
+source ansible/artifacts/k8s-operator-env.sh
+kubectl get nodes
+```
+
+For one-off checks without changing the current shell environment:
+
+```bash
+make kubectl ARGS='get nodes'
 ```
 
 ## Traefik Model

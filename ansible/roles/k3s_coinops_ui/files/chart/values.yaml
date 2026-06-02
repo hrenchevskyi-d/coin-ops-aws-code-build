@@ -4,12 +4,35 @@ ui:
   imagePullSecretName: ghcr-pull-secret
   image: ""
   servicePort: 80
+  containerPort: 8080
   proxyServiceName: coinops-proxy
-  proxyServiceNamespace: coinops-app
+  proxyServiceNamespace: coinops-proxy
   proxyServicePort: 8080
   historyServiceName: coinops-history-api
-  historyServiceNamespace: coinops-app
+  historyServiceNamespace: coinops-history-api
   historyServicePort: 8000
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 101
+    runAsGroup: 101
+    fsGroup: 101
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 70
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
 
   resources:
     requests:

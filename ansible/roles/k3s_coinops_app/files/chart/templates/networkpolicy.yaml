@@ -1,0 +1,63 @@
+{{- $uiNamespace := .Values.networkPolicy.uiNamespace }}
+{{- $dataNamespace := .Values.networkPolicy.dataNamespace }}
+{{- range $component := list .Values.proxy .Values.historyApi .Values.consumer }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $component.name }}-default-deny
+  namespace: {{ $component.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $component.name }}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $component.name }}-allowed-traffic
+  namespace: {{ $component.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $component.name }}
+  policyTypes:
+    - Ingress
+    - Egress
+{{- if $component.servicePort }}
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $uiNamespace }}
+      ports:
+        - protocol: TCP
+          port: {{ $component.servicePort }}
+{{- end }}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $dataNamespace }}
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
+{{- end }}
