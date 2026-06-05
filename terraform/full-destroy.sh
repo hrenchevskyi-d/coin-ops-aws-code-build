@@ -208,6 +208,8 @@ for name in clouds_to_unguard:
             terraform_dir / "modules" / "cloud" / name / "secrets" / "main.tf",
         ]
     )
+    if name == "gcp":
+        files.append(terraform_dir / "gcp_cnpg_backup.tf")
 
 lifecycle_pattern = re.compile(
     r"\n\s*lifecycle\s*\{\s*\n\s*prevent_destroy\s*=\s*true\s*\n\s*\}\s*\n",
@@ -219,6 +221,26 @@ for path in files:
         continue
     content = path.read_text(encoding="utf-8")
     content = lifecycle_pattern.sub("\n", content)
+    if path.name == "gcp_cnpg_backup.tf":
+        content = re.sub(
+            r"(?m)^(\s*)count\s*=\s*local\.cnpg_backup_enabled\s*\?\s*1\s*:\s*0\s*$",
+            r"\1count = 1",
+            content,
+        )
+        if re.search(r"(?m)^\s*force_destroy\s*=", content):
+            content = re.sub(
+                r"(?m)^(\s*)force_destroy\s*=.*$",
+                r"\1force_destroy = true",
+                content,
+                count=1,
+            )
+        else:
+            content = re.sub(
+                r'(?m)^(\s*public_access_prevention\s*=\s*"enforced"\s*)$',
+                r"\1\n  force_destroy               = true",
+                content,
+                count=1,
+            )
     if path.name == "main.tf" and path.parent.name == "database":
         content = content.replace("deletion_protection = true", "deletion_protection = false")
         content = content.replace("skip_final_snapshot         = false", "skip_final_snapshot         = true")
@@ -714,6 +736,11 @@ build_destroy_command() {
           -target=module.gcp_firewall
           -target=module.gcp_database
           -target=module.gcp_secrets
+          -target=google_storage_bucket_iam_member.cnpg_backup_object_admin
+          -target=google_storage_bucket_iam_member.cnpg_backup_bucket_reader
+          -target=google_service_account_key.cnpg_backup
+          -target=google_service_account.cnpg_backup
+          -target=google_storage_bucket.cnpg_backups
           -target=module.gcp_network
         )
         ;;

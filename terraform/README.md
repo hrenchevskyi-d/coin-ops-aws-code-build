@@ -149,7 +149,10 @@ bash full-destroy.sh --yes-really-destroy-stateful --cloud gcp -var='suppress_se
 `full-destroy.sh` works from an isolated temporary copy of the Terraform root
 and keeps the checked-in files untouched. In that temporary copy it:
 
-- removes `prevent_destroy` from database and secrets modules
+- removes `prevent_destroy` from database, secrets, and CNPG backup resources
+- sets the CNPG GCS backup bucket to force-delete only in the temporary copy
+- keeps CNPG backup resources instantiated in the temporary copy so destroy
+  receives the force-delete bucket configuration
 - disables AWS RDS deletion protection before teardown
 - disables and deletes GCP Cloud SQL instances found in state before teardown
 - deletes GCP private service connections and reserved peering ranges that can
