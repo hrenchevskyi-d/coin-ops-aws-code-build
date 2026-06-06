@@ -79,6 +79,7 @@ PY
 }
 
 IAM_USER_NAME="$(read_config 'data["clouds"]["providers"]["aws"]["terraform_identity"]["name"]')"
+PROJECT_NAME="$(read_config 'data["general"].get("project_name", "coin-ops")')"
 CONTROL_PLANE="$(read_config 'data["clouds"]["control_plane"]')"
 REGION_PROFILE="$(read_config 'data["general"]["region_profile"]')"
 REGION="$(python3 -c 'import json,sys; data=json.load(open(sys.argv[1], encoding="utf-8")); print(data["regions"]["aws"][sys.argv[2]]["region"])' "${MAPPING_PATH}" "${REGION_PROFILE}")"
@@ -101,6 +102,14 @@ print(json.loads(sys.argv[1])["Arn"])
 PY
 )"
 TARGET_USER_ARN="arn:aws:iam::${ACCOUNT_ID}:user/${IAM_USER_NAME}"
+CNPG_BACKUP_POLICY_NAME="coinops-cnpg-backup-identity-management"
+CNPG_BACKUP_USER_NAME="$(python3 - <<'PY' "${PROJECT_NAME}"
+import sys
+
+print((sys.argv[1].replace("_", "-").lower() + "-cnpg-backup")[:64])
+PY
+)"
+CNPG_BACKUP_USER_ARN="arn:aws:iam::${ACCOUNT_ID}:user/${CNPG_BACKUP_USER_NAME}"
 RUNNING_AS_TARGET_USER=false
 if [ "$CALLER_ARN" = "$TARGET_USER_ARN" ]; then
   RUNNING_AS_TARGET_USER=true
@@ -117,9 +126,86 @@ fi
 echo "Starting AWS bootstrap process in account ${ACCOUNT_ID}, region ${REGION}"
 echo "Active AWS identity: ${CALLER_ARN}"
 
+put_cnpg_backup_iam_policy() {
+  echo "Granting scoped IAM permissions for CNPG backup identity management..."
+  aws iam put-user-policy \
+    --user-name "$IAM_USER_NAME" \
+    --policy-name "$CNPG_BACKUP_POLICY_NAME" \
+    --policy-document "$(python3 - <<'PY' "${CNPG_BACKUP_USER_ARN}" "${TARGET_USER_ARN}"
+import json
+import sys
+
+cnpg_backup_user_arn = sys.argv[1]
+target_user_arn = sys.argv[2]
+print(json.dumps({
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "ManageCnpgBackupIamUser",
+            "Effect": "Allow",
+            "Action": [
+                "iam:CreateUser",
+                "iam:DeleteUser",
+                "iam:GetUser",
+                "iam:TagUser",
+                "iam:UntagUser",
+                "iam:ListUserTags",
+                "iam:ListGroupsForUser",
+                "iam:ListAttachedUserPolicies",
+                "iam:PutUserPolicy",
+                "iam:GetUserPolicy",
+                "iam:DeleteUserPolicy",
+                "iam:ListUserPolicies",
+                "iam:CreateAccessKey",
+                "iam:DeleteAccessKey",
+                "iam:GetAccessKeyLastUsed",
+                "iam:ListAccessKeys",
+                "iam:UpdateAccessKey"
+            ],
+            "Resource": cnpg_backup_user_arn
+        },
+        {
+            "Sid": "ReadOwnTerraformUserPolicies",
+            "Effect": "Allow",
+            "Action": [
+                "iam:GetUser",
+                "iam:GetUserPolicy",
+                "iam:ListUserPolicies",
+                "iam:ListAttachedUserPolicies"
+            ],
+            "Resource": target_user_arn
+        },
+        {
+            "Sid": "ListIamUsersForTerraformRefresh",
+            "Effect": "Allow",
+            "Action": [
+                "iam:ListUsers"
+            ],
+            "Resource": "*"
+        }
+    ]
+}))
+PY
+)" >/dev/null
+}
+
 if [ "$RUNNING_AS_TARGET_USER" = true ]; then
-  echo "Already running as ${IAM_USER_NAME}; skipping IAM user/policy/key bootstrap."
-  echo "Use an admin/operator AWS identity only when you need to create or repair the Terraform IAM user."
+  echo "Already running as ${IAM_USER_NAME}; checking IAM repair policy."
+  if ! aws iam get-user-policy --user-name "$IAM_USER_NAME" --policy-name "$CNPG_BACKUP_POLICY_NAME" >/dev/null 2>&1; then
+    cat <<EOF >&2
+The current credentials are for ${IAM_USER_NAME}, but the required inline IAM
+policy ${CNPG_BACKUP_POLICY_NAME} is not readable or is missing.
+
+This user cannot grant itself missing IAM permissions. Rerun bootstrap with an
+admin/operator AWS identity, not with local/generated-env.sh credentials:
+
+  unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+  AWS_PROFILE=<admin-profile> bash terraform/bootstrap-aws.sh --activate-backend
+
+Then source local/generated-env.sh again and rerun terraform apply.
+EOF
+    exit 1
+  fi
 else
   echo "Ensuring IAM User exists: $IAM_USER_NAME"
   if ! aws iam get-user --user-name "$IAM_USER_NAME" > /dev/null 2>&1; then
@@ -140,6 +226,8 @@ else
   do
     aws iam attach-user-policy --user-name "$IAM_USER_NAME" --policy-arn "$policy" || true
   done
+
+  put_cnpg_backup_iam_policy
 
   echo "Checking Terraform IAM access key capacity..."
   EXISTING_KEY_COUNT="$(aws iam list-access-keys --user-name "$IAM_USER_NAME" --query 'length(AccessKeyMetadata)' --output text)"

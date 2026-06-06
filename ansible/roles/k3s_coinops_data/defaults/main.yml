@@ -39,12 +39,15 @@ k3s_coinops_data_pod_security_enforce: false
 k3s_coinops_data_pod_security_enforce_version: latest
 
 k3s_coinops_data_backup_enabled: '{{ cnpg_backup_metadata.get("enabled", false) | bool }}'
+k3s_coinops_data_backup_provider: '{{ cnpg_backup_metadata.get("provider", "gcs") }}'
 k3s_coinops_data_backup_destination_path: '{{ cnpg_backup_metadata.get("destination_path", "") }}'
 k3s_coinops_data_backup_schedule: '{{ cnpg_backup_metadata.get("schedule", "0 0 2 * * *") }}'
 k3s_coinops_data_backup_retention_policy: '{{ cnpg_backup_metadata.get("retention_policy", "30d") }}'
-k3s_coinops_data_backup_credentials_secret_name: coinops-cnpg-gcs-backup
-k3s_coinops_data_backup_credentials_secret_key: gcsCredentials
-k3s_coinops_data_backup_objectstore_name: coinops-postgres-gcs
+k3s_coinops_data_backup_credentials_secret_name: '{{ "coinops-cnpg-s3-backup" if k3s_coinops_data_backup_provider == "s3" else "coinops-cnpg-gcs-backup" }}'
+k3s_coinops_data_backup_credentials_secret_key: '{{ "ACCESS_SECRET_KEY" if k3s_coinops_data_backup_provider == "s3" else "gcsCredentials" }}'
+k3s_coinops_data_backup_s3_access_key_id_secret_key: ACCESS_KEY_ID
+k3s_coinops_data_backup_s3_secret_access_key_secret_key: ACCESS_SECRET_KEY
+k3s_coinops_data_backup_objectstore_name: '{{ "coinops-postgres-s3" if k3s_coinops_data_backup_provider == "s3" else "coinops-postgres-gcs" }}'
 k3s_coinops_data_backup_scheduled_name: coinops-postgres-daily
 k3s_coinops_data_barman_plugin_name: barman-cloud.cloudnative-pg.io
 k3s_coinops_data_barman_plugin_manifest_url: https://github.com/cloudnative-pg/plugin-barman-cloud/releases/download/v0.12.0/manifest.yaml

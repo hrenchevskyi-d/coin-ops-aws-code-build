@@ -80,8 +80,9 @@
     - name: Update apt cache
       apt:
         update_cache: yes
-        cache_valid_time: 3600
         lock_timeout: "{{ provisioning_apt_lock_timeout | default(900) }}"
+        update_cache_retries: "{{ common_apt_update_retries }}"
+        update_cache_retry_max_delay: "{{ common_apt_update_retry_max_delay }}"
 
     - name: Upgrade all packages
       apt:
@@ -91,12 +92,7 @@
 
     - name: Install base packages
       apt:
-        name:
-          - curl
-          - htop
-          - jq
-          - acl
-          - unattended-upgrades
+        name: "{{ common_base_packages }}"
         state: present
         lock_timeout: "{{ provisioning_apt_lock_timeout | default(900) }}"
 
@@ -152,6 +148,34 @@
   when:
     - common_is_forwarder
     - ufw_binary.stat.exists
+
+- name: Install NAT forwarding script on traffic-forwarding hosts
+  template:
+    dest: /usr/local/sbin/coinops-nat-forwarding.sh
+    mode: "0755"
+    src: coinops-nat-forwarding.sh.j2
+  when:
+    - common_is_forwarder
+    - common_nat_private_subnet_cidr | length > 0
+
+- name: Install NAT forwarding service on traffic-forwarding hosts
+  template:
+    dest: /etc/systemd/system/coinops-nat-forwarding.service
+    mode: "0644"
+    src: coinops-nat-forwarding.service.j2
+  when:
+    - common_is_forwarder
+    - common_nat_private_subnet_cidr | length > 0
+
+- name: Enable NAT forwarding service on traffic-forwarding hosts
+  systemd:
+    daemon_reload: yes
+    name: coinops-nat-forwarding.service
+    enabled: yes
+    state: restarted
+  when:
+    - common_is_forwarder
+    - common_nat_private_subnet_cidr | length > 0
 
 - name: Validate baked common host tooling on golden-image hosts
   when: host_uses_golden_image

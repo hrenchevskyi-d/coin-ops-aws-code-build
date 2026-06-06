@@ -17,8 +17,8 @@ The role stages its local Helm chart, renders values, installs or upgrades the r
 
 ```bash
 make k8s-api-ready
-KUBECONFIG=/home/notebook/projects/coin-ops/ansible/artifacts/kubeconfig-gcp-k3s-tunneled.yaml kubectl get pods -n homepage
-KUBECONFIG=/home/notebook/projects/coin-ops/ansible/artifacts/kubeconfig-gcp-k3s-tunneled.yaml kubectl get ingress -n homepage
+make kubectl ARGS='get pods -n homepage'
+make kubectl ARGS='get ingress -n homepage'
 ```
 
 Homepage uses a dedicated service account and read-only RBAC for the Kubernetes widget.

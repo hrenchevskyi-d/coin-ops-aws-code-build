@@ -1,2 +1,6 @@
 ---
 k3s_postcheck_local_artifact_dir: "{{ repo_root ~ '/ansible/artifacts' }}"
+k3s_postcheck_cloud_slug: "{{ my_cloud | default('cluster', true) }}"
+k3s_postcheck_local_kubeconfig_path: "{{ k3s_postcheck_local_artifact_dir }}/kubeconfig-{{ k3s_postcheck_cloud_slug }}-k3s.yaml"
+k3s_postcheck_local_tunneled_kubeconfig_path: "{{ k3s_postcheck_local_artifact_dir }}/kubeconfig-{{ k3s_postcheck_cloud_slug }}-k3s-tunneled.yaml"
+k3s_postcheck_jump_host_alias: "{{ jump_host if (jump_host | default('', true)).startswith(k3s_postcheck_cloud_slug ~ '-') else 'coinops-' ~ k3s_postcheck_cloud_slug ~ '-' ~ (jump_host | default('jump-host', true)) }}"

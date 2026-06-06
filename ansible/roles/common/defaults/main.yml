@@ -34,3 +34,14 @@ common_allowed_ports: >-
       [infra_general.get('ssh_port', 53725)]
     )
   }}
+
+common_base_packages:
+  - curl
+  - htop
+  - jq
+  - acl
+  - unattended-upgrades
+
+common_nat_private_subnet_cidr: "{{ cloud_subnets.get('internal', {}).get('cidr', '') }}"
+common_apt_update_retries: 5
+common_apt_update_retry_max_delay: 30

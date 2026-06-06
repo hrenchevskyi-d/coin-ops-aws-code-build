@@ -19,6 +19,7 @@ module "local_operator_artifacts" {
           managed = try(module.gcp_database[0].private_ip, "") != ""
         }
         cnpg_backup = {
+          provider         = "gcs"
           enabled          = local.cnpg_backup_enabled
           bucket           = local.cnpg_backup_bucket_name
           destination_path = local.cnpg_backup_destination
@@ -39,6 +40,15 @@ module "local_operator_artifacts" {
           name    = local.db_name
           user    = local.db_username
           managed = try(module.aws_database[0].address, "") != ""
+        }
+        cnpg_backup = {
+          provider         = "s3"
+          enabled          = local.aws_cnpg_backup_enabled
+          bucket           = local.aws_cnpg_backup_bucket_name
+          destination_path = local.aws_cnpg_backup_destination
+          schedule         = local.cnpg_backup_schedule
+          retention_policy = local.cnpg_backup_retention
+          region           = local.aws_region
         }
       }
     } : {},
@@ -126,15 +136,17 @@ module "local_operator_artifacts" {
   ansible_runtime_content = jsonencode(merge(
     local.gcp_enabled ? {
       gcp = {
-        k3s_api_endpoint        = local.gcp_k3s_api_lb_enabled ? try(module.gcp_k3s_api_lb[0].ip_address, "") : ""
-        headlamp_ingress_ip     = local.gcp_k3s_ingress_lb_enabled ? try(module.gcp_k3s_ingress_lb[0].ip_address, "") : ""
-        headlamp_tunnel_enabled = local.headlamp_tunnel_enabled
-        headlamp_tunnel_token   = local.headlamp_tunnel_enabled ? cloudflare_zero_trust_tunnel_cloudflared.headlamp[0].tunnel_token : ""
-        headlamp_public_host    = local.headlamp_domain
-        homepage_public_ip      = local.gcp_k3s_public_ingress_lb_enabled ? try(module.gcp_k3s_public_ingress_lb[0].ip_address, "") : ""
-        homepage_public_host    = local.homepage_domain
-        database_ip             = try(module.gcp_database[0].private_ip, "")
-        use_managed_db          = try(module.gcp_database[0].private_ip, "") != ""
+        k3s_api_endpoint                = local.gcp_k3s_api_lb_enabled ? try(module.gcp_k3s_api_lb[0].ip_address, "") : ""
+        headlamp_ingress_ip             = local.gcp_k3s_ingress_lb_enabled ? try(module.gcp_k3s_ingress_lb[0].ip_address, "") : ""
+        headlamp_tunnel_enabled         = local.headlamp_tunnel_enabled
+        headlamp_tunnel_token           = local.headlamp_tunnel_enabled ? cloudflare_zero_trust_tunnel_cloudflared.headlamp[0].tunnel_token : ""
+        headlamp_public_host            = local.headlamp_domain
+        homepage_public_ip              = local.gcp_k3s_public_ingress_lb_enabled ? try(module.gcp_k3s_public_ingress_lb[0].ip_address, "") : ""
+        homepage_public_host            = local.homepage_domain
+        homepage_public_endpoint        = local.gcp_k3s_public_ingress_lb_enabled ? try(module.gcp_k3s_public_ingress_lb[0].ip_address, "") : ""
+        public_ingress_load_balancer_ip = local.gcp_k3s_public_ingress_lb_enabled ? try(module.gcp_k3s_public_ingress_lb[0].ip_address, "") : ""
+        database_ip                     = try(module.gcp_database[0].private_ip, "")
+        use_managed_db                  = try(module.gcp_database[0].private_ip, "") != ""
         database = {
           host    = try(module.gcp_database[0].private_ip, "")
           port    = local.db_port
@@ -143,6 +155,7 @@ module "local_operator_artifacts" {
           managed = try(module.gcp_database[0].private_ip, "") != ""
         }
         cnpg_backup = {
+          provider         = "gcs"
           enabled          = local.cnpg_backup_enabled
           bucket           = local.cnpg_backup_bucket_name
           destination_path = local.cnpg_backup_destination
@@ -153,14 +166,30 @@ module "local_operator_artifacts" {
     } : {},
     local.aws_enabled ? {
       aws = {
-        database_ip    = try(module.aws_database[0].address, "")
-        use_managed_db = try(module.aws_database[0].address, "") != ""
+        k3s_api_endpoint                      = local.aws_k3s_api_lb_enabled ? try(module.aws_k3s_api_lb[0].dns_name, "") : ""
+        headlamp_tunnel_enabled               = local.headlamp_tunnel_enabled
+        headlamp_tunnel_token                 = local.headlamp_tunnel_enabled ? cloudflare_zero_trust_tunnel_cloudflared.headlamp[0].tunnel_token : ""
+        headlamp_public_host                  = local.headlamp_domain
+        homepage_public_host                  = local.homepage_domain
+        homepage_public_endpoint              = local.aws_k3s_public_ingress_lb_enabled ? try(module.aws_k3s_public_ingress_lb[0].dns_name, "") : ""
+        public_ingress_load_balancer_dns_name = local.aws_k3s_public_ingress_lb_enabled ? try(module.aws_k3s_public_ingress_lb[0].dns_name, "") : ""
+        database_ip                           = try(module.aws_database[0].address, "")
+        use_managed_db                        = try(module.aws_database[0].address, "") != ""
         database = {
           host    = try(module.aws_database[0].address, "")
           port    = try(module.aws_database[0].port, local.db_port)
           name    = local.db_name
           user    = local.db_username
           managed = try(module.aws_database[0].address, "") != ""
+        }
+        cnpg_backup = {
+          provider         = "s3"
+          enabled          = local.aws_cnpg_backup_enabled
+          bucket           = local.aws_cnpg_backup_bucket_name
+          destination_path = local.aws_cnpg_backup_destination
+          schedule         = local.cnpg_backup_schedule
+          retention_policy = local.cnpg_backup_retention
+          region           = local.aws_region
         }
       }
     } : {},

@@ -33,10 +33,10 @@
         "aws": {
             "europe-central": {
                 "region": "eu-central-1",
-                "zone": "eu-central-1a",
+                "zone": "eu-central-1b",
                 "zones": {
-                    "primary": "eu-central-1a",
-                    "secondary": "eu-central-1b"
+                    "primary": "eu-central-1b",
+                    "secondary": "eu-central-1c"
                 }
             },
             "europe-west": {

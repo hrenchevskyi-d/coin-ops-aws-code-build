@@ -37,6 +37,8 @@
           k3s_api_endpoint: "{{ cloud_runtime_metadata.get('k3s_api_endpoint', '') }}"
           headlamp_ingress_ip: "{{ cloud_runtime_metadata.get('headlamp_ingress_ip', '') }}"
           homepage_public_ip: "{{ cloud_runtime_metadata.get('homepage_public_ip', '') }}"
+          homepage_public_endpoint: "{{ cloud_runtime_metadata.get('homepage_public_endpoint', '') }}"
+          public_ingress_load_balancer_dns_name: "{{ cloud_runtime_metadata.get('public_ingress_load_balancer_dns_name', '') }}"
           homepage_public_host: "{{ cloud_runtime_metadata.get('homepage_public_host', '') }}"
           tailscale_enabled: "{{ tailscale_enabled }}"
       tags: [runtime_config]

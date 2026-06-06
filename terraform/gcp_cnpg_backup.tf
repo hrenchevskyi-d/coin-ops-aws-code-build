@@ -1,6 +1,6 @@
 # GCS target and credentials used by CNPG Barman Cloud Plugin backups.
 resource "google_storage_bucket" "cnpg_backups" {
-  count = local.cnpg_backup_enabled ? 1 : 0
+  count = local.gcp_cnpg_backup_enabled ? 1 : 0
 
   name                        = local.cnpg_backup_bucket_name
   location                    = local.gcp_region
@@ -18,7 +18,7 @@ resource "google_storage_bucket" "cnpg_backups" {
 }
 
 resource "google_service_account" "cnpg_backup" {
-  count = local.cnpg_backup_enabled ? 1 : 0
+  count = local.gcp_cnpg_backup_enabled ? 1 : 0
 
   account_id   = substr(lower("${replace(local.project_name, "_", "-")}-cnpg-backup"), 0, 30)
   display_name = "${local.project_name} CNPG backup writer"
@@ -26,7 +26,7 @@ resource "google_service_account" "cnpg_backup" {
 }
 
 resource "google_storage_bucket_iam_member" "cnpg_backup_object_admin" {
-  count = local.cnpg_backup_enabled ? 1 : 0
+  count = local.gcp_cnpg_backup_enabled ? 1 : 0
 
   bucket = google_storage_bucket.cnpg_backups[0].name
   role   = "roles/storage.objectAdmin"
@@ -34,7 +34,7 @@ resource "google_storage_bucket_iam_member" "cnpg_backup_object_admin" {
 }
 
 resource "google_storage_bucket_iam_member" "cnpg_backup_bucket_reader" {
-  count = local.cnpg_backup_enabled ? 1 : 0
+  count = local.gcp_cnpg_backup_enabled ? 1 : 0
 
   bucket = google_storage_bucket.cnpg_backups[0].name
   role   = "roles/storage.legacyBucketReader"
@@ -42,7 +42,7 @@ resource "google_storage_bucket_iam_member" "cnpg_backup_bucket_reader" {
 }
 
 resource "google_service_account_key" "cnpg_backup" {
-  count = local.cnpg_backup_enabled ? 1 : 0
+  count = local.gcp_cnpg_backup_enabled ? 1 : 0
 
   service_account_id = google_service_account.cnpg_backup[0].name
 }

@@ -38,8 +38,13 @@ metadata:
     cnpg.io/reload: "true"
 type: Opaque
 stringData:
+{% if k3s_coinops_data_backup_provider == "s3" %}
+  {{ k3s_coinops_data_backup_s3_access_key_id_secret_key }}: "{{ cnpg_backup_s3_access_key_id }}"
+  {{ k3s_coinops_data_backup_s3_secret_access_key_secret_key }}: "{{ cnpg_backup_s3_secret_access_key }}"
+{% else %}
   {{ k3s_coinops_data_backup_credentials_secret_key }}: |
 {{ (cnpg_backup_gcs_credentials if cnpg_backup_gcs_credentials is string else (cnpg_backup_gcs_credentials | to_json)) | indent(4, true) }}
+{% endif %}
 {% endif %}
 ---
 # Runtime SQL is mounted into the one-shot bootstrap job.
@@ -110,10 +115,20 @@ spec:
   retentionPolicy: {{ k3s_coinops_data_backup_retention_policy | quote }}
   configuration:
     destinationPath: {{ k3s_coinops_data_backup_destination_path | quote }}
+{% if k3s_coinops_data_backup_provider == "s3" %}
+    s3Credentials:
+      accessKeyId:
+        name: {{ k3s_coinops_data_backup_credentials_secret_name }}
+        key: {{ k3s_coinops_data_backup_s3_access_key_id_secret_key }}
+      secretAccessKey:
+        name: {{ k3s_coinops_data_backup_credentials_secret_name }}
+        key: {{ k3s_coinops_data_backup_s3_secret_access_key_secret_key }}
+{% else %}
     googleCredentials:
       applicationCredentials:
         name: {{ k3s_coinops_data_backup_credentials_secret_name }}
         key: {{ k3s_coinops_data_backup_credentials_secret_key }}
+{% endif %}
     wal:
       compression: gzip
     data:

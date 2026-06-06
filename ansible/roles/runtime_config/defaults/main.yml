@@ -225,6 +225,8 @@ registry_token: ""
 cloudflare_api_token: ""
 tailscale_auth_key: ""
 cnpg_backup_gcs_credentials: ""
+cnpg_backup_s3_access_key_id: ""
+cnpg_backup_s3_secret_access_key: ""
 
 rabbitmq_user: cognitor
 database_metadata: "{{ cloud_runtime_metadata.get('database', {}) }}"

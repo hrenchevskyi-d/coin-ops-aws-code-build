@@ -1,5 +1,10 @@
 {
-    "routing": {},
+    "routing": {
+        "private_default_route": {
+            "name": "private-default-via-jump-host",
+            "destination_cidr": "0.0.0.0/0"
+        }
+    },
     "security": {
         "egress_cidrs": [
             "0.0.0.0/0"
@@ -60,6 +65,24 @@
         "aws": {
             "vpc_name": "coin-ops-aws-vpc",
             "vpc_cidr": "10.30.0.0/16",
+            "k3s_api_load_balancer": {
+                "enabled": true,
+                "name": "coin-ops-k3s-api",
+                "port": 6443,
+                "internal_subnets": [
+                    "internal"
+                ],
+                "health_check_port": 6443
+            },
+            "k3s_public_ingress_load_balancer": {
+                "enabled": true,
+                "name": "coin-ops-k3s-public-ingress",
+                "port": 443,
+                "public_subnets": [
+                    "external"
+                ],
+                "health_check_port": 443
+            },
             "subnets": {
                 "internal": {
                     "cidr": "10.30.1.0/24",
@@ -126,6 +149,29 @@
             ],
             "target_role": "jump-host"
         },
+        "allow-private-nat-to-jump-host": {
+            "protocols": [
+                {
+                    "protocol": "tcp",
+                    "ports": [
+                        "0-65535"
+                    ]
+                },
+                {
+                    "protocol": "udp",
+                    "ports": [
+                        "0-65535"
+                    ]
+                },
+                {
+                    "protocol": "icmp"
+                }
+            ],
+            "source_cidrs": [
+                "10.30.1.0/24"
+            ],
+            "target_role": "jump-host"
+        },
         "allow-k3s-server-admin-from-jump": {
             "protocols": [
                 {
@@ -160,7 +206,8 @@
                 }
             ],
             "source_cidrs": [
-                "10.20.0.0/16"
+                "10.20.0.0/16",
+                "10.30.0.0/16"
             ],
             "target_role": "k3s-server"
         },

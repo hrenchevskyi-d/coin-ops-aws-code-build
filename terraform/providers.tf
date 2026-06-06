@@ -50,7 +50,7 @@ provider "aws" {
 
 provider "cloudflare" {
   # Cloudflare validates this during init; placeholder keeps disabled plans usable.
-  api_token = trimspace(local.effective_cloudflare_api_token != "" ? local.effective_cloudflare_api_token : "placeholder_token")
+  api_token = local.cloudflare_provider_api_token
 }
 
 provider "google" {

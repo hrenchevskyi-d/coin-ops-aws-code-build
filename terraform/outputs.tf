@@ -58,14 +58,24 @@ output "database_endpoints" {
 
 output "public_endpoints" {
   description = "Public application endpoints for the k3s ingress path."
-  value = local.gcp_k3s_public_ingress_lb_enabled ? {
-    gcp = {
-      public_ip  = local.coinops_public_ip
-      direct_url = format("https://%s", local.coinops_public_ip)
-      dns_name   = local.coinops_domain
-      dns_url    = format("https://%s", local.coinops_domain)
-    }
-  } : {}
+  value = merge(
+    local.gcp_k3s_public_ingress_lb_enabled ? {
+      gcp = {
+        public_ip  = local.coinops_public_ip
+        direct_url = format("https://%s", local.coinops_public_ip)
+        dns_name   = local.coinops_domain
+        dns_url    = format("https://%s", local.coinops_domain)
+      }
+    } : {},
+    local.aws_k3s_public_ingress_lb_enabled ? {
+      aws = {
+        public_dns = local.coinops_public_dns
+        direct_url = format("https://%s", local.coinops_public_dns)
+        dns_name   = local.coinops_domain
+        dns_url    = format("https://%s", local.coinops_domain)
+      }
+    } : {}
+  )
 }
 
 output "control_plane_cloud" {
@@ -88,7 +98,17 @@ output "gcp_k3s_public_ingress_load_balancer_ip" {
   value       = local.gcp_k3s_public_ingress_lb_enabled ? try(module.gcp_k3s_public_ingress_lb[0].ip_address, "") : ""
 }
 
+output "aws_k3s_api_load_balancer_dns_name" {
+  description = "Internal HA endpoint for the k3s Kubernetes API in AWS."
+  value       = local.aws_k3s_api_lb_enabled ? try(module.aws_k3s_api_lb[0].dns_name, "") : ""
+}
+
+output "aws_k3s_public_ingress_load_balancer_dns_name" {
+  description = "Public HTTPS endpoint for Homepage and future public apps in AWS."
+  value       = local.aws_k3s_public_ingress_lb_enabled ? try(module.aws_k3s_public_ingress_lb[0].dns_name, "") : ""
+}
+
 output "homepage_public_url" {
-  description = "Preferred public Homepage URL when the GCP public ingress load balancer is enabled."
-  value       = local.gcp_k3s_public_ingress_lb_enabled ? "https://${local.homepage_domain}" : ""
+  description = "Preferred public Homepage URL when a public k3s ingress load balancer is enabled."
+  value       = local.gcp_k3s_public_ingress_lb_enabled || local.aws_k3s_public_ingress_lb_enabled ? "https://${local.homepage_domain}" : ""
 }

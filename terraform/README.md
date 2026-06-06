@@ -150,7 +150,7 @@ bash full-destroy.sh --yes-really-destroy-stateful --cloud gcp -var='suppress_se
 and keeps the checked-in files untouched. In that temporary copy it:
 
 - removes `prevent_destroy` from database, secrets, and CNPG backup resources
-- sets the CNPG GCS backup bucket to force-delete only in the temporary copy
+- sets CNPG object-storage backup buckets to force-delete only in the temporary copy
 - keeps CNPG backup resources instantiated in the temporary copy so destroy
   receives the force-delete bucket configuration
 - disables AWS RDS deletion protection before teardown

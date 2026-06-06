@@ -11,7 +11,6 @@ LOCALHOST_INVENTORY := $(ANSIBLE_DIR)/inventory/localhost.yml
 CLOUD_INVENTORIES := -i "$(AWS_INVENTORY)" -i "$(AZURE_INVENTORY)" -i "$(GCP_INVENTORY)"
 ENV_FILE := $(REPO_ROOT)/local/generated-env.sh
 K8S_ARTIFACTS_DIR := $(ANSIBLE_DIR)/artifacts
-K8S_TUNNELED_KUBECONFIG := $(K8S_ARTIFACTS_DIR)/kubeconfig-gcp-k3s-tunneled.yaml
 K8S_OPERATOR_ENV := $(K8S_ARTIFACTS_DIR)/k8s-operator-env.sh
 HEADLAMP_START_SCRIPT := $(K8S_ARTIFACTS_DIR)/headlamp-start.sh
 K8S_API_TUNNEL_SCRIPT := $(K8S_ARTIFACTS_DIR)/k8s-api-tunnel.sh
@@ -21,6 +20,11 @@ HOST ?=
 LIMIT ?=
 TF_APPLY_ARGS ?=
 TF_DESTROY_ARGS ?=
+CONFIG_CONTROL_PLANE_CLOUD := $(shell python3 -c 'import json; print(json.load(open("terraform/config/clouds.json")).get("clouds", {}).get("control_plane", "gcp"))' 2>/dev/null || echo gcp)
+K8S_CLUSTER ?=
+K8S_CLOUD ?= $(if $(K8S_CLUSTER),$(K8S_CLUSTER),$(CONFIG_CONTROL_PLANE_CLOUD))
+K8S_TUNNELED_KUBECONFIG := $(K8S_ARTIFACTS_DIR)/kubeconfig-$(K8S_CLOUD)-k3s-tunneled.yaml
+K3S_INVENTORY := $(if $(filter aws,$(K8S_CLOUD)),$(AWS_INVENTORY),$(if $(filter azure,$(K8S_CLOUD)),$(AZURE_INVENTORY),$(GCP_INVENTORY)))
 
 ENV_PREFIX = source "$(ENV_FILE)" &&
 # Use the repo-local virtualenv only for localhost execution. Remote hosts
@@ -58,11 +62,11 @@ help:
 	@echo "  make ansible-check           - Run local syntax checks for the main Ansible entrypoints"
 	@echo "  make provision               - Run ansible/provision.yml"
 	@echo "  make deploy                  - Run ansible/deploy.yml"
-	@echo "  make k3s-cluster             - Run ansible/k3s-cluster.yml against GCP dynamic inventory"
-	@echo "  make k3s-headlamp            - Run ansible/k3s-headlamp.yml against GCP dynamic inventory"
-	@echo "  make k3s-homepage            - Run ansible/k3s-homepage.yml against GCP dynamic inventory"
-	@echo "  make k3s-coinops             - Run ansible/k3s-coinops.yml against GCP dynamic inventory"
-	@echo "  make k3s-platform            - Run ansible/k3s-platform.yml against GCP dynamic inventory"
+	@echo "  make k3s-cluster             - Run ansible/k3s-cluster.yml against selected cloud inventory"
+	@echo "  make k3s-headlamp            - Run ansible/k3s-headlamp.yml against selected cloud inventory"
+	@echo "  make k3s-homepage            - Run ansible/k3s-homepage.yml against selected cloud inventory"
+	@echo "  make k3s-coinops             - Run ansible/k3s-coinops.yml against selected cloud inventory"
+	@echo "  make k3s-platform            - Run ansible/k3s-platform.yml against selected cloud inventory"
 	@echo "  make headlamp-start          - Start Headlamp access"
 	@echo "  make headlamp-token          - Print a Headlamp login token"
 	@echo "  make k8s-env                 - Print the source command for kubectl access"
@@ -72,6 +76,8 @@ help:
 	@echo "  LIMIT=role_app_backend       - Pass --limit to provision/deploy"
 	@echo "  TF_APPLY_ARGS='-auto-approve'"
 	@echo "  TF_DESTROY_ARGS='-auto-approve'"
+	@echo "  K8S_CLOUD=aws               - Use AWS k3s inventory and generated kubeconfig artifacts"
+	@echo "  K8S_CLUSTER=aws             - Alias for K8S_CLOUD=aws"
 
 infra-check:
 	cd "$(TF_DIR)" && terraform fmt -check -recursive
@@ -132,19 +138,19 @@ deploy:
 	$(ANSIBLE_CMD) ansible-playbook $(CLOUD_INVENTORIES) "$(ANSIBLE_DIR)/deploy.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
 
 k3s-cluster:
-	$(ANSIBLE_CMD) ansible-playbook -i "$(LOCALHOST_INVENTORY)" -i "$(GCP_INVENTORY)" "$(ANSIBLE_DIR)/k3s-cluster.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
+	$(ANSIBLE_CMD) ansible-playbook -i "$(LOCALHOST_INVENTORY)" -i "$(K3S_INVENTORY)" "$(ANSIBLE_DIR)/k3s-cluster.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
 
 k3s-headlamp: ensure-k8s-api-tunnel
-	$(ANSIBLE_CMD) ansible-playbook -i "$(LOCALHOST_INVENTORY)" -i "$(GCP_INVENTORY)" "$(ANSIBLE_DIR)/k3s-headlamp.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
+	$(ANSIBLE_CMD) ansible-playbook -i "$(LOCALHOST_INVENTORY)" -i "$(K3S_INVENTORY)" "$(ANSIBLE_DIR)/k3s-headlamp.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
 
 k3s-homepage: ensure-k8s-api-tunnel
-	$(ANSIBLE_CMD) ansible-playbook -i "$(LOCALHOST_INVENTORY)" -i "$(GCP_INVENTORY)" "$(ANSIBLE_DIR)/k3s-homepage.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
+	$(ANSIBLE_CMD) ansible-playbook -i "$(LOCALHOST_INVENTORY)" -i "$(K3S_INVENTORY)" "$(ANSIBLE_DIR)/k3s-homepage.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
 
 k3s-coinops: ensure-k8s-api-tunnel
-	$(ANSIBLE_CMD) ansible-playbook -i "$(LOCALHOST_INVENTORY)" -i "$(GCP_INVENTORY)" "$(ANSIBLE_DIR)/k3s-coinops.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
+	$(ANSIBLE_CMD) ansible-playbook -i "$(LOCALHOST_INVENTORY)" -i "$(K3S_INVENTORY)" "$(ANSIBLE_DIR)/k3s-coinops.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
 
 k3s-platform: ensure-k8s-api-tunnel
-	$(ANSIBLE_CMD) ansible-playbook -i "$(LOCALHOST_INVENTORY)" -i "$(GCP_INVENTORY)" "$(ANSIBLE_DIR)/k3s-platform.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
+	$(ANSIBLE_CMD) ansible-playbook -i "$(LOCALHOST_INVENTORY)" -i "$(K3S_INVENTORY)" "$(ANSIBLE_DIR)/k3s-platform.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
 
 k8s-api-ready: ensure-k8s-api-tunnel
 

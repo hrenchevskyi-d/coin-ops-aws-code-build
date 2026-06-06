@@ -9,7 +9,7 @@ Cloudflare Access login: `GitHub`
 The private Headlamp ingress load balancer is no longer used for the primary browser path.
 {% elif k3s_headlamp_ingress_enabled | bool %}Preferred URL: `{{ headlamp_access_scheme }}://{{ k3s_headlamp_ingress_host }}/`
 
-Ingress load balancer IP: `{{ headlamp_access_ip }}`
+Ingress load balancer endpoint: `{{ headlamp_access_ip }}`
 {% else %}Preferred URL: `http://127.0.0.1:{{ k3s_headlamp_local_port }}/`
 
 Cloudflare Tunnel is configured in code but not yet active in runtime metadata. Until Terraform has created the tunnel token and DNS, use the port-forward fallback below.
@@ -17,7 +17,7 @@ Cloudflare Tunnel is configured in code but not yet active in runtime metadata. 
 
 Kubeconfig:
 
-`{{ k3s_headlamp_local_artifact_dir }}/kubeconfig-gcp-k3s-tunneled.yaml`
+`{{ k3s_headlamp_tunneled_kubeconfig_path }}`
 
 Port-forward script:
 

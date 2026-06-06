@@ -30,7 +30,7 @@ ansible/artifacts/headlamp-start.sh
 Generate a login token:
 
 ```bash
-KUBECONFIG=/home/notebook/projects/coin-ops/ansible/artifacts/kubeconfig-gcp-k3s-tunneled.yaml kubectl create token headlamp-admin -n headlamp
+make headlamp-token
 ```
 
 ## Notes

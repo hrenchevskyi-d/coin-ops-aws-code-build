@@ -15,6 +15,11 @@ make k3s-coinops
 
 `k3s-cluster.yml` prepares the three server nodes, bootstraps the first server, joins the rest, configures packaged Traefik, and writes local access files.
 
+AWS k3s uses the same playbooks, but Terraform config must explicitly enable
+AWS and allow the `k3s-server-*` instances on AWS in `terraform/config/instances.json`.
+For AWS runs, use `K8S_CLOUD=aws` so Makefile targets select the AWS inventory
+and the AWS-generated kubeconfig artifact names.
+
 ## Operator Artifacts
 
 Generated kubeconfigs and tunnel scripts are written under `ansible/artifacts/`. They are local, sensitive, and ignored by git.

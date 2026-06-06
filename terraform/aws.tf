@@ -58,6 +58,50 @@ module "aws_nat_route" {
   depends_on = [module.aws_instances]
 }
 
+module "aws_k3s_api_lb" {
+  count  = local.aws_k3s_api_lb_enabled ? 1 : 0
+  source = "./modules/cloud/aws/network_load_balancer"
+
+  name       = try(local.aws_k3s_api_lb_cfg.name, "${local.project_name}-k3s-api")
+  vpc_id     = module.aws_network[0].vpc_id
+  subnet_ids = [for name in try(local.aws_k3s_api_lb_cfg.internal_subnets, ["internal"]) : module.aws_network[0].subnet_ids[name]]
+  internal   = true
+  target_instance_ids = {
+    for name in local.aws_k3s_server_names : name => module.aws_instances[0].instance_ids[name]
+  }
+  target_security_group_id          = try(module.aws_security_groups[0].sg_ids["k3s-server"], "")
+  allowed_target_cidrs              = [local.aws_vpc_cidr]
+  enable_target_security_group_rule = false
+  port                              = try(local.aws_k3s_api_lb_cfg.port, 6443)
+  health_check_port                 = try(local.aws_k3s_api_lb_cfg.health_check_port, 6443)
+  tags = {
+    Project = local.project_name
+    Cloud   = "aws"
+  }
+}
+
+module "aws_k3s_public_ingress_lb" {
+  count  = local.aws_k3s_public_ingress_lb_enabled ? 1 : 0
+  source = "./modules/cloud/aws/network_load_balancer"
+
+  name       = try(local.aws_k3s_public_ingress_lb_cfg.name, "${local.project_name}-k3s-public-ingress")
+  vpc_id     = module.aws_network[0].vpc_id
+  subnet_ids = [for name in try(local.aws_k3s_public_ingress_lb_cfg.public_subnets, ["external"]) : module.aws_network[0].subnet_ids[name]]
+  internal   = false
+  target_instance_ids = {
+    for name in local.aws_k3s_server_names : name => module.aws_instances[0].instance_ids[name]
+  }
+  target_security_group_id          = try(module.aws_security_groups[0].sg_ids["k3s-server"], "")
+  allowed_target_cidrs              = [local.aws_vpc_cidr]
+  enable_target_security_group_rule = false
+  port                              = try(local.aws_k3s_public_ingress_lb_cfg.port, 443)
+  health_check_port                 = try(local.aws_k3s_public_ingress_lb_cfg.health_check_port, 443)
+  tags = {
+    Project = local.project_name
+    Cloud   = "aws"
+  }
+}
+
 module "aws_database" {
   count                     = local.aws_enabled && local.database_enabled ? 1 : 0
   source                    = "./modules/cloud/aws/database"
@@ -78,15 +122,17 @@ module "aws_database" {
 }
 
 module "aws_secrets" {
-  count                      = local.write_aws_secret_backend ? 1 : 0
-  source                     = "./modules/cloud/aws/secrets"
-  db_secret_name             = local.db_secret_name
-  app_secret_name            = local.app_secret_name
-  db_password                = local.effective_db_password
-  rabbitmq_password          = local.effective_rabbitmq_password
-  ghcr_token                 = local.effective_ghcr_token
-  cloudflare_api_token       = local.effective_cloudflare_api_token
-  tailscale_auth_key         = local.effective_tailscale_auth_key
-  github_oauth_client_id     = local.effective_github_oauth_client_id
-  github_oauth_client_secret = local.effective_github_oauth_client_secret
+  count                            = local.write_aws_secret_backend ? 1 : 0
+  source                           = "./modules/cloud/aws/secrets"
+  db_secret_name                   = local.db_secret_name
+  app_secret_name                  = local.app_secret_name
+  db_password                      = local.effective_db_password
+  rabbitmq_password                = local.effective_rabbitmq_password
+  ghcr_token                       = local.effective_ghcr_token
+  cloudflare_api_token             = local.effective_cloudflare_api_token
+  tailscale_auth_key               = local.effective_tailscale_auth_key
+  github_oauth_client_id           = local.effective_github_oauth_client_id
+  github_oauth_client_secret       = local.effective_github_oauth_client_secret
+  cnpg_backup_s3_access_key_id     = local.effective_cnpg_backup_s3_access_key_id
+  cnpg_backup_s3_secret_access_key = local.effective_cnpg_backup_s3_secret_access_key
 }

@@ -14,3 +14,5 @@ k3s_headlamp_ingress_enabled: "{{ deploy_config.headlamp_ingress_enabled | defau
 k3s_headlamp_ingress_host: "{{ deploy_config.headlamp_hostname | default('headlamp.' ~ app_domain) }}"
 k3s_headlamp_ingress_class_name: "{{ deploy_config.headlamp_ingress_class_name | default('traefik') }}"
 k3s_headlamp_local_artifact_dir: "{{ repo_root ~ '/ansible/artifacts' }}"
+k3s_headlamp_cloud_slug: "{{ my_cloud | default('cluster', true) }}"
+k3s_headlamp_tunneled_kubeconfig_path: "{{ k3s_headlamp_local_artifact_dir }}/kubeconfig-{{ k3s_headlamp_cloud_slug }}-k3s-tunneled.yaml"

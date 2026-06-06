@@ -7,6 +7,7 @@ k3s_kubeconfig_access_controller_hosts:
   - localhost
   - 127.0.0.1
 k3s_kubeconfig_access_local_artifact_dir: "{{ repo_root ~ '/ansible/artifacts' }}"
-k3s_kubeconfig_access_local_cluster_kubeconfig_path: "{{ k3s_kubeconfig_access_local_artifact_dir }}/kubeconfig-gcp-k3s-tunneled.yaml"
+k3s_kubeconfig_access_cloud_slug: "{{ my_cloud | default('cluster', true) }}"
+k3s_kubeconfig_access_local_cluster_kubeconfig_path: "{{ k3s_kubeconfig_access_local_artifact_dir }}/kubeconfig-{{ k3s_kubeconfig_access_cloud_slug }}-k3s-tunneled.yaml"
 k3s_kubeconfig_access_remote_kubeconfig_path: /etc/rancher/k3s/k3s.yaml
 k3s_kubeconfig_access_remote_fallback_kubeconfig_path: /tmp/coinops-k3s-kubeconfig.yaml

@@ -63,7 +63,7 @@
 
 - name: Write local kubeconfig
   template:
-    dest: "{{ k3s_postcheck_local_artifact_dir }}/kubeconfig-gcp-k3s.yaml"
+    dest: "{{ k3s_postcheck_local_kubeconfig_path }}"
     src: kubeconfig-gcp-k3s.yaml.j2
     mode: "0600"
   delegate_to: localhost
@@ -73,7 +73,7 @@
 # Tunneled kubeconfig keeps TLS verification while using SSH for private APIs.
 - name: Write tunneled kubeconfig
   template:
-    dest: "{{ k3s_postcheck_local_artifact_dir }}/kubeconfig-gcp-k3s-tunneled.yaml"
+    dest: "{{ k3s_postcheck_local_tunneled_kubeconfig_path }}"
     src: kubeconfig-gcp-k3s-tunneled.yaml.j2
     mode: "0600"
   delegate_to: localhost

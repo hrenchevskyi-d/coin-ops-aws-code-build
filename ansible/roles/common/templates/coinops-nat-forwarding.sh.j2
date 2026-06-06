@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PRIVATE_SUBNET_CIDR="{{ common_nat_private_subnet_cidr }}"
+
+if [ -z "$PRIVATE_SUBNET_CIDR" ]; then
+  echo "common_nat_private_subnet_cidr is empty; refusing to configure NAT." >&2
+  exit 1
+fi
+
+cat >/etc/sysctl.d/99-coinops-nat.conf <<'EOF'
+net.ipv4.ip_forward = 1
+EOF
+sysctl -w net.ipv4.ip_forward=1 >/dev/null
+
+IFACE="$(ip route show default | awk '/default/ { print $5 }' | head -1)"
+if [ -z "$IFACE" ]; then
+  echo "Could not detect default route interface." >&2
+  exit 1
+fi
+
+iptables -t nat -C POSTROUTING -s "$PRIVATE_SUBNET_CIDR" -o "$IFACE" -j MASQUERADE 2>/dev/null || \
+  iptables -t nat -A POSTROUTING -s "$PRIVATE_SUBNET_CIDR" -o "$IFACE" -j MASQUERADE
+
+iptables -C FORWARD -s "$PRIVATE_SUBNET_CIDR" -o "$IFACE" -j ACCEPT 2>/dev/null || \
+  iptables -A FORWARD -s "$PRIVATE_SUBNET_CIDR" -o "$IFACE" -j ACCEPT
+
+iptables -C FORWARD -d "$PRIVATE_SUBNET_CIDR" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || \
+  iptables -A FORWARD -d "$PRIVATE_SUBNET_CIDR" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT

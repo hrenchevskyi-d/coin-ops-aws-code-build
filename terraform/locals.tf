@@ -151,17 +151,49 @@ locals {
 
   cnpg_backup_cfg = merge({
     enabled        = true
+    provider       = ""
     bucket_name    = ""
     path           = "coinops-postgres"
     retention_days = 30
     schedule       = "0 0 2 * * *"
   }, try(local.deploy.cnpg_backup, {}))
-  cnpg_backup_enabled     = local.gcp_enabled && local.secrets_enabled && local.secret_backend == "gcp" && try(local.cnpg_backup_cfg.enabled, true)
-  cnpg_backup_bucket_name = try(local.cnpg_backup_cfg.bucket_name, "") != "" ? local.cnpg_backup_cfg.bucket_name : lower("${local.project_name}-${substr(md5(local.gcp_project_id), 0, 8)}-cnpg-backups")
-  cnpg_backup_path        = trim(try(local.cnpg_backup_cfg.path, "coinops-postgres"), "/")
-  cnpg_backup_destination = "gs://${local.cnpg_backup_bucket_name}/${local.cnpg_backup_path}"
-  cnpg_backup_schedule    = try(local.cnpg_backup_cfg.schedule, "0 0 2 * * *")
-  cnpg_backup_retention   = "${try(local.cnpg_backup_cfg.retention_days, 30)}d"
+  cnpg_backup_provider = (
+    trimspace(try(local.cnpg_backup_cfg.provider, "")) != ""
+    ? lower(trimspace(local.cnpg_backup_cfg.provider))
+    : (local.secret_backend == "aws" ? "s3" : "gcs")
+  )
+  gcp_cnpg_backup_enabled = (
+    local.gcp_enabled
+    && local.secrets_enabled
+    && local.secret_backend == "gcp"
+    && local.cnpg_backup_provider == "gcs"
+    && try(local.cnpg_backup_cfg.enabled, true)
+  )
+  aws_cnpg_backup_enabled = (
+    local.aws_enabled
+    && local.secrets_enabled
+    && local.secret_backend == "aws"
+    && local.cnpg_backup_provider == "s3"
+    && try(local.cnpg_backup_cfg.enabled, true)
+  )
+  cnpg_backup_enabled = local.gcp_cnpg_backup_enabled
+
+  cnpg_backup_path      = trim(try(local.cnpg_backup_cfg.path, "coinops-postgres"), "/")
+  cnpg_backup_schedule  = try(local.cnpg_backup_cfg.schedule, "0 0 2 * * *")
+  cnpg_backup_retention = "${try(local.cnpg_backup_cfg.retention_days, 30)}d"
+  gcp_cnpg_backup_bucket_name = (
+    try(local.cnpg_backup_cfg.bucket_name, "") != ""
+    ? local.cnpg_backup_cfg.bucket_name
+    : lower("${local.project_name}-${substr(md5(local.gcp_project_id), 0, 8)}-cnpg-backups")
+  )
+  aws_cnpg_backup_bucket_name = (
+    try(local.cnpg_backup_cfg.bucket_name, "") != ""
+    ? local.cnpg_backup_cfg.bucket_name
+    : lower("${replace(local.project_name, "_", "-")}-${substr(md5(coalesce(local.aws_account_id, local.aws_region)), 0, 8)}-cnpg-backups")
+  )
+  cnpg_backup_bucket_name     = local.gcp_cnpg_backup_bucket_name
+  cnpg_backup_destination     = "gs://${local.gcp_cnpg_backup_bucket_name}/${local.cnpg_backup_path}"
+  aws_cnpg_backup_destination = "s3://${local.aws_cnpg_backup_bucket_name}/${local.cnpg_backup_path}"
 
   db_name          = try(local.database.name, "cognitor")
   db_username      = try(local.database.username, "cognitor")
@@ -241,6 +273,41 @@ locals {
     local.gcp_compute_enabled
     && try(local.gcp_k3s_public_ingress_lb_cfg.enabled, false)
     && length(local.gcp_k3s_server_names) > 0
+  )
+
+  aws_k3s_server_names = local.aws_compute_enabled ? [
+    for name, cfg in local.aws_instances_base : name
+    if lookup(cfg, "role", "") == "k3s-server"
+  ] : []
+  aws_k3s_api_lb_cfg = merge(
+    {
+      enabled           = false
+      name              = "${local.project_name}-k3s-api"
+      port              = 6443
+      internal_subnets  = ["internal"]
+      health_check_port = 6443
+    },
+    try(local.aws_network_cfg.k3s_api_load_balancer, {})
+  )
+  aws_k3s_api_lb_enabled = (
+    local.aws_compute_enabled
+    && try(local.aws_k3s_api_lb_cfg.enabled, false)
+    && length(local.aws_k3s_server_names) > 0
+  )
+  aws_k3s_public_ingress_lb_cfg = merge(
+    {
+      enabled           = false
+      name              = "${local.project_name}-k3s-public-ingress"
+      port              = 443
+      public_subnets    = ["external"]
+      health_check_port = 443
+    },
+    try(local.aws_network_cfg.k3s_public_ingress_load_balancer, {})
+  )
+  aws_k3s_public_ingress_lb_enabled = (
+    local.aws_compute_enabled
+    && try(local.aws_k3s_public_ingress_lb_cfg.enabled, false)
+    && length(local.aws_k3s_server_names) > 0
   )
 
   gcp_jump_host_name = local.gcp_compute_enabled ? try([
@@ -534,6 +601,11 @@ locals {
   effective_cloudflare_api_token = (
     local.seed_secret_manager ? var.cloudflare_api_token : try(local.active_app_secrets.CLOUDFLARE_API_TOKEN, var.cloudflare_api_token)
   )
+  cloudflare_provider_api_token = (
+    trimspace(coalesce(nonsensitive(local.effective_cloudflare_api_token), "")) != ""
+    ? trimspace(coalesce(nonsensitive(local.effective_cloudflare_api_token), ""))
+    : "placeholder_token"
+  )
   effective_tailscale_auth_key = (
     local.seed_secret_manager ? var.tailscale_auth_key : try(local.active_app_secrets.TAILSCALE_AUTH_KEY, var.tailscale_auth_key)
   )
@@ -543,7 +615,12 @@ locals {
   effective_github_oauth_client_secret = (
     local.seed_secret_manager ? var.github_oauth_client_secret : try(local.active_app_secrets.GITHUB_OAUTH_CLIENT_SECRET, var.github_oauth_client_secret)
   )
-  effective_cnpg_backup_gcs_credentials = try(base64decode(google_service_account_key.cnpg_backup[0].private_key), try(local.active_app_secrets.CNPG_BACKUP_GCS_CREDENTIALS, ""))
+  effective_cnpg_backup_gcs_credentials  = try(base64decode(google_service_account_key.cnpg_backup[0].private_key), try(local.active_app_secrets.CNPG_BACKUP_GCS_CREDENTIALS, ""))
+  effective_cnpg_backup_s3_access_key_id = try(aws_iam_access_key.cnpg_backup[0].id, try(local.active_app_secrets.CNPG_BACKUP_S3_ACCESS_KEY_ID, ""))
+  effective_cnpg_backup_s3_secret_access_key = try(
+    aws_iam_access_key.cnpg_backup[0].secret,
+    try(local.active_app_secrets.CNPG_BACKUP_S3_SECRET_ACCESS_KEY, "")
+  )
   headlamp_tunnel_enabled = (
     try(local.headlamp_cfg.enabled, true)
     && try(local.headlamp_tunnel_cfg.enabled, false)

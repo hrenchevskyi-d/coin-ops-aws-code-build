@@ -1,6 +1,6 @@
 {
     "dns": {
-        "primary_cloud": "gcp",
+        "primary_cloud": "aws",
         "cloudflare": {
             "account_id": "c750bc7b5555f3b48a1380ca3fa86595",
             "zone_id": "de9eabb2b5b0b9b25b7ee2decc5d161b",

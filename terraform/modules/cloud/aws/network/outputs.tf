@@ -11,6 +11,11 @@ output "private_subnet_ids" {
   value       = { for name, subnet in aws_subnet.subnet : name => subnet.id if contains(keys(local.private_subnets), name) }
 }
 
+output "public_subnet_ids" {
+  description = "Subnet IDs for subnets with public = true."
+  value       = { for name, subnet in aws_subnet.subnet : name => subnet.id if contains(keys(local.public_subnets), name) }
+}
+
 output "database_subnet_ids" {
   description = "Private subnet IDs used by managed database subnet groups."
   value       = [for name, subnet in aws_subnet.subnet : subnet.id if contains(keys(local.private_subnets), name)]

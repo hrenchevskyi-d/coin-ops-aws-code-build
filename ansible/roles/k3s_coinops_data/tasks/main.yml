@@ -139,11 +139,12 @@
 - name: k3s-coinops-data-assert-backup-destination-metadata
   assert:
     that:
+      - k3s_coinops_data_backup_provider in ['gcs', 's3']
       - k3s_coinops_data_backup_destination_path | length > 0
     fail_msg: >-
-      CNPG backup is enabled, but Terraform runtime metadata does not include
-      cnpg_backup.destination_path. Run Terraform apply, then confirm
-      terraform/config/ansible-runtime.json contains .gcp.cnpg_backup.destination_path.
+      CNPG backup is enabled, but Terraform runtime metadata is missing or invalid.
+      Run Terraform apply, then confirm terraform/config/ansible-runtime.json
+      contains .<cloud>.cnpg_backup.provider and .<cloud>.cnpg_backup.destination_path.
   when:
     - k3s_coinops_data_enabled | bool
     - k3s_coinops_data_backup_enabled | bool
@@ -162,6 +163,24 @@
   when:
     - k3s_coinops_data_enabled | bool
     - k3s_coinops_data_backup_enabled | bool
+    - k3s_coinops_data_backup_provider == 'gcs'
+  tags: [coinops, k3s, cnpg, data, backup]
+
+- name: k3s-coinops-data-assert-backup-s3-credentials
+  assert:
+    that:
+      - cnpg_backup_s3_access_key_id | length > 0
+      - cnpg_backup_s3_secret_access_key | length > 0
+    fail_msg: >-
+      CNPG S3 backup is enabled, but CNPG_BACKUP_S3_ACCESS_KEY_ID or
+      CNPG_BACKUP_S3_SECRET_ACCESS_KEY is missing from the resolved app secret
+      payload. Re-run Terraform apply with the AWS backup resources enabled so
+      a fresh coinops-app-secrets version is written.
+  no_log: "{{ not (lookup('env', 'DEBUG_SECRET_LOOKUP') | default('false', true) | bool) }}"
+  when:
+    - k3s_coinops_data_enabled | bool
+    - k3s_coinops_data_backup_enabled | bool
+    - k3s_coinops_data_backup_provider == 's3'
   tags: [coinops, k3s, cnpg, data, backup]
 
 - name: k3s-coinops-data-ensure-namespace

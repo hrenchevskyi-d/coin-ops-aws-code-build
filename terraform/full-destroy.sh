@@ -210,6 +210,8 @@ for name in clouds_to_unguard:
     )
     if name == "gcp":
         files.append(terraform_dir / "gcp_cnpg_backup.tf")
+    if name == "aws":
+        files.append(terraform_dir / "aws_cnpg_backup.tf")
 
 lifecycle_pattern = re.compile(
     r"\n\s*lifecycle\s*\{\s*\n\s*prevent_destroy\s*=\s*true\s*\n\s*\}\s*\n",
@@ -221,12 +223,13 @@ for path in files:
         continue
     content = path.read_text(encoding="utf-8")
     content = lifecycle_pattern.sub("\n", content)
-    if path.name == "gcp_cnpg_backup.tf":
+    if path.name in ("gcp_cnpg_backup.tf", "aws_cnpg_backup.tf"):
         content = re.sub(
-            r"(?m)^(\s*)count\s*=\s*local\.cnpg_backup_enabled\s*\?\s*1\s*:\s*0\s*$",
+            r"(?m)^(\s*)count\s*=\s*local\.(?:gcp_|aws_)?cnpg_backup_enabled\s*\?\s*1\s*:\s*0\s*$",
             r"\1count = 1",
             content,
         )
+    if path.name == "gcp_cnpg_backup.tf":
         if re.search(r"(?m)^\s*force_destroy\s*=", content):
             content = re.sub(
                 r"(?m)^(\s*)force_destroy\s*=.*$",
@@ -241,6 +244,13 @@ for path in files:
                 content,
                 count=1,
             )
+    if path.name == "aws_cnpg_backup.tf":
+        content = re.sub(
+            r"(?m)^(\s*)force_destroy\s*=.*$",
+            r"\1force_destroy = true",
+            content,
+            count=1,
+        )
     if path.name == "main.tf" and path.parent.name == "database":
         content = content.replace("deletion_protection = true", "deletion_protection = false")
         content = content.replace("skip_final_snapshot         = false", "skip_final_snapshot         = true")
@@ -747,10 +757,19 @@ build_destroy_command() {
       aws)
         cmd+=(
           -target=module.aws_nat_route
+          -target=module.aws_k3s_api_lb
+          -target=module.aws_k3s_public_ingress_lb
           -target=module.aws_instances
           -target=module.aws_security_groups
           -target=module.aws_database
           -target=module.aws_secrets
+          -target=aws_iam_access_key.cnpg_backup
+          -target=aws_iam_user_policy.cnpg_backup
+          -target=aws_iam_user.cnpg_backup
+          -target=aws_s3_bucket_server_side_encryption_configuration.cnpg_backups
+          -target=aws_s3_bucket_versioning.cnpg_backups
+          -target=aws_s3_bucket_public_access_block.cnpg_backups
+          -target=aws_s3_bucket.cnpg_backups
           -target=module.aws_network
         )
         ;;
