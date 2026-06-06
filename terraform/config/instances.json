@@ -16,7 +16,7 @@
         "k3s-server-1": {
             "subnet": "internal",
             "has_public_ip": false,
-            "instance_size": "medium",
+            "instance_size": "small",
             "disk_size": 40,
             "role": "k3s-server",
             "clouds": [
@@ -26,7 +26,7 @@
         "k3s-server-2": {
             "subnet": "internal",
             "has_public_ip": false,
-            "instance_size": "medium",
+            "instance_size": "small",
             "disk_size": 40,
             "role": "k3s-server",
             "clouds": [
@@ -36,7 +36,7 @@
         "k3s-server-3": {
             "subnet": "internal",
             "has_public_ip": false,
-            "instance_size": "medium",
+            "instance_size": "small",
             "disk_size": 40,
             "role": "k3s-server",
             "clouds": [
