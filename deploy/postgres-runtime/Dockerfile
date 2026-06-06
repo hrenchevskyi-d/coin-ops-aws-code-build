@@ -29,7 +29,7 @@ COPY --from=tembo-pgmq /usr/share/postgresql/16/extension/pgmq* /usr/share/postg
 RUN mkdir -p "$PGDATA" /docker-entrypoint-initdb.d /var/run/postgresql \
     && chown -R postgres:postgres /var/lib/postgresql /docker-entrypoint-initdb.d /var/run/postgresql \
     && chmod 3777 /var/run/postgresql \
-    && printf "shared_preload_libraries = 'pg_cron'\ncron.database_name = 'cognitor'\n" \
+    && printf "listen_addresses = '*'\nshared_preload_libraries = 'pg_cron'\ncron.database_name = 'cognitor'\n" \
         >> /usr/share/postgresql/16/postgresql.conf.sample
 
 VOLUME /var/lib/postgresql/data

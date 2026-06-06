@@ -37,6 +37,12 @@
   loop: "{{ k3s_sysctl_settings | dict2items }}"
   tags: [k3s, k3s_prereqs]
 
+- name: Disable UFW on k3s servers to avoid blocking CNI forwarding
+  community.general.ufw:
+    state: disabled
+  when: ufw_binary.stat.exists
+  tags: [k3s, k3s_prereqs]
+
 # Kubernetes requires swap off for predictable eviction/accounting semantics.
 # Keep fstab cleanup too, or the next reboot can undo the runtime swapoff.
 - name: Disable active swap
@@ -66,5 +72,31 @@
     port: "{{ item }}"
     proto: udp
   loop: "{{ k3s_udp_ports }}"
+  when: ufw_binary.stat.exists
+  tags: [k3s, k3s_prereqs]
+
+- name: Allow k3s pod and service CIDRs to reach node services through UFW when present
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ item }}"
+  loop: "{{ k3s_ufw_allowed_cidrs }}"
+  when: ufw_binary.stat.exists
+  tags: [k3s, k3s_prereqs]
+
+- name: Allow routed k3s pod traffic through UFW when present
+  community.general.ufw:
+    rule: allow
+    route: true
+    from_ip: "{{ k3s_pod_cidr }}"
+    to_ip: "{{ k3s_pod_cidr }}"
+  when: ufw_binary.stat.exists
+  tags: [k3s, k3s_prereqs]
+
+- name: Allow routed k3s pod-to-service traffic through UFW when present
+  community.general.ufw:
+    rule: allow
+    route: true
+    from_ip: "{{ k3s_pod_cidr }}"
+    to_ip: "{{ k3s_service_cidr }}"
   when: ufw_binary.stat.exists
   tags: [k3s, k3s_prereqs]

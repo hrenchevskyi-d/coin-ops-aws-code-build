@@ -4,6 +4,11 @@ k3s_prerequisite_packages:
   - python3-kubernetes
 k3s_udp_ports:
   - "8472"
+k3s_pod_cidr: "{{ deploy_config.k3s_cluster_cidr | default('10.42.0.0/16') }}"
+k3s_service_cidr: "{{ deploy_config.k3s_service_cidr | default('10.43.0.0/16') }}"
+k3s_ufw_allowed_cidrs:
+  - "{{ k3s_pod_cidr }}"
+  - "{{ k3s_service_cidr }}"
 k3s_sysctl_settings:
   net.bridge.bridge-nf-call-iptables: "1"
   net.bridge.bridge-nf-call-ip6tables: "1"
