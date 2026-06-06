@@ -83,6 +83,7 @@ resource "aws_instance" "vm" {
   subnet_id                   = var.subnet_ids[each.value.subnet]
   vpc_security_group_ids      = each.value.role != "" ? [var.sg_ids[each.value.role]] : []
   key_name                    = length(aws_key_pair.deployer) > 0 ? aws_key_pair.deployer[0].key_name : null
+  iam_instance_profile        = var.iam_instance_profile_name
   associate_public_ip_address = each.value.has_public_ip
   source_dest_check           = !each.value.can_ip_forward
   user_data                   = local.instance_scripts[each.key] != "" ? local.instance_scripts[each.key] : null

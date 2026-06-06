@@ -29,14 +29,18 @@ module "aws_security_groups" {
 }
 
 module "aws_instances" {
-  count               = local.aws_compute_enabled ? 1 : 0
-  source              = "./modules/cloud/aws/instances"
-  instances           = local.aws_instances_cfg
-  defaults            = local.general
-  cloud_defaults      = local.aws_cfg
-  instance_sizes      = local.aws_instance_sizes
-  subnet_ids          = module.aws_network[0].subnet_ids
-  sg_ids              = module.aws_security_groups[0].sg_ids
+  count          = local.aws_compute_enabled ? 1 : 0
+  source         = "./modules/cloud/aws/instances"
+  instances      = local.aws_instances_cfg
+  defaults       = local.general
+  cloud_defaults = local.aws_cfg
+  instance_sizes = local.aws_instance_sizes
+  subnet_ids     = module.aws_network[0].subnet_ids
+  sg_ids         = module.aws_security_groups[0].sg_ids
+  iam_instance_profile_name = try(
+    aws_iam_instance_profile.ec2_observability[0].name,
+    null
+  )
   ssh_public_key      = local.ssh_public_key
   private_subnet_cidr = local.aws_private_subnet_cidr
   vpc_cidr            = local.aws_vpc_cidr

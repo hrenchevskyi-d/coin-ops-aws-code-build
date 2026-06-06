@@ -110,6 +110,9 @@ print((sys.argv[1].replace("_", "-").lower() + "-cnpg-backup")[:64])
 PY
 )"
 CNPG_BACKUP_USER_ARN="arn:aws:iam::${ACCOUNT_ID}:user/${CNPG_BACKUP_USER_NAME}"
+EC2_OBSERVABILITY_ROLE_NAME="${PROJECT_NAME}-ec2-observability"
+EC2_OBSERVABILITY_ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${EC2_OBSERVABILITY_ROLE_NAME}"
+EC2_OBSERVABILITY_INSTANCE_PROFILE_ARN="arn:aws:iam::${ACCOUNT_ID}:instance-profile/${EC2_OBSERVABILITY_ROLE_NAME}"
 RUNNING_AS_TARGET_USER=false
 if [ "$CALLER_ARN" = "$TARGET_USER_ARN" ]; then
   RUNNING_AS_TARGET_USER=true
@@ -126,17 +129,19 @@ fi
 echo "Starting AWS bootstrap process in account ${ACCOUNT_ID}, region ${REGION}"
 echo "Active AWS identity: ${CALLER_ARN}"
 
-put_cnpg_backup_iam_policy() {
-  echo "Granting scoped IAM permissions for CNPG backup identity management..."
+put_scoped_iam_policy() {
+  echo "Granting scoped IAM permissions for Terraform-managed identities..."
   aws iam put-user-policy \
     --user-name "$IAM_USER_NAME" \
     --policy-name "$CNPG_BACKUP_POLICY_NAME" \
-    --policy-document "$(python3 - <<'PY' "${CNPG_BACKUP_USER_ARN}" "${TARGET_USER_ARN}"
+    --policy-document "$(python3 - <<'PY' "${CNPG_BACKUP_USER_ARN}" "${TARGET_USER_ARN}" "${EC2_OBSERVABILITY_ROLE_ARN}" "${EC2_OBSERVABILITY_INSTANCE_PROFILE_ARN}"
 import json
 import sys
 
 cnpg_backup_user_arn = sys.argv[1]
 target_user_arn = sys.argv[2]
+ec2_observability_role_arn = sys.argv[3]
+ec2_observability_instance_profile_arn = sys.argv[4]
 print(json.dumps({
     "Version": "2012-10-17",
     "Statement": [
@@ -165,6 +170,53 @@ print(json.dumps({
             "Resource": cnpg_backup_user_arn
         },
         {
+            "Sid": "ManageEc2ObservabilityRole",
+            "Effect": "Allow",
+            "Action": [
+                "iam:CreateRole",
+                "iam:DeleteRole",
+                "iam:GetRole",
+                "iam:TagRole",
+                "iam:UntagRole",
+                "iam:ListRoleTags",
+                "iam:AttachRolePolicy",
+                "iam:DetachRolePolicy",
+                "iam:ListAttachedRolePolicies",
+                "iam:ListRolePolicies",
+                "iam:GetRolePolicy",
+                "iam:DeleteRolePolicy"
+            ],
+            "Resource": ec2_observability_role_arn
+        },
+        {
+            "Sid": "PassEc2ObservabilityRoleToEc2",
+            "Effect": "Allow",
+            "Action": [
+                "iam:PassRole"
+            ],
+            "Resource": ec2_observability_role_arn,
+            "Condition": {
+                "StringEquals": {
+                    "iam:PassedToService": "ec2.amazonaws.com"
+                }
+            }
+        },
+        {
+            "Sid": "ManageEc2ObservabilityInstanceProfile",
+            "Effect": "Allow",
+            "Action": [
+                "iam:CreateInstanceProfile",
+                "iam:DeleteInstanceProfile",
+                "iam:GetInstanceProfile",
+                "iam:AddRoleToInstanceProfile",
+                "iam:RemoveRoleFromInstanceProfile",
+                "iam:TagInstanceProfile",
+                "iam:UntagInstanceProfile",
+                "iam:ListInstanceProfileTags"
+            ],
+            "Resource": ec2_observability_instance_profile_arn
+        },
+        {
             "Sid": "ReadOwnTerraformUserPolicies",
             "Effect": "Allow",
             "Action": [
@@ -176,10 +228,13 @@ print(json.dumps({
             "Resource": target_user_arn
         },
         {
-            "Sid": "ListIamUsersForTerraformRefresh",
+            "Sid": "ListIamResourcesForTerraformRefresh",
             "Effect": "Allow",
             "Action": [
-                "iam:ListUsers"
+                "iam:ListUsers",
+                "iam:ListRoles",
+                "iam:ListInstanceProfiles",
+                "iam:ListPolicies"
             ],
             "Resource": "*"
         }
@@ -227,7 +282,7 @@ else
     aws iam attach-user-policy --user-name "$IAM_USER_NAME" --policy-arn "$policy" || true
   done
 
-  put_cnpg_backup_iam_policy
+  put_scoped_iam_policy
 
   echo "Checking Terraform IAM access key capacity..."
   EXISTING_KEY_COUNT="$(aws iam list-access-keys --user-name "$IAM_USER_NAME" --query 'length(AccessKeyMetadata)' --output text)"

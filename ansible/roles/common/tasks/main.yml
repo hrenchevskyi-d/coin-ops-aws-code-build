@@ -146,6 +146,12 @@
         lock_timeout: "{{ provisioning_apt_lock_timeout | default(900) }}"
       when: common_manage_ufw
 
+- name: Install AWS SSM Agent on EC2 hosts
+  include_role:
+    name: aws_ssm_agent
+  when: my_cloud == 'aws'
+  tags: [aws, ssm, cloudwatch]
+
 - name: Disable UFW where host firewalling interferes with forwarding or k3s CNI
   community.general.ufw:
     state: disabled

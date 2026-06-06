@@ -1,0 +1,46 @@
+---
+- name: Assert AWS SSM Agent supports host architecture
+  assert:
+    that:
+      - ansible_os_family == 'Debian'
+      - ansible_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    fail_msg: "AWS SSM Agent role expects Debian-family amd64 or arm64 EC2 hosts."
+  when: aws_ssm_agent_enabled | bool
+
+- name: Gather package facts before AWS SSM Agent install
+  package_facts:
+    manager: auto
+  when: aws_ssm_agent_enabled | bool
+
+- name: Create AWS SSM Agent package work directory
+  file:
+    path: "{{ aws_ssm_agent_work_dir }}"
+    state: directory
+    mode: "0755"
+  when:
+    - aws_ssm_agent_enabled | bool
+    - "'amazon-ssm-agent' not in ansible_facts.packages"
+
+- name: Download AWS SSM Agent Debian package
+  get_url:
+    url: "{{ aws_ssm_agent_download_url }}"
+    dest: "{{ aws_ssm_agent_package_path }}"
+    mode: "0644"
+  when:
+    - aws_ssm_agent_enabled | bool
+    - "'amazon-ssm-agent' not in ansible_facts.packages"
+
+- name: Install AWS SSM Agent Debian package
+  apt:
+    deb: "{{ aws_ssm_agent_package_path }}"
+    lock_timeout: "{{ provisioning_apt_lock_timeout | default(900) }}"
+  when:
+    - aws_ssm_agent_enabled | bool
+    - "'amazon-ssm-agent' not in ansible_facts.packages"
+
+- name: Enable and start AWS SSM Agent service
+  systemd:
+    name: amazon-ssm-agent
+    enabled: yes
+    state: started
+  when: aws_ssm_agent_enabled | bool

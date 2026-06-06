@@ -69,6 +69,12 @@ variable "ssh_port" {
   default     = 22
 }
 
+variable "iam_instance_profile_name" {
+  type        = string
+  description = "Optional IAM instance profile name to attach to all EC2 instances."
+  default     = null
+}
+
 variable "project_name" {
   type        = string
   description = "Project name to be used in labels/tags for cloud-native Ansible inventory plugins."

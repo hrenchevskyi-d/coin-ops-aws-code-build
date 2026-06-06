@@ -1,0 +1,11 @@
+---
+aws_ssm_agent_enabled: true
+aws_ssm_agent_work_dir: /tmp/ssm
+aws_ssm_agent_package_path: "{{ aws_ssm_agent_work_dir }}/amazon-ssm-agent.deb"
+aws_ssm_agent_debian_arch: >-
+  {{
+    'arm64'
+    if ansible_architecture in ['aarch64', 'arm64']
+    else 'amd64'
+  }}
+aws_ssm_agent_download_url: "https://s3.{{ aws_region }}.amazonaws.com/amazon-ssm-{{ aws_region }}/latest/debian_{{ aws_ssm_agent_debian_arch }}/amazon-ssm-agent.deb"
