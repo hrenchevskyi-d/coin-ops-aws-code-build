@@ -1,4 +1,12 @@
 ---
+- name: Gather minimal facts for AWS SSM Agent
+  setup:
+    gather_subset:
+      - min
+  when:
+    - aws_ssm_agent_enabled | bool
+    - ansible_os_family is not defined
+
 - name: Assert AWS SSM Agent supports host architecture
   assert:
     that:

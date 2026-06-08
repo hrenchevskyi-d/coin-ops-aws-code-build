@@ -118,6 +118,10 @@ EC2_OBSERVABILITY_INSTANCE_PROFILE_ARN="arn:aws:iam::${ACCOUNT_ID}:instance-prof
 K3S_CONTAINER_LOG_GROUP_NAME="/${PROJECT_NAME}/k3s/containers"
 K3S_CONTAINER_LOG_GROUP_BASE_ARN="arn:aws:logs:${REGION}:${ACCOUNT_ID}:log-group:${K3S_CONTAINER_LOG_GROUP_NAME}"
 K3S_CONTAINER_LOG_GROUP_ARN="arn:aws:logs:${REGION}:${ACCOUNT_ID}:log-group:${K3S_CONTAINER_LOG_GROUP_NAME}:*"
+OBSERVABILITY_ALERTS_TOPIC_ARN="arn:aws:sns:${REGION}:${ACCOUNT_ID}:${PROJECT_NAME}-observability-alerts"
+OBSERVABILITY_ALARM_ARN="arn:aws:cloudwatch:${REGION}:${ACCOUNT_ID}:alarm:${PROJECT_NAME}-*"
+CLOUDWATCH_AGENT_PARAMETER_NAME="/${PROJECT_NAME}/cloudwatch-agent/linux"
+CLOUDWATCH_AGENT_PARAMETER_ARN="arn:aws:ssm:${REGION}:${ACCOUNT_ID}:parameter${CLOUDWATCH_AGENT_PARAMETER_NAME}"
 RUNNING_AS_TARGET_USER=false
 if [ "$CALLER_ARN" = "$TARGET_USER_ARN" ]; then
   RUNNING_AS_TARGET_USER=true
@@ -135,7 +139,7 @@ echo "Starting AWS bootstrap process in account ${ACCOUNT_ID}, region ${REGION}"
 echo "Active AWS identity: ${CALLER_ARN}"
 
 build_scoped_management_policy_document() {
-  python3 - <<'PY' "${CNPG_BACKUP_USER_ARN}" "${TARGET_USER_ARN}" "${EC2_OBSERVABILITY_ROLE_ARN}" "${EC2_OBSERVABILITY_INSTANCE_PROFILE_ARN}" "${K3S_CONTAINER_LOG_GROUP_BASE_ARN}" "${K3S_CONTAINER_LOG_GROUP_ARN}"
+  python3 - <<'PY' "${CNPG_BACKUP_USER_ARN}" "${TARGET_USER_ARN}" "${EC2_OBSERVABILITY_ROLE_ARN}" "${EC2_OBSERVABILITY_INSTANCE_PROFILE_ARN}" "${K3S_CONTAINER_LOG_GROUP_BASE_ARN}" "${K3S_CONTAINER_LOG_GROUP_ARN}" "${OBSERVABILITY_ALERTS_TOPIC_ARN}" "${OBSERVABILITY_ALARM_ARN}" "${CLOUDWATCH_AGENT_PARAMETER_ARN}"
 import json
 import sys
 
@@ -145,6 +149,9 @@ ec2_observability_role_arn = sys.argv[3]
 ec2_observability_instance_profile_arn = sys.argv[4]
 k3s_container_log_group_base_arn = sys.argv[5]
 k3s_container_log_group_arn = sys.argv[6]
+observability_alerts_topic_arn = sys.argv[7]
+observability_alarm_arn = sys.argv[8]
+cloudwatch_agent_parameter_arn = sys.argv[9]
 print(json.dumps({
     "Version": "2012-10-17",
     "Statement": [
@@ -215,7 +222,8 @@ print(json.dumps({
                 "iam:RemoveRoleFromInstanceProfile",
                 "iam:TagInstanceProfile",
                 "iam:UntagInstanceProfile",
-                "iam:ListInstanceProfileTags"
+                "iam:ListInstanceProfileTags",
+                "iam:ListInstanceProfilesForRole"
             ],
             "Resource": ec2_observability_instance_profile_arn
         },
@@ -235,6 +243,9 @@ print(json.dumps({
                 "logs:DeleteLogGroup",
                 "logs:PutRetentionPolicy",
                 "logs:DeleteRetentionPolicy",
+                "logs:PutMetricFilter",
+                "logs:DeleteMetricFilter",
+                "logs:DescribeMetricFilters",
                 "logs:ListTagsForResource",
                 "logs:TagResource",
                 "logs:UntagResource"
@@ -243,6 +254,108 @@ print(json.dumps({
                 k3s_container_log_group_base_arn,
                 k3s_container_log_group_arn
             ]
+        },
+        {
+            "Sid": "ManageObservabilityAlarms",
+            "Effect": "Allow",
+            "Action": [
+                "cloudwatch:PutMetricAlarm",
+                "cloudwatch:DeleteAlarms",
+                "cloudwatch:DescribeAlarms",
+                "cloudwatch:EnableAlarmActions",
+                "cloudwatch:DisableAlarmActions",
+                "cloudwatch:ListTagsForResource",
+                "cloudwatch:TagResource",
+                "cloudwatch:UntagResource"
+            ],
+            "Resource": observability_alarm_arn
+        },
+        {
+            "Sid": "ReadCloudWatchMetricsForTerraformRefresh",
+            "Effect": "Allow",
+            "Action": [
+                "cloudwatch:DescribeAlarms",
+                "cloudwatch:ListMetrics"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "ManageObservabilityDashboards",
+            "Effect": "Allow",
+            "Action": [
+                "cloudwatch:PutDashboard",
+                "cloudwatch:GetDashboard",
+                "cloudwatch:DeleteDashboards",
+                "cloudwatch:ListDashboards"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "ManageObservabilitySnsTopic",
+            "Effect": "Allow",
+            "Action": [
+                "sns:CreateTopic",
+                "sns:DeleteTopic",
+                "sns:GetTopicAttributes",
+                "sns:SetTopicAttributes",
+                "sns:ListTagsForResource",
+                "sns:TagResource",
+                "sns:UntagResource",
+                "sns:Subscribe",
+                "sns:Unsubscribe",
+                "sns:GetSubscriptionAttributes",
+                "sns:SetSubscriptionAttributes",
+                "sns:ListSubscriptionsByTopic"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "ListSnsForTerraformRefresh",
+            "Effect": "Allow",
+            "Action": [
+                "sns:ListTopics",
+                "sns:ListSubscriptions"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "ManageCloudWatchAgentParameter",
+            "Effect": "Allow",
+            "Action": [
+                "ssm:PutParameter",
+                "ssm:GetParameter",
+                "ssm:GetParameters",
+                "ssm:DeleteParameter",
+                "ssm:AddTagsToResource",
+                "ssm:RemoveTagsFromResource",
+                "ssm:ListTagsForResource"
+            ],
+            "Resource": cloudwatch_agent_parameter_arn
+        },
+        {
+            "Sid": "DescribeCloudWatchAgentParameters",
+            "Effect": "Allow",
+            "Action": [
+                "ssm:DescribeParameters"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "ManageCloudWatchAgentAssociations",
+            "Effect": "Allow",
+            "Action": [
+                "ssm:CreateAssociation",
+                "ssm:DeleteAssociation",
+                "ssm:UpdateAssociation",
+                "ssm:DescribeAssociation",
+                "ssm:ListAssociations",
+                "ssm:AddTagsToResource",
+                "ssm:RemoveTagsFromResource",
+                "ssm:ListTagsForResource",
+                "ssm:GetDocument",
+                "ssm:DescribeDocument"
+            ],
+            "Resource": "*"
         },
         {
             "Sid": "ReadOwnTerraformUserPolicies",
@@ -309,25 +422,17 @@ put_scoped_iam_policy() {
 }
 
 if [ "$RUNNING_AS_TARGET_USER" = true ]; then
-  echo "Already running as ${IAM_USER_NAME}; checking scoped management policy."
-  if ! aws iam list-attached-user-policies \
-    --user-name "$IAM_USER_NAME" \
-    --query "AttachedPolicies[?PolicyArn=='${SCOPED_MANAGEMENT_POLICY_ARN}']" \
-    --output text | grep -q "$SCOPED_MANAGEMENT_POLICY_ARN"; then
-    cat <<EOF >&2
-The current credentials are for ${IAM_USER_NAME}, but the required managed IAM
-policy ${SCOPED_MANAGEMENT_POLICY_NAME} is not attached.
-
-This user cannot grant itself missing IAM permissions. Rerun bootstrap with an
-admin/operator AWS identity, not with local/generated-env.sh credentials:
+  cat <<EOF >&2
+The current credentials are for ${IAM_USER_NAME}. Bootstrap must refresh the
+managed IAM policy ${SCOPED_MANAGEMENT_POLICY_NAME}, and this user cannot grant
+itself new or updated IAM permissions.
 
   unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
   AWS_PROFILE=<admin-profile> bash terraform/bootstrap-aws.sh --activate-backend
 
 Then source local/generated-env.sh again and rerun terraform apply.
 EOF
-    exit 1
-  fi
+  exit 1
 else
   echo "Ensuring IAM User exists: $IAM_USER_NAME"
   if ! aws iam get-user --user-name "$IAM_USER_NAME" > /dev/null 2>&1; then

@@ -1,0 +1,12 @@
+---
+aws_cloudwatch_agent_enabled: true
+aws_cloudwatch_agent_work_dir: /tmp/cloudwatch-agent
+aws_cloudwatch_agent_package_path: "{{ aws_cloudwatch_agent_work_dir }}/amazon-cloudwatch-agent.deb"
+aws_cloudwatch_agent_debian_arch: >-
+  {{
+    'arm64'
+    if ansible_architecture in ['aarch64', 'arm64']
+    else 'amd64'
+  }}
+aws_cloudwatch_agent_download_url: "https://amazoncloudwatch-agent.s3.amazonaws.com/debian/{{ aws_cloudwatch_agent_debian_arch }}/latest/amazon-cloudwatch-agent.deb"
+aws_cloudwatch_agent_config_parameter_name: "/{{ infra_general.get('project_name', 'coin-ops') }}/cloudwatch-agent/linux"

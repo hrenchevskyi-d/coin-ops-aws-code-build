@@ -54,6 +54,7 @@ provider "cloudflare" {
 }
 
 provider "google" {
-  project = local.gcp_project_id
-  region  = local.gcp_region
+  project      = local.gcp_project_id
+  region       = local.gcp_region
+  access_token = local.gcp_enabled ? null : "disabled-provider-placeholder"
 }

@@ -1,0 +1,65 @@
+---
+- name: Gather minimal facts for AWS CloudWatch Agent
+  setup:
+    gather_subset:
+      - min
+  when:
+    - aws_cloudwatch_agent_enabled | bool
+    - ansible_os_family is not defined
+
+- name: Assert AWS CloudWatch Agent supports host architecture
+  assert:
+    that:
+      - ansible_os_family == 'Debian'
+      - ansible_architecture in ['x86_64', 'amd64', 'aarch64', 'arm64']
+    fail_msg: "AWS CloudWatch Agent role expects Debian-family amd64 or arm64 EC2 hosts."
+  when: aws_cloudwatch_agent_enabled | bool
+
+- name: Gather package facts before AWS CloudWatch Agent install
+  package_facts:
+    manager: auto
+  when: aws_cloudwatch_agent_enabled | bool
+
+- name: Create AWS CloudWatch Agent package work directory
+  file:
+    path: "{{ aws_cloudwatch_agent_work_dir }}"
+    state: directory
+    mode: "0755"
+  when:
+    - aws_cloudwatch_agent_enabled | bool
+    - "'amazon-cloudwatch-agent' not in ansible_facts.packages"
+
+- name: Download AWS CloudWatch Agent Debian package
+  get_url:
+    url: "{{ aws_cloudwatch_agent_download_url }}"
+    dest: "{{ aws_cloudwatch_agent_package_path }}"
+    mode: "0644"
+  when:
+    - aws_cloudwatch_agent_enabled | bool
+    - "'amazon-cloudwatch-agent' not in ansible_facts.packages"
+
+- name: Install AWS CloudWatch Agent Debian package
+  apt:
+    deb: "{{ aws_cloudwatch_agent_package_path }}"
+    lock_timeout: "{{ provisioning_apt_lock_timeout | default(900) }}"
+  when:
+    - aws_cloudwatch_agent_enabled | bool
+    - "'amazon-cloudwatch-agent' not in ansible_facts.packages"
+
+- name: Fetch and apply AWS CloudWatch Agent config from SSM
+  command: >-
+    /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl
+    -a fetch-config
+    -m ec2
+    -c ssm:{{ aws_cloudwatch_agent_config_parameter_name }}
+    -s
+  register: aws_cloudwatch_agent_fetch_config
+  changed_when: "'Configuration validation succeeded' in aws_cloudwatch_agent_fetch_config.stdout"
+  when: aws_cloudwatch_agent_enabled | bool
+
+- name: Enable and start AWS CloudWatch Agent service
+  systemd:
+    name: amazon-cloudwatch-agent
+    enabled: yes
+    state: started
+  when: aws_cloudwatch_agent_enabled | bool

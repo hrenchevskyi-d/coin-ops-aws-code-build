@@ -64,5 +64,5 @@ k3s_coinops_data_k3s_service_cidr: "{{ deploy_config.k3s_service_cidr | default(
 k3s_coinops_data_bootstrap_run_as_user: 10004
 k3s_coinops_data_bootstrap_run_as_group: 10004
 
-k3s_coinops_data_wait_retries: 6
+k3s_coinops_data_wait_retries: 10
 k3s_coinops_data_wait_delay: 5

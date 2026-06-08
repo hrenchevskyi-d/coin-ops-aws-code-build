@@ -149,8 +149,18 @@
 - name: Install AWS SSM Agent on EC2 hosts
   include_role:
     name: aws_ssm_agent
+    apply:
+      tags: [aws, ssm, cloudwatch]
   when: my_cloud == 'aws'
   tags: [aws, ssm, cloudwatch]
+
+- name: Install and configure AWS CloudWatch Agent on EC2 hosts
+  include_role:
+    name: aws_cloudwatch_agent
+    apply:
+      tags: [aws, cloudwatch, monitoring]
+  when: my_cloud == 'aws'
+  tags: [aws, cloudwatch, monitoring]
 
 - name: Disable UFW where host firewalling interferes with forwarding or k3s CNI
   community.general.ufw:
