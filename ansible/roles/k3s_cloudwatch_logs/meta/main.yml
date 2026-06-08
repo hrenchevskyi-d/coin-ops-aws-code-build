@@ -1,0 +1,7 @@
+---
+galaxy_info:
+  author: coin-ops
+  description: Ships k3s container logs to AWS CloudWatch Logs with aws-for-fluent-bit.
+  license: MIT
+  min_ansible_version: "2.15"
+dependencies: []

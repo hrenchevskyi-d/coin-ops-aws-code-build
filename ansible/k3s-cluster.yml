@@ -99,3 +99,16 @@
       tags: [runtime_config, k3s, k3s_postcheck]
   roles:
     - k3s_postcheck
+
+- name: Configure k3s CloudWatch container logs
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  pre_tasks:
+    - name: Resolve runtime configuration for k3s CloudWatch logs
+      include_role:
+        name: runtime_config
+        public: true
+      tags: [runtime_config, k3s, cloudwatch, logs]
+  roles:
+    - k3s_cloudwatch_logs

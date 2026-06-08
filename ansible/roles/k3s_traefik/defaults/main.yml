@@ -7,6 +7,8 @@ k3s_traefik_deployment_kind: DaemonSet
 k3s_traefik_service_type: ClusterIP
 k3s_traefik_web_host_port: 80
 k3s_traefik_websecure_host_port: 443
+k3s_traefik_access_logs_enabled: true
+k3s_traefik_access_logs_format: json
 
 k3s_traefik_middlewares_manifest_path: /var/lib/rancher/k3s/server/manifests/k3s-traefik-middlewares.yaml
 k3s_traefik_security_headers_middleware_name: security-headers

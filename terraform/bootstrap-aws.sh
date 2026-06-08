@@ -102,7 +102,9 @@ print(json.loads(sys.argv[1])["Arn"])
 PY
 )"
 TARGET_USER_ARN="arn:aws:iam::${ACCOUNT_ID}:user/${IAM_USER_NAME}"
-CNPG_BACKUP_POLICY_NAME="coinops-cnpg-backup-identity-management"
+SCOPED_MANAGEMENT_POLICY_NAME="coinops-terraform-scoped-management"
+SCOPED_MANAGEMENT_POLICY_ARN="arn:aws:iam::${ACCOUNT_ID}:policy/${SCOPED_MANAGEMENT_POLICY_NAME}"
+LEGACY_SCOPED_INLINE_POLICY_NAME="coinops-cnpg-backup-identity-management"
 CNPG_BACKUP_USER_NAME="$(python3 - <<'PY' "${PROJECT_NAME}"
 import sys
 
@@ -113,6 +115,9 @@ CNPG_BACKUP_USER_ARN="arn:aws:iam::${ACCOUNT_ID}:user/${CNPG_BACKUP_USER_NAME}"
 EC2_OBSERVABILITY_ROLE_NAME="${PROJECT_NAME}-ec2-observability"
 EC2_OBSERVABILITY_ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${EC2_OBSERVABILITY_ROLE_NAME}"
 EC2_OBSERVABILITY_INSTANCE_PROFILE_ARN="arn:aws:iam::${ACCOUNT_ID}:instance-profile/${EC2_OBSERVABILITY_ROLE_NAME}"
+K3S_CONTAINER_LOG_GROUP_NAME="/${PROJECT_NAME}/k3s/containers"
+K3S_CONTAINER_LOG_GROUP_BASE_ARN="arn:aws:logs:${REGION}:${ACCOUNT_ID}:log-group:${K3S_CONTAINER_LOG_GROUP_NAME}"
+K3S_CONTAINER_LOG_GROUP_ARN="arn:aws:logs:${REGION}:${ACCOUNT_ID}:log-group:${K3S_CONTAINER_LOG_GROUP_NAME}:*"
 RUNNING_AS_TARGET_USER=false
 if [ "$CALLER_ARN" = "$TARGET_USER_ARN" ]; then
   RUNNING_AS_TARGET_USER=true
@@ -129,12 +134,8 @@ fi
 echo "Starting AWS bootstrap process in account ${ACCOUNT_ID}, region ${REGION}"
 echo "Active AWS identity: ${CALLER_ARN}"
 
-put_scoped_iam_policy() {
-  echo "Granting scoped IAM permissions for Terraform-managed identities..."
-  aws iam put-user-policy \
-    --user-name "$IAM_USER_NAME" \
-    --policy-name "$CNPG_BACKUP_POLICY_NAME" \
-    --policy-document "$(python3 - <<'PY' "${CNPG_BACKUP_USER_ARN}" "${TARGET_USER_ARN}" "${EC2_OBSERVABILITY_ROLE_ARN}" "${EC2_OBSERVABILITY_INSTANCE_PROFILE_ARN}"
+build_scoped_management_policy_document() {
+  python3 - <<'PY' "${CNPG_BACKUP_USER_ARN}" "${TARGET_USER_ARN}" "${EC2_OBSERVABILITY_ROLE_ARN}" "${EC2_OBSERVABILITY_INSTANCE_PROFILE_ARN}" "${K3S_CONTAINER_LOG_GROUP_BASE_ARN}" "${K3S_CONTAINER_LOG_GROUP_ARN}"
 import json
 import sys
 
@@ -142,6 +143,8 @@ cnpg_backup_user_arn = sys.argv[1]
 target_user_arn = sys.argv[2]
 ec2_observability_role_arn = sys.argv[3]
 ec2_observability_instance_profile_arn = sys.argv[4]
+k3s_container_log_group_base_arn = sys.argv[5]
+k3s_container_log_group_arn = sys.argv[6]
 print(json.dumps({
     "Version": "2012-10-17",
     "Statement": [
@@ -217,6 +220,31 @@ print(json.dumps({
             "Resource": ec2_observability_instance_profile_arn
         },
         {
+            "Sid": "CreateAndListCloudWatchLogGroups",
+            "Effect": "Allow",
+            "Action": [
+                "logs:CreateLogGroup",
+                "logs:DescribeLogGroups"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "ManageK3sContainerLogGroup",
+            "Effect": "Allow",
+            "Action": [
+                "logs:DeleteLogGroup",
+                "logs:PutRetentionPolicy",
+                "logs:DeleteRetentionPolicy",
+                "logs:ListTagsForResource",
+                "logs:TagResource",
+                "logs:UntagResource"
+            ],
+            "Resource": [
+                k3s_container_log_group_base_arn,
+                k3s_container_log_group_arn
+            ]
+        },
+        {
             "Sid": "ReadOwnTerraformUserPolicies",
             "Effect": "Allow",
             "Action": [
@@ -241,15 +269,54 @@ print(json.dumps({
     ]
 }))
 PY
-)" >/dev/null
+}
+
+put_scoped_iam_policy() {
+  echo "Granting scoped IAM permissions for Terraform-managed identities..."
+  local policy_document
+  policy_document="$(build_scoped_management_policy_document)"
+
+  if aws iam get-policy --policy-arn "$SCOPED_MANAGEMENT_POLICY_ARN" >/dev/null 2>&1; then
+    local versions_to_delete
+    versions_to_delete="$(aws iam list-policy-versions \
+      --policy-arn "$SCOPED_MANAGEMENT_POLICY_ARN" \
+      --query 'Versions[?IsDefaultVersion==`false`].VersionId' \
+      --output text)"
+
+    for version_id in $versions_to_delete; do
+      aws iam delete-policy-version \
+        --policy-arn "$SCOPED_MANAGEMENT_POLICY_ARN" \
+        --version-id "$version_id" >/dev/null
+    done
+
+    aws iam create-policy-version \
+      --policy-arn "$SCOPED_MANAGEMENT_POLICY_ARN" \
+      --policy-document "$policy_document" \
+      --set-as-default >/dev/null
+  else
+    aws iam create-policy \
+      --policy-name "$SCOPED_MANAGEMENT_POLICY_NAME" \
+      --policy-document "$policy_document" >/dev/null
+  fi
+
+  aws iam attach-user-policy \
+    --user-name "$IAM_USER_NAME" \
+    --policy-arn "$SCOPED_MANAGEMENT_POLICY_ARN" >/dev/null
+
+  aws iam delete-user-policy \
+    --user-name "$IAM_USER_NAME" \
+    --policy-name "$LEGACY_SCOPED_INLINE_POLICY_NAME" >/dev/null 2>&1 || true
 }
 
 if [ "$RUNNING_AS_TARGET_USER" = true ]; then
-  echo "Already running as ${IAM_USER_NAME}; checking IAM repair policy."
-  if ! aws iam get-user-policy --user-name "$IAM_USER_NAME" --policy-name "$CNPG_BACKUP_POLICY_NAME" >/dev/null 2>&1; then
+  echo "Already running as ${IAM_USER_NAME}; checking scoped management policy."
+  if ! aws iam list-attached-user-policies \
+    --user-name "$IAM_USER_NAME" \
+    --query "AttachedPolicies[?PolicyArn=='${SCOPED_MANAGEMENT_POLICY_ARN}']" \
+    --output text | grep -q "$SCOPED_MANAGEMENT_POLICY_ARN"; then
     cat <<EOF >&2
-The current credentials are for ${IAM_USER_NAME}, but the required inline IAM
-policy ${CNPG_BACKUP_POLICY_NAME} is not readable or is missing.
+The current credentials are for ${IAM_USER_NAME}, but the required managed IAM
+policy ${SCOPED_MANAGEMENT_POLICY_NAME} is not attached.
 
 This user cannot grant itself missing IAM permissions. Rerun bootstrap with an
 admin/operator AWS identity, not with local/generated-env.sh credentials:

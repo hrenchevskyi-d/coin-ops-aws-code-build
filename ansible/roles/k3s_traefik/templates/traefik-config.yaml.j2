@@ -12,6 +12,10 @@ spec:
       type: {{ k3s_traefik_service_type }}
     additionalArguments:
       - "--entryPoints.websecure.http.middlewares={{ k3s_traefik_chart_namespace }}-{{ k3s_traefik_security_headers_middleware_name }}@kubernetescrd,{{ k3s_traefik_chart_namespace }}-{{ k3s_traefik_rate_limit_middleware_name }}@kubernetescrd"
+{% if k3s_traefik_access_logs_enabled | bool %}
+      - "--accesslog=true"
+      - "--accesslog.format={{ k3s_traefik_access_logs_format }}"
+{% endif %}
     ports:
       web:
         hostPort: {{ k3s_traefik_web_host_port }}

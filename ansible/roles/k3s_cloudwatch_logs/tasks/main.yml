@@ -1,0 +1,37 @@
+---
+- name: k3s-cloudwatch-logs-resolve-kubeconfig
+  include_role:
+    name: k3s_kubeconfig_access
+  when: k3s_cloudwatch_logs_enabled | bool
+  tags: [k3s, cloudwatch, logs]
+
+- name: k3s-cloudwatch-logs-apply-fluent-bit
+  kubernetes.core.k8s:
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
+    definition: "{{ lookup('template', 'fluent-bit.yaml.j2') | from_yaml_all | list }}"
+    state: present
+    wait: true
+  when: k3s_cloudwatch_logs_enabled | bool
+  tags: [k3s, cloudwatch, logs]
+
+- name: k3s-cloudwatch-logs-read-daemonset-status
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
+    api_version: apps/v1
+    kind: DaemonSet
+    namespace: "{{ k3s_cloudwatch_logs_namespace }}"
+    name: "{{ k3s_cloudwatch_logs_daemonset_name }}"
+  register: k3s_cloudwatch_logs_daemonset_info
+  retries: 30
+  delay: 10
+  until: >-
+    (
+      k3s_cloudwatch_logs_daemonset_info.resources | default([]) | length
+    ) > 0 and
+    (
+      k3s_cloudwatch_logs_daemonset_info.resources[0].status.numberReady | default(0) | int
+    ) >= (
+      k3s_cloudwatch_logs_daemonset_info.resources[0].status.desiredNumberScheduled | default(1) | int
+    )
+  when: k3s_cloudwatch_logs_enabled | bool
+  tags: [k3s, cloudwatch, logs]
