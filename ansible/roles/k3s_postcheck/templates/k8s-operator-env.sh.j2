@@ -4,12 +4,12 @@
 
 export KUBECONFIG="{{ k3s_postcheck_local_tunneled_kubeconfig_path }}"
 
-if ! nc -z 127.0.0.1 6443 >/dev/null 2>&1; then
+if ! nc -z -w 2 127.0.0.1 6443 >/dev/null 2>&1; then
   nohup "{{ k3s_postcheck_local_artifact_dir }}/k8s-api-tunnel.sh" >/tmp/coinops-k8s-api-tunnel.log 2>&1 &
   sleep 1
 fi
 
-if ! nc -z 127.0.0.1 6443 >/dev/null 2>&1; then
+if ! nc -z -w 2 127.0.0.1 6443 >/dev/null 2>&1; then
   echo "Kubernetes API tunnel is not reachable on 127.0.0.1:6443." >&2
   echo "Check /tmp/coinops-k8s-api-tunnel.log for SSH errors." >&2
   return 1 2>/dev/null || exit 1

@@ -2,7 +2,32 @@
 - name: k3s-cloudwatch-logs-resolve-kubeconfig
   include_role:
     name: k3s_kubeconfig_access
+    apply:
+      tags: [k3s, cloudwatch, logs]
   when: k3s_cloudwatch_logs_enabled | bool
+  tags: [k3s, cloudwatch, logs]
+
+- name: k3s-cloudwatch-logs-check-api-ready
+  command: >-
+    kubectl --kubeconfig {{ k3s_effective_kubeconfig_path | quote }}
+    get --raw=/readyz
+    --request-timeout=10s
+  register: k3s_cloudwatch_logs_api_ready
+  changed_when: false
+  failed_when: false
+  when: k3s_cloudwatch_logs_enabled | bool
+  tags: [k3s, cloudwatch, logs]
+
+- name: k3s-cloudwatch-logs-fail-when-api-unreachable
+  fail:
+    msg: >-
+      Kubernetes API is not reachable through {{ k3s_effective_kubeconfig_path }}.
+      If this kubeconfig uses 127.0.0.1:6443, check the SSH tunnel with
+      ansible/artifacts/k8s-api-tunnel.sh and /tmp/coinops-k8s-api-tunnel.log.
+      kubectl stderr: {{ k3s_cloudwatch_logs_api_ready.stderr | default('') }}
+  when:
+    - k3s_cloudwatch_logs_enabled | bool
+    - k3s_cloudwatch_logs_api_ready.rc != 0
   tags: [k3s, cloudwatch, logs]
 
 - name: k3s-cloudwatch-logs-apply-fluent-bit
@@ -10,7 +35,7 @@
     kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     definition: "{{ lookup('template', 'fluent-bit.yaml.j2') | from_yaml_all | list }}"
     state: present
-    wait: true
+    wait: false
   when: k3s_cloudwatch_logs_enabled | bool
   tags: [k3s, cloudwatch, logs]
 

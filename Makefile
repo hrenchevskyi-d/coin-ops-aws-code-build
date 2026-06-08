@@ -171,9 +171,9 @@ headlamp-token: ensure-k8s-api-tunnel
 
 ensure-k8s-api-tunnel:
 	@test -x "$(K8S_API_TUNNEL_SCRIPT)" || (echo "Missing $(K8S_API_TUNNEL_SCRIPT). Run 'make k3s-cluster' first."; exit 1)
-	@if ! nc -z 127.0.0.1 6443 >/dev/null 2>&1; then \
+	@if ! nc -z -w 2 127.0.0.1 6443 >/dev/null 2>&1; then \
 		echo "Starting Kubernetes API tunnel on 127.0.0.1:6443"; \
 		nohup "$(K8S_API_TUNNEL_SCRIPT)" >/tmp/coinops-k8s-api-tunnel.log 2>&1 & \
 		sleep 1; \
 	fi
-	@nc -z 127.0.0.1 6443 >/dev/null 2>&1 || (echo "Kubernetes API tunnel is not reachable on 127.0.0.1:6443"; exit 1)
+	@nc -z -w 2 127.0.0.1 6443 >/dev/null 2>&1 || (echo "Kubernetes API tunnel is not reachable on 127.0.0.1:6443"; exit 1)
