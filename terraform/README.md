@@ -153,6 +153,9 @@ and keeps the checked-in files untouched. In that temporary copy it:
 - sets CNPG object-storage backup buckets to force-delete only in the temporary copy
 - keeps CNPG backup resources instantiated in the temporary copy so destroy
   receives the force-delete bucket configuration
+- includes AWS observability resources in AWS-only targeted teardown:
+  CloudWatch alarms, dashboard, log metric filters, log group, SNS alerts,
+  the CloudWatch Agent SSM parameter, and the EC2 observability IAM profile
 - disables AWS RDS deletion protection before teardown
 - disables and deletes GCP Cloud SQL instances found in state before teardown
 - deletes GCP private service connections and reserved peering ranges that can

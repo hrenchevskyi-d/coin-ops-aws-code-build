@@ -38,7 +38,7 @@ module "aws_instances" {
   subnet_ids     = module.aws_network[0].subnet_ids
   sg_ids         = module.aws_security_groups[0].sg_ids
   iam_instance_profile_name = try(
-    aws_iam_instance_profile.ec2_observability[0].name,
+    module.aws_observability_iam[0].instance_profile_name,
     null
   )
   ssh_public_key      = local.ssh_public_key

@@ -6,12 +6,12 @@
             "mode": "certbot",
             "certbot": {
                 "email_localpart": "admin",
-                "staging": true
+                "staging": false
             }
         },
         "certbot": {
             "email_localpart": "admin",
-            "staging": true
+            "staging": false
         },
         "runtime_backend": "external",
         "k3s": {

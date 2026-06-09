@@ -194,7 +194,8 @@ print(json.dumps({
                 "iam:ListAttachedRolePolicies",
                 "iam:ListRolePolicies",
                 "iam:GetRolePolicy",
-                "iam:DeleteRolePolicy"
+                "iam:DeleteRolePolicy",
+                "iam:ListInstanceProfilesForRole"
             ],
             "Resource": ec2_observability_role_arn
         },
@@ -222,8 +223,7 @@ print(json.dumps({
                 "iam:RemoveRoleFromInstanceProfile",
                 "iam:TagInstanceProfile",
                 "iam:UntagInstanceProfile",
-                "iam:ListInstanceProfileTags",
-                "iam:ListInstanceProfilesForRole"
+                "iam:ListInstanceProfileTags"
             ],
             "Resource": ec2_observability_instance_profile_arn
         },

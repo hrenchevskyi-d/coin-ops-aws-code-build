@@ -1,11 +1,9 @@
-resource "aws_cloudwatch_log_group" "k3s_container_logs" {
+module "aws_observability_logs" {
   count = local.aws_compute_enabled ? 1 : 0
 
-  name              = "/${local.project_name}/k3s/containers"
-  retention_in_days = 7
+  source = "./modules/cloud/aws/observability_logs"
 
-  tags = {
-    Project = local.project_name
-    Cloud   = "aws"
-  }
+  project_name      = local.project_name
+  retention_in_days = 7
+  tags              = local.aws_observability_tags
 }

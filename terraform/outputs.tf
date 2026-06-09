@@ -11,7 +11,7 @@ output "aws_instance_ips" {
 
 output "aws_ec2_observability_instance_profile" {
   description = "IAM instance profile attached to AWS EC2 instances for SSM and CloudWatch Agent."
-  value       = local.aws_compute_enabled ? try(aws_iam_instance_profile.ec2_observability[0].name, "") : ""
+  value       = local.aws_compute_enabled ? try(module.aws_observability_iam[0].instance_profile_name, "") : ""
 }
 
 output "azure_instance_ips" {

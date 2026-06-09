@@ -5,45 +5,12 @@ locals {
   ])
 }
 
-resource "aws_iam_role" "ec2_observability" {
+module "aws_observability_iam" {
   count = local.aws_compute_enabled ? 1 : 0
 
-  name = "${local.project_name}-ec2-observability"
+  source = "./modules/cloud/aws/observability_iam"
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Principal = {
-          Service = "ec2.amazonaws.com"
-        }
-        Action = "sts:AssumeRole"
-      }
-    ]
-  })
-
-  tags = {
-    Project = local.project_name
-    Cloud   = "aws"
-  }
-}
-
-resource "aws_iam_role_policy_attachment" "ec2_observability" {
-  for_each = local.aws_compute_enabled ? local.aws_ec2_observability_policy_arns : toset([])
-
-  role       = aws_iam_role.ec2_observability[0].name
-  policy_arn = each.value
-}
-
-resource "aws_iam_instance_profile" "ec2_observability" {
-  count = local.aws_compute_enabled ? 1 : 0
-
-  name = "${local.project_name}-ec2-observability"
-  role = aws_iam_role.ec2_observability[0].name
-
-  tags = {
-    Project = local.project_name
-    Cloud   = "aws"
-  }
+  project_name = local.project_name
+  policy_arns  = local.aws_ec2_observability_policy_arns
+  tags         = local.aws_observability_tags
 }

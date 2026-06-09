@@ -15,6 +15,7 @@ K8S_OPERATOR_ENV := $(K8S_ARTIFACTS_DIR)/k8s-operator-env.sh
 HEADLAMP_START_SCRIPT := $(K8S_ARTIFACTS_DIR)/headlamp-start.sh
 K8S_API_TUNNEL_SCRIPT := $(K8S_ARTIFACTS_DIR)/k8s-api-tunnel.sh
 VENV_PYTHON := $(REPO_ROOT)/.venv/bin/python
+KUBECTL ?= $(shell if [ -x /usr/bin/kubectl ]; then echo /usr/bin/kubectl; else command -v kubectl 2>/dev/null || echo kubectl; fi)
 
 HOST ?=
 LIMIT ?=
@@ -78,6 +79,7 @@ help:
 	@echo "  TF_DESTROY_ARGS='-auto-approve'"
 	@echo "  K8S_CLOUD=aws               - Use AWS k3s inventory and generated kubeconfig artifacts"
 	@echo "  K8S_CLUSTER=aws             - Alias for K8S_CLOUD=aws"
+	@echo "  KUBECTL=/usr/bin/kubectl    - Override kubectl binary used by Make targets"
 
 infra-check:
 	cd "$(TF_DIR)" && terraform fmt -check -recursive
@@ -160,14 +162,14 @@ k8s-env:
 
 kubectl: ensure-k8s-api-tunnel
 	@if [ -z "$(ARGS)" ]; then echo "ARGS is required, for example: make kubectl ARGS='get nodes'"; exit 1; fi
-	KUBECONFIG="$(K8S_TUNNELED_KUBECONFIG)" kubectl $(ARGS)
+	KUBECONFIG="$(K8S_TUNNELED_KUBECONFIG)" "$(KUBECTL)" $(ARGS)
 
 headlamp-start:
 	@test -x "$(HEADLAMP_START_SCRIPT)" || (echo "Missing $(HEADLAMP_START_SCRIPT). Run 'make k3s-platform' first."; exit 1)
 	"$(HEADLAMP_START_SCRIPT)"
 
 headlamp-token: ensure-k8s-api-tunnel
-	KUBECONFIG="$(K8S_TUNNELED_KUBECONFIG)" kubectl create token headlamp-admin -n headlamp
+	KUBECONFIG="$(K8S_TUNNELED_KUBECONFIG)" "$(KUBECTL)" create token headlamp-admin -n headlamp
 
 ensure-k8s-api-tunnel:
 	@test -x "$(K8S_API_TUNNEL_SCRIPT)" || (echo "Missing $(K8S_API_TUNNEL_SCRIPT). Run 'make k3s-cluster' first."; exit 1)

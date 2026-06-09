@@ -1,5 +1,3 @@
-DASHBOARD_PROJECT.md
-
 # Environment file — passwords and local paths, never commit
 .env
 
@@ -10,10 +8,6 @@ DASHBOARD_PROJECT.md
 
 # Superpowers generated plans/specs — internal tooling, not for the repo
 docs/superpowers/
-
-# Local/scratch analysis and helper artifacts excluded from dev
-scripts/
-tournament/
 
 # Terraform
 terraform/.terraform/
@@ -35,9 +29,6 @@ terraform/config/ansible-runtime.json
 ansible/vars/local.generated.json
 ansible/artifacts/
 
-# Source zip
-coin-ops-intelligence.zip
-
 # Patch files
 *.patch
 
@@ -49,16 +40,7 @@ __pycache__/
 *.pyc
 *.pyo
 
-# Personal notes — not for the repo
-docs/interview-notes.md
-interview-notes.md
-0804meet.txt
-1004meet.txt
-container-sizes-report.txt
-
 # Local docs and infrastructure artifacts
-hyper-v/
-terraform-guide.pdf
 ansible/group_vars/all/*.backup
 ansible/group_vars/all/secrets.yml
 local/generated-env.sh
@@ -68,15 +50,9 @@ local/generated-azure-env.sh
 packer/**/*.pkrvars.hcl
 packer/**/*.manifest.json
 packer/packer_cache/
-!packer/common/
-!packer/common/scripts/
-!packer/common/scripts/*.sh
 
 ssh_config
-coin-ops_infra_roadmap_120d8424.plan.md
 terraform/sa-key.json
-!terraform/scripts/
-!terraform/scripts/*.tpl
 
 .venv/*
 local/generated-azure-python-env.sh

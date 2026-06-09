@@ -392,6 +392,138 @@ force_delete_aws_secrets() {
   done
 }
 
+empty_aws_s3_bucket() {
+  local bucket="$1"
+
+  if [[ -z "${bucket}" ]]; then
+    return 0
+  fi
+
+  echo "Emptying versioned S3 bucket ${bucket} before Terraform destroys it..."
+
+  local uploads_file upload_entries_file upload_error
+  uploads_file="$(mktemp "${TMP_ROOT}/s3-uploads.XXXXXX.json")"
+  upload_entries_file="$(mktemp "${TMP_ROOT}/s3-upload-entries.XXXXXX.tsv")"
+  if ! upload_error="$(aws s3api list-multipart-uploads --bucket "${bucket}" --output json >"${uploads_file}" 2>&1)"; then
+    if grep -Eqi 'NoSuchBucket|Not Found|404' <<<"${upload_error}"; then
+      echo "S3 bucket ${bucket} is already absent."
+      return 0
+    fi
+
+    echo "${upload_error}" >&2
+    return 1
+  fi
+
+  python3 - <<'PY' "${uploads_file}" >"${upload_entries_file}"
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    data = json.load(handle)
+
+for upload in data.get("Uploads", []) or []:
+    key = upload.get("Key", "")
+    upload_id = upload.get("UploadId", "")
+    if key and upload_id:
+        print(f"{key}\t{upload_id}")
+PY
+
+  local key upload_id
+  while IFS=$'\t' read -r key upload_id; do
+    [[ -n "${key}" && -n "${upload_id}" ]] || continue
+    aws s3api abort-multipart-upload \
+      --bucket "${bucket}" \
+      --key "${key}" \
+      --upload-id "${upload_id}" >/dev/null
+  done <"${upload_entries_file}"
+
+  local versions_file delete_file count list_error
+  while true; do
+    versions_file="$(mktemp "${TMP_ROOT}/s3-versions.XXXXXX.json")"
+    delete_file="$(mktemp "${TMP_ROOT}/s3-delete.XXXXXX.json")"
+
+    if ! list_error="$(aws s3api list-object-versions --bucket "${bucket}" --output json >"${versions_file}" 2>&1)"; then
+      if grep -Eqi 'NoSuchBucket|Not Found|404' <<<"${list_error}"; then
+        echo "S3 bucket ${bucket} is already absent."
+        return 0
+      fi
+
+      echo "${list_error}" >&2
+      return 1
+    fi
+
+    count="$(
+      python3 - <<'PY' "${versions_file}" "${delete_file}"
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    data = json.load(handle)
+
+objects = []
+for item in (data.get("Versions", []) or []) + (data.get("DeleteMarkers", []) or []):
+    key = item.get("Key")
+    version_id = item.get("VersionId")
+    if key and version_id:
+        objects.append({"Key": key, "VersionId": version_id})
+
+objects = objects[:1000]
+with open(sys.argv[2], "w", encoding="utf-8") as handle:
+    json.dump({"Objects": objects, "Quiet": True}, handle)
+
+print(len(objects))
+PY
+    )"
+
+    if [[ "${count}" -eq 0 ]]; then
+      echo "S3 bucket ${bucket} is empty."
+      return 0
+    fi
+
+    echo "Deleting ${count} object version(s) from ${bucket}..."
+    aws s3api delete-objects \
+      --bucket "${bucket}" \
+      --delete "file://${delete_file}" >/dev/null
+  done
+}
+
+empty_aws_s3_buckets() {
+  if ! command -v aws >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local addresses=()
+  mapfile -t addresses < <(terraform state list | grep 'aws_s3_bucket\.cnpg_backups' || true)
+
+  if [[ "${#addresses[@]}" -eq 0 ]]; then
+    return 0
+  fi
+
+  local address bucket
+  for address in "${addresses[@]}"; do
+    bucket="$(
+      terraform state show -no-color "${address}" \
+        | awk -F'= ' '
+            /^[[:space:]]*bucket[[:space:]]*=/ { gsub(/"/, "", $2); print $2; found=1; exit }
+            /^[[:space:]]*id[[:space:]]*=/ { fallback=$2 }
+            END {
+              if (!found && fallback != "") {
+                gsub(/"/, "", fallback)
+                print fallback
+              }
+            }
+          '
+    )"
+
+    if [[ -z "${bucket}" ]]; then
+      echo "Could not determine S3 bucket name for ${address}; skipping."
+      continue
+    fi
+
+    empty_aws_s3_bucket "${bucket}"
+  done
+}
+
 disable_gcp_sql_deletion_protection() {
   if ! command -v gcloud >/dev/null 2>&1; then
     return 0
@@ -759,7 +891,15 @@ build_destroy_command() {
           -target=module.aws_nat_route
           -target=module.aws_k3s_api_lb
           -target=module.aws_k3s_public_ingress_lb
+          -target=module.aws_observability_dashboard
+          -target=module.aws_observability_nlb_alarms
+          -target=module.aws_observability_ec2_alarms
+          -target=module.aws_observability_log_metrics
+          -target=module.aws_observability_agent_config
+          -target=module.aws_observability_alerting
+          -target=module.aws_observability_logs
           -target=module.aws_instances
+          -target=module.aws_observability_iam
           -target=module.aws_security_groups
           -target=module.aws_database
           -target=module.aws_secrets
@@ -793,6 +933,7 @@ build_destroy_command() {
 if [[ "${TARGET_CLOUD}" == "all" || "${TARGET_CLOUD}" == "aws" ]]; then
   disable_aws_rds_deletion_protection
   force_delete_aws_secrets
+  empty_aws_s3_buckets
 fi
 
 if [[ "${TARGET_CLOUD}" == "all" || "${TARGET_CLOUD}" == "gcp" ]]; then
