@@ -437,6 +437,17 @@ PY
       --upload-id "${upload_id}" >/dev/null
   done <"${upload_entries_file}"
 
+  local rm_error=""
+  if ! rm_error="$(aws s3 rm "s3://${bucket}" --recursive 2>&1 >/dev/null)"; then
+    if grep -Eqi 'NoSuchBucket|Not Found|404' <<<"${rm_error}"; then
+      echo "S3 bucket ${bucket} is already absent."
+      return 0
+    fi
+
+    echo "${rm_error}" >&2
+    return 1
+  fi
+
   local versions_file delete_file count list_error
   while true; do
     versions_file="$(mktemp "${TMP_ROOT}/s3-versions.XXXXXX.json")"
@@ -492,36 +503,70 @@ empty_aws_s3_buckets() {
     return 0
   fi
 
+  local bucket_candidates_file
+  bucket_candidates_file="$(mktemp "${TMP_ROOT}/s3-bucket-candidates.XXXXXX.txt")"
+
   local addresses=()
   mapfile -t addresses < <(terraform state list | grep 'aws_s3_bucket\.cnpg_backups' || true)
 
-  if [[ "${#addresses[@]}" -eq 0 ]]; then
+  if [[ "${#addresses[@]}" -gt 0 ]]; then
+    local address bucket
+    for address in "${addresses[@]}"; do
+      bucket="$(
+        terraform state show -no-color "${address}" \
+          | awk -F'= ' '
+              /^[[:space:]]*bucket[[:space:]]*=/ { gsub(/"/, "", $2); print $2; found=1; exit }
+              /^[[:space:]]*id[[:space:]]*=/ { fallback=$2 }
+              END {
+                if (!found && fallback != "") {
+                  gsub(/"/, "", fallback)
+                  print fallback
+                }
+              }
+            '
+      )"
+
+      if [[ -z "${bucket}" ]]; then
+        echo "Could not determine S3 bucket name for ${address}; skipping state-derived candidate."
+        continue
+      fi
+
+      printf '%s\n' "${bucket}" >>"${bucket_candidates_file}"
+    done
+  fi
+
+  python3 - <<'PY' "${TMP_TERRAFORM_DIR}/config" >>"${bucket_candidates_file}"
+import json
+import pathlib
+import sys
+
+config_dir = pathlib.Path(sys.argv[1])
+
+for name in ("ansible-runtime.json", "hosts.json"):
+    path = config_dir / name
+    if not path.exists():
+        continue
+
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        continue
+
+    aws = data.get("aws", {})
+    bucket = aws.get("cnpg_backup", {}).get("bucket", "")
+    if bucket:
+        print(bucket)
+PY
+
+  if [[ ! -s "${bucket_candidates_file}" ]]; then
     return 0
   fi
 
-  local address bucket
-  for address in "${addresses[@]}"; do
-    bucket="$(
-      terraform state show -no-color "${address}" \
-        | awk -F'= ' '
-            /^[[:space:]]*bucket[[:space:]]*=/ { gsub(/"/, "", $2); print $2; found=1; exit }
-            /^[[:space:]]*id[[:space:]]*=/ { fallback=$2 }
-            END {
-              if (!found && fallback != "") {
-                gsub(/"/, "", fallback)
-                print fallback
-              }
-            }
-          '
-    )"
-
-    if [[ -z "${bucket}" ]]; then
-      echo "Could not determine S3 bucket name for ${address}; skipping."
-      continue
-    fi
-
+  local bucket
+  while IFS= read -r bucket; do
+    [[ -n "${bucket}" ]] || continue
     empty_aws_s3_bucket "${bucket}"
-  done
+  done < <(sort -u "${bucket_candidates_file}")
 }
 
 disable_gcp_sql_deletion_protection() {
@@ -891,12 +936,7 @@ build_destroy_command() {
           -target=module.aws_nat_route
           -target=module.aws_k3s_api_lb
           -target=module.aws_k3s_public_ingress_lb
-          -target=module.aws_observability_dashboard
-          -target=module.aws_observability_nlb_alarms
-          -target=module.aws_observability_ec2_alarms
-          -target=module.aws_observability_log_metrics
-          -target=module.aws_observability_agent_config
-          -target=module.aws_observability_alerting
+          -target=module.aws_observability_monitoring
           -target=module.aws_observability_logs
           -target=module.aws_instances
           -target=module.aws_observability_iam

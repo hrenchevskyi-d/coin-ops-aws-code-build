@@ -1,0 +1,311 @@
+{
+    "observability": {
+        "enabled": true,
+        "alerts": {
+            "email": "grenchevskiyd@gmail.com"
+        },
+        "logs": {
+            "container_log_group_name": "/coin-ops/k3s/containers",
+            "retention_in_days": 7,
+            "container_log_silence_minutes": 15,
+            "metric_filters": {
+                "container_log_events": {
+                    "name_suffix": "container-log-events",
+                    "pattern": "{ $.kubernetes.container_name = * }",
+                    "metric_name": "ContainerLogEvents",
+                    "namespace": "CoinOps/K3s",
+                    "value": "1"
+                },
+                "traefik_request_count": {
+                    "name_suffix": "traefik-request-count",
+                    "pattern": "{ $.kubernetes.container_name = \"traefik\" && $.log_processed.DownstreamStatus = * }",
+                    "metric_name": "RequestCount",
+                    "namespace": "CoinOps/Traefik",
+                    "value": "1"
+                },
+                "traefik_downstream_5xx_count": {
+                    "name_suffix": "traefik-downstream-5xx-count",
+                    "pattern": "{ $.kubernetes.container_name = \"traefik\" && $.log_processed.DownstreamStatus >= 500 && $.log_processed.DownstreamStatus < 600 }",
+                    "metric_name": "Downstream5xxCount",
+                    "namespace": "CoinOps/Traefik",
+                    "value": "1"
+                },
+                "traefik_origin_5xx_count": {
+                    "name_suffix": "traefik-origin-5xx-count",
+                    "pattern": "{ $.kubernetes.container_name = \"traefik\" && $.log_processed.OriginStatus >= 500 && $.log_processed.OriginStatus < 600 }",
+                    "metric_name": "Origin5xxCount",
+                    "namespace": "CoinOps/Traefik",
+                    "value": "1"
+                }
+            }
+        },
+        "cloudwatch_agent": {
+            "parameter_name": "/coin-ops/cloudwatch-agent/linux",
+            "metrics_collection_interval": 60,
+            "run_as_user": "cwagent",
+            "host_metric_groups": {
+                "mem": {
+                    "enabled": true,
+                    "measurement": [
+                        "mem_used_percent"
+                    ]
+                },
+                "disk": {
+                    "enabled": true,
+                    "measurement": [
+                        "used_percent",
+                        "inodes_free",
+                        "inodes_used",
+                        "inodes_total"
+                    ],
+                    "resources": [
+                        "/"
+                    ],
+                    "drop_device": true
+                },
+                "swap": {
+                    "enabled": true,
+                    "measurement": [
+                        "swap_used_percent"
+                    ]
+                }
+            }
+        },
+        "alarms": {
+            "ec2": {
+                "cpu_utilization": {
+                    "name_suffix": "ec2-cpu-utilization",
+                    "description": "EC2 CPU utilization is above 85% on {instance_name}.",
+                    "namespace": "AWS/EC2",
+                    "metric_name": "CPUUtilization",
+                    "statistic": "Average",
+                    "period": 300,
+                    "evaluation_periods": 2,
+                    "threshold": 85,
+                    "comparison_operator": "GreaterThanThreshold",
+                    "treat_missing_data": "notBreaching"
+                },
+                "status_check_failed": {
+                    "name_suffix": "ec2-status-check-failed",
+                    "description": "EC2 instance or system status check failed on {instance_name}.",
+                    "namespace": "AWS/EC2",
+                    "metric_name": "StatusCheckFailed",
+                    "statistic": "Maximum",
+                    "period": 60,
+                    "evaluation_periods": 2,
+                    "threshold": 0,
+                    "comparison_operator": "GreaterThanThreshold",
+                    "treat_missing_data": "notBreaching"
+                },
+                "memory_used_percent": {
+                    "name_suffix": "ec2-memory-used-percent",
+                    "description": "EC2 memory usage is above 85% on {instance_name}.",
+                    "namespace": "CWAgent",
+                    "metric_name": "mem_used_percent",
+                    "statistic": "Average",
+                    "period": 300,
+                    "evaluation_periods": 2,
+                    "threshold": 85,
+                    "comparison_operator": "GreaterThanThreshold",
+                    "treat_missing_data": "notBreaching"
+                },
+                "disk_used_percent": {
+                    "name_suffix": "ec2-disk-used-percent",
+                    "description": "EC2 disk usage is above 85% on {instance_name}.",
+                    "namespace": "CWAgent",
+                    "metric_name": "disk_used_percent",
+                    "statistic": "Maximum",
+                    "period": 300,
+                    "evaluation_periods": 2,
+                    "threshold": 85,
+                    "comparison_operator": "GreaterThanThreshold",
+                    "treat_missing_data": "notBreaching"
+                }
+            },
+            "nlb": {
+                "unhealthy_targets": {
+                    "enabled": true,
+                    "name_suffix": "k3s-public-ingress-nlb-unhealthy-targets",
+                    "description": "Public k3s ingress NLB has unhealthy targets.",
+                    "dimension_scope": "target_group",
+                    "namespace": "AWS/NetworkELB",
+                    "metric_name": "UnHealthyHostCount",
+                    "statistic": "Maximum",
+                    "period": 60,
+                    "evaluation_periods": 1,
+                    "threshold": 0,
+                    "comparison_operator": "GreaterThanThreshold",
+                    "treat_missing_data": "notBreaching"
+                },
+                "healthy_target_count": {
+                    "enabled": true,
+                    "name_suffix": "k3s-public-ingress-nlb-healthy-target-count",
+                    "description": "Public k3s ingress NLB healthy target count is below the configured server count.",
+                    "dimension_scope": "target_group",
+                    "namespace": "AWS/NetworkELB",
+                    "metric_name": "HealthyHostCount",
+                    "statistic": "Minimum",
+                    "period": 60,
+                    "evaluation_periods": 1,
+                    "threshold_source": "target_count",
+                    "comparison_operator": "LessThanThreshold",
+                    "treat_missing_data": "breaching"
+                },
+                "rejected_flows": {
+                    "enabled": true,
+                    "name_suffix": "k3s-public-ingress-nlb-rejected-flows",
+                    "description": "Public k3s ingress NLB rejected flows.",
+                    "dimension_scope": "load_balancer",
+                    "namespace": "AWS/NetworkELB",
+                    "metric_name": "RejectedFlowCount",
+                    "statistic": "Sum",
+                    "period": 60,
+                    "evaluation_periods": 1,
+                    "threshold": 0,
+                    "comparison_operator": "GreaterThanThreshold",
+                    "treat_missing_data": "notBreaching"
+                },
+                "port_allocation_errors": {
+                    "enabled": true,
+                    "name_suffix": "k3s-public-ingress-nlb-port-allocation-errors",
+                    "description": "Public k3s ingress NLB had port allocation errors.",
+                    "dimension_scope": "load_balancer",
+                    "namespace": "AWS/NetworkELB",
+                    "metric_name": "PortAllocationErrorCount",
+                    "statistic": "Sum",
+                    "period": 60,
+                    "evaluation_periods": 1,
+                    "threshold": 0,
+                    "comparison_operator": "GreaterThanThreshold",
+                    "treat_missing_data": "notBreaching"
+                },
+                "processed_bytes_high": {
+                    "enabled": true,
+                    "name_suffix": "k3s-public-ingress-nlb-processed-bytes-high",
+                    "description": "Baseline alarm: public ingress NLB processed more than 10485760 bytes in a 5 minute period.",
+                    "dimension_scope": "load_balancer",
+                    "namespace": "AWS/NetworkELB",
+                    "metric_name": "ProcessedBytes",
+                    "statistic": "Sum",
+                    "period": 300,
+                    "evaluation_periods": 1,
+                    "threshold": 10485760,
+                    "comparison_operator": "GreaterThanThreshold",
+                    "treat_missing_data": "notBreaching"
+                },
+                "new_flows_high": {
+                    "enabled": true,
+                    "name_suffix": "k3s-public-ingress-nlb-new-flows-high",
+                    "description": "Baseline alarm: public ingress NLB saw more than 300 new flows in a 5 minute period.",
+                    "dimension_scope": "load_balancer",
+                    "namespace": "AWS/NetworkELB",
+                    "metric_name": "NewFlowCount",
+                    "statistic": "Sum",
+                    "period": 300,
+                    "evaluation_periods": 1,
+                    "threshold": 300,
+                    "comparison_operator": "GreaterThanThreshold",
+                    "treat_missing_data": "notBreaching"
+                },
+                "active_flows_high": {
+                    "enabled": true,
+                    "name_suffix": "k3s-public-ingress-nlb-active-flows-high",
+                    "description": "Baseline alarm: public ingress NLB active flows exceeded 50.",
+                    "dimension_scope": "load_balancer",
+                    "namespace": "AWS/NetworkELB",
+                    "metric_name": "ActiveFlowCount",
+                    "statistic": "Maximum",
+                    "period": 300,
+                    "evaluation_periods": 1,
+                    "threshold": 50,
+                    "comparison_operator": "GreaterThanThreshold",
+                    "treat_missing_data": "notBreaching"
+                },
+                "client_resets_high": {
+                    "enabled": true,
+                    "name_suffix": "k3s-public-ingress-nlb-client-resets-high",
+                    "description": "Baseline alarm: public ingress NLB client TCP resets exceeded 500 in a 5 minute period.",
+                    "dimension_scope": "load_balancer",
+                    "namespace": "AWS/NetworkELB",
+                    "metric_name": "TCP_Client_Reset_Count",
+                    "statistic": "Sum",
+                    "period": 300,
+                    "evaluation_periods": 1,
+                    "threshold": 500,
+                    "comparison_operator": "GreaterThanThreshold",
+                    "treat_missing_data": "notBreaching"
+                },
+                "target_resets_high": {
+                    "enabled": true,
+                    "name_suffix": "k3s-public-ingress-nlb-target-resets-high",
+                    "description": "Baseline alarm: public ingress NLB target TCP resets exceeded 300 in a 5 minute period.",
+                    "dimension_scope": "load_balancer",
+                    "namespace": "AWS/NetworkELB",
+                    "metric_name": "TCP_Target_Reset_Count",
+                    "statistic": "Sum",
+                    "period": 300,
+                    "evaluation_periods": 1,
+                    "threshold": 300,
+                    "comparison_operator": "GreaterThanThreshold",
+                    "treat_missing_data": "notBreaching"
+                },
+                "elb_resets": {
+                    "enabled": true,
+                    "name_suffix": "k3s-public-ingress-nlb-elb-resets",
+                    "description": "Public ingress NLB generated TCP resets.",
+                    "dimension_scope": "load_balancer",
+                    "namespace": "AWS/NetworkELB",
+                    "metric_name": "TCP_ELB_Reset_Count",
+                    "statistic": "Sum",
+                    "period": 300,
+                    "evaluation_periods": 1,
+                    "threshold": 20,
+                    "comparison_operator": "GreaterThanThreshold",
+                    "treat_missing_data": "notBreaching"
+                }
+            },
+            "traefik": {
+                "downstream_5xx": {
+                    "enabled": true,
+                    "name_suffix": "traefik-downstream-5xx",
+                    "description": "Traefik returned downstream 5xx responses.",
+                    "metric_key": "traefik_downstream_5xx_count",
+                    "statistic": "Sum",
+                    "period": 60,
+                    "evaluation_periods": 1,
+                    "threshold": 0,
+                    "comparison_operator": "GreaterThanThreshold",
+                    "treat_missing_data": "notBreaching"
+                },
+                "origin_5xx": {
+                    "enabled": true,
+                    "name_suffix": "traefik-origin-5xx",
+                    "description": "Traefik observed origin 5xx responses.",
+                    "metric_key": "traefik_origin_5xx_count",
+                    "statistic": "Sum",
+                    "period": 60,
+                    "evaluation_periods": 1,
+                    "threshold": 0,
+                    "comparison_operator": "GreaterThanThreshold",
+                    "treat_missing_data": "notBreaching"
+                }
+            },
+            "container_logs": {
+                "silent": {
+                    "enabled": true,
+                    "name_suffix": "container-logs-silent",
+                    "description": "No Kubernetes container logs reached CloudWatch for {silence_minutes} minutes.",
+                    "metric_key": "container_log_events",
+                    "statistic": "Sum",
+                    "period": 300,
+                    "threshold": 1,
+                    "comparison_operator": "LessThanThreshold",
+                    "treat_missing_data": "breaching"
+                }
+            }
+        },
+        "dashboard": {
+            "enabled": true
+        }
+    }
+}

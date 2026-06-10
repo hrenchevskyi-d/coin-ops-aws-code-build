@@ -6,7 +6,7 @@ locals {
 }
 
 module "aws_observability_iam" {
-  count = local.aws_compute_enabled ? 1 : 0
+  count = local.aws_compute_enabled && local.aws_observability_enabled ? 1 : 0
 
   source = "./modules/cloud/aws/observability_iam"
 

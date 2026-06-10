@@ -1,26 +1,65 @@
 locals {
+  aws_observability_enabled = try(local.observability.enabled, true)
   aws_observability_tags = {
     Project = local.project_name
     Cloud   = "aws"
   }
 
-  aws_observability_alert_email       = "grenchevskiyd@gmail.com"
-  aws_cloudwatch_agent_parameter_name = "/${local.project_name}/cloudwatch-agent/linux"
+  aws_observability_alerts_cfg = merge({
+    email = ""
+  }, try(local.observability.alerts, {}))
 
-  aws_observability_container_log_silence_minutes = 15
-  aws_observability_nlb_traffic_thresholds = {
-    processed_bytes_per_5m = 10485760
-    new_flows_per_5m       = 300
-    active_flows           = 50
-    client_resets_per_5m   = 500
-    target_resets_per_5m   = 300
-    elb_resets_per_5m      = 20
+  aws_observability_logs_cfg = merge({
+    container_log_group_name      = "/${local.project_name}/k3s/containers"
+    retention_in_days             = 7
+    container_log_silence_minutes = 15
+    metric_filters                = {}
+  }, try(local.observability.logs, {}))
+
+  aws_observability_cloudwatch_agent_cfg = merge({
+    parameter_name              = "/${local.project_name}/cloudwatch-agent/linux"
+    metrics_collection_interval = 60
+    run_as_user                 = "cwagent"
+    host_metric_groups          = {}
+  }, try(local.observability.cloudwatch_agent, {}))
+
+  aws_observability_alarms_cfg = merge({
+    ec2            = {}
+    nlb            = {}
+    traefik        = {}
+    container_logs = {}
+  }, try(local.observability.alarms, {}))
+
+  aws_observability_dashboard_cfg = merge({
+    enabled = true
+  }, try(local.observability.dashboard, {}))
+
+  aws_observability_log_metric_filters = {
+    for key, filter in local.aws_observability_logs_cfg.metric_filters : key => merge(filter, {
+      name = try(filter.name, "${local.project_name}-${filter.name_suffix}")
+    })
+  }
+
+  aws_cloudwatch_agent_metrics_collected = {
+    for group_name, group_cfg in local.aws_observability_cloudwatch_agent_cfg.host_metric_groups : group_name => merge(
+      {
+        measurement                 = try(group_cfg.measurement, [])
+        metrics_collection_interval = local.aws_observability_cloudwatch_agent_cfg.metrics_collection_interval
+      },
+      try(group_cfg.resources, null) == null ? {} : {
+        resources = group_cfg.resources
+      },
+      try(group_cfg.drop_device, null) == null ? {} : {
+        drop_device = group_cfg.drop_device
+      }
+    )
+    if try(group_cfg.enabled, true)
   }
 
   aws_cloudwatch_agent_config = {
     agent = {
-      metrics_collection_interval = 60
-      run_as_user                 = "cwagent"
+      metrics_collection_interval = local.aws_observability_cloudwatch_agent_cfg.metrics_collection_interval
+      run_as_user                 = local.aws_observability_cloudwatch_agent_cfg.run_as_user
     }
     metrics = {
       append_dimensions = {
@@ -29,33 +68,7 @@ locals {
       aggregation_dimensions = [
         ["InstanceId"]
       ]
-      metrics_collected = {
-        mem = {
-          measurement = [
-            "mem_used_percent"
-          ]
-          metrics_collection_interval = 60
-        }
-        disk = {
-          measurement = [
-            "used_percent",
-            "inodes_free",
-            "inodes_used",
-            "inodes_total"
-          ]
-          metrics_collection_interval = 60
-          resources = [
-            "/"
-          ]
-          drop_device = true
-        }
-        swap = {
-          measurement = [
-            "swap_used_percent"
-          ]
-          metrics_collection_interval = 60
-        }
-      }
+      metrics_collected = local.aws_cloudwatch_agent_metrics_collected
     }
   }
 
@@ -70,74 +83,34 @@ locals {
     target_group_arn_suffix  = try(module.aws_k3s_public_ingress_lb[0].target_group_arn_suffix, "")
     target_count             = local.aws_k3s_public_ingress_target_count
   }
+
+  aws_observability_log_metric_alarms = merge(
+    try(local.aws_observability_alarms_cfg.traefik, {}),
+    {
+      for key, alarm in try(local.aws_observability_alarms_cfg.container_logs, {}) : key => merge(alarm, {
+        description        = replace(try(alarm.description, ""), "{silence_minutes}", tostring(local.aws_observability_logs_cfg.container_log_silence_minutes))
+        evaluation_periods = try(alarm.evaluation_periods, ceil(local.aws_observability_logs_cfg.container_log_silence_minutes * 60 / try(alarm.period, 300)))
+      })
+    }
+  )
 }
 
-module "aws_observability_alerting" {
-  count = local.aws_compute_enabled ? 1 : 0
+module "aws_observability_monitoring" {
+  count = local.aws_compute_enabled && local.aws_observability_enabled ? 1 : 0
 
-  source = "./modules/cloud/aws/observability_alerting"
+  source = "./modules/cloud/aws/observability_monitoring"
 
-  project_name = local.project_name
-  tags         = local.aws_observability_tags
-  alert_email  = local.aws_observability_alert_email
-}
-
-module "aws_observability_agent_config" {
-  count = local.aws_compute_enabled ? 1 : 0
-
-  source = "./modules/cloud/aws/observability_agent_config"
-
-  parameter_name = local.aws_cloudwatch_agent_parameter_name
-  config         = local.aws_cloudwatch_agent_config
-  tags           = local.aws_observability_tags
-}
-
-module "aws_observability_log_metrics" {
-  count = local.aws_compute_enabled ? 1 : 0
-
-  source = "./modules/cloud/aws/observability_log_metrics"
-
-  project_name                  = local.project_name
-  container_log_group_name      = module.aws_observability_logs[0].log_group_name
-  alert_topic_arn               = module.aws_observability_alerting[0].topic_arn
-  container_log_silence_minutes = local.aws_observability_container_log_silence_minutes
-  tags                          = local.aws_observability_tags
-}
-
-module "aws_observability_ec2_alarms" {
-  count = local.aws_compute_enabled ? 1 : 0
-
-  source = "./modules/cloud/aws/observability_ec2_alarms"
-
-  project_name    = local.project_name
-  instance_ids    = local.aws_observability_instance_ids
-  alert_topic_arn = module.aws_observability_alerting[0].topic_arn
-  tags            = local.aws_observability_tags
-}
-
-module "aws_observability_nlb_alarms" {
-  count = local.aws_compute_enabled && local.aws_observability_public_ingress_nlb.enabled ? 1 : 0
-
-  source = "./modules/cloud/aws/observability_nlb_alarms"
-
-  project_name = local.project_name
-  public_ingress_nlb = {
-    load_balancer_arn_suffix = local.aws_observability_public_ingress_nlb.load_balancer_arn_suffix
-    target_group_arn_suffix  = local.aws_observability_public_ingress_nlb.target_group_arn_suffix
-    target_count             = local.aws_observability_public_ingress_nlb.target_count
-  }
-  alert_topic_arn    = module.aws_observability_alerting[0].topic_arn
-  traffic_thresholds = local.aws_observability_nlb_traffic_thresholds
-  tags               = local.aws_observability_tags
-}
-
-module "aws_observability_dashboard" {
-  count = local.aws_compute_enabled ? 1 : 0
-
-  source = "./modules/cloud/aws/observability_dashboard"
-
-  project_name       = local.project_name
-  aws_region         = local.aws_region
-  instance_ids       = local.aws_observability_instance_ids
-  public_ingress_nlb = local.aws_observability_public_ingress_nlb
+  project_name               = local.project_name
+  aws_region                 = local.aws_region
+  tags                       = local.aws_observability_tags
+  alert_email                = local.aws_observability_alerts_cfg.email
+  cloudwatch_agent_parameter = local.aws_observability_cloudwatch_agent_cfg.parameter_name
+  cloudwatch_agent_config    = local.aws_cloudwatch_agent_config
+  instance_ids               = local.aws_observability_instance_ids
+  ec2_alarms                 = local.aws_observability_alarms_cfg.ec2
+  public_ingress_nlb         = local.aws_observability_public_ingress_nlb
+  nlb_alarms                 = local.aws_observability_alarms_cfg.nlb
+  log_metric_definitions     = try(module.aws_observability_logs[0].metric_definitions, {})
+  log_metric_alarms          = local.aws_observability_log_metric_alarms
+  dashboard_enabled          = local.aws_observability_dashboard_cfg.enabled
 }

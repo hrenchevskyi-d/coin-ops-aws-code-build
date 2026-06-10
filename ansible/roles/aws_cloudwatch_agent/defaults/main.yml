@@ -9,4 +9,4 @@ aws_cloudwatch_agent_debian_arch: >-
     else 'amd64'
   }}
 aws_cloudwatch_agent_download_url: "https://amazoncloudwatch-agent.s3.amazonaws.com/debian/{{ aws_cloudwatch_agent_debian_arch }}/latest/amazon-cloudwatch-agent.deb"
-aws_cloudwatch_agent_config_parameter_name: "/{{ infra_general.get('project_name', 'coin-ops') }}/cloudwatch-agent/linux"
+aws_cloudwatch_agent_config_parameter_name: "{{ infra_observability.get('cloudwatch_agent', {}).get('parameter_name', '/' ~ infra_general.get('project_name', 'coin-ops') ~ '/cloudwatch-agent/linux') }}"

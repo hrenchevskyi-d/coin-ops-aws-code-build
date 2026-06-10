@@ -7,6 +7,7 @@ locals {
     try(jsondecode(file("${path.module}/config/general.json")), {}),
     try(jsondecode(file("${path.module}/config/deploy.json")), {}),
     try(jsondecode(file("${path.module}/config/database.json")), {}),
+    try(jsondecode(file("${path.module}/config/observability.json")), {}),
     try(jsondecode(file("${path.module}/config/dns.json")), {}),
     try(jsondecode(file("${path.module}/config/secrets.json")), {}),
     try(jsondecode(file("${path.module}/config/instances.json")), {})
@@ -24,6 +25,7 @@ locals {
   azure_account   = lookup(local.azure_provider, "account", {})
   deploy          = lookup(local.cfg, "deploy", {})
   database        = lookup(local.cfg, "database", {})
+  observability   = lookup(local.cfg, "observability", {})
   dns             = lookup(local.cfg, "dns", {})
   general         = lookup(local.cfg, "general", {})
   secrets         = lookup(local.cfg, "secrets", {})

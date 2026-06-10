@@ -20,6 +20,7 @@ infra_config_mappings_file: "{{ lookup('file', infra_config_dir ~ '/cloud_mappin
 infra_config_general_file: "{{ lookup('file', infra_config_dir ~ '/general.json') | from_json }}"
 infra_config_deploy_file: "{{ lookup('file', infra_config_dir ~ '/deploy.json') | from_json }}"
 infra_config_database_file: "{{ lookup('file', infra_config_dir ~ '/database.json') | from_json }}"
+infra_config_observability_file: "{{ lookup('file', infra_config_dir ~ '/observability.json') | from_json }}"
 infra_config_dns_file: "{{ lookup('file', infra_config_dir ~ '/dns.json') | from_json }}"
 infra_config_secrets_file: "{{ lookup('file', infra_config_dir ~ '/secrets.json') | from_json }}"
 infra_config_instances_file: "{{ lookup('file', infra_config_dir ~ '/instances.json') | from_json }}"
@@ -32,6 +33,7 @@ infra_config: >-
     | combine(infra_config_general_file, recursive=True)
     | combine(infra_config_deploy_file, recursive=True)
     | combine(infra_config_database_file, recursive=True)
+    | combine(infra_config_observability_file, recursive=True)
     | combine(infra_config_dns_file, recursive=True)
     | combine(infra_config_secrets_file, recursive=True)
     | combine(infra_config_instances_file, recursive=True)
@@ -43,6 +45,7 @@ infra_cloud_providers: "{{ infra_clouds.get('providers', {}) }}"
 infra_general: "{{ infra_config.get('general', {}) }}"
 infra_deploy: "{{ infra_config.get('deploy', {}) }}"
 infra_database: "{{ infra_config.get('database', {}) }}"
+infra_observability: "{{ infra_config.get('observability', {}) }}"
 infra_images: "{{ infra_config.get('images', {}) }}"
 infra_ports: "{{ infra_config.get('ports', {}) }}"
 infra_secrets: "{{ infra_config.get('secrets', {}) }}"

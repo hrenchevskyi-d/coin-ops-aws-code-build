@@ -5,7 +5,7 @@ k3s_cloudwatch_logs_service_account: fluent-bit
 k3s_cloudwatch_logs_config_name: fluent-bit-config
 k3s_cloudwatch_logs_daemonset_name: fluent-bit
 k3s_cloudwatch_logs_image: public.ecr.aws/aws-observability/aws-for-fluent-bit:stable
-k3s_cloudwatch_logs_log_group_name: "/{{ infra_general.get('project_name', 'coin-ops') }}/k3s/containers"
+k3s_cloudwatch_logs_log_group_name: "{{ infra_observability.get('logs', {}).get('container_log_group_name', '/' ~ infra_general.get('project_name', 'coin-ops') ~ '/k3s/containers') }}"
 k3s_cloudwatch_logs_stream_prefix: "k3s/"
 k3s_cloudwatch_logs_state_dir: /var/lib/fluent-bit
-k3s_cloudwatch_logs_retention_days: 7
+k3s_cloudwatch_logs_retention_days: "{{ infra_observability.get('logs', {}).get('retention_in_days', 7) }}"
