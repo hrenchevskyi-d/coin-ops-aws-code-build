@@ -26,7 +26,7 @@ install_terraform() {
 
   verify_tools curl unzip
 
-  local version="${COINOPS_TERRAFORM_VERSION:-1.9.8}"
+  local version="${COINOPS_TERRAFORM_VERSION:-1.15.2}"
   local machine
   local arch
   local zip_path
