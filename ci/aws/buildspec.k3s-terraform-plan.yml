@@ -1,0 +1,30 @@
+version: 0.2
+
+env:
+  shell: bash
+
+phases:
+  install:
+    commands:
+      - ./ci/aws/codebuild-worker-env.sh verify-tools terraform python3 make aws
+      - terraform version
+      - python3 --version
+  pre_build:
+    commands:
+      - source ./ci/aws/codebuild-worker-env.sh
+      - ./ci/aws/codebuild-worker-env.sh render-backend
+      - make tf-check-backend
+      - terraform -chdir=terraform init -reconfigure
+  build:
+    commands:
+      - source ./ci/aws/codebuild-worker-env.sh
+      - terraform -chdir=terraform fmt -check -recursive
+      - terraform -chdir=terraform validate
+      - terraform -chdir=terraform plan -input=false -out=plan.out
+      - terraform -chdir=terraform show -no-color plan.out > terraform/plan.txt
+
+artifacts:
+  files:
+    - terraform/plan.out
+    - terraform/plan.txt
+  discard-paths: no
