@@ -404,12 +404,13 @@ empty_aws_s3_bucket() {
   local uploads_file upload_entries_file upload_error
   uploads_file="$(mktemp "${TMP_ROOT}/s3-uploads.XXXXXX.json")"
   upload_entries_file="$(mktemp "${TMP_ROOT}/s3-upload-entries.XXXXXX.tsv")"
-  if ! upload_error="$(aws s3api list-multipart-uploads --bucket "${bucket}" --output json >"${uploads_file}" 2>&1)"; then
+  if ! upload_error="$(aws s3api list-multipart-uploads --bucket "${bucket}" --output json 2>&1 >"${uploads_file}")"; then
     if grep -Eqi 'NoSuchBucket|Not Found|404' <<<"${upload_error}"; then
       echo "S3 bucket ${bucket} is already absent."
       return 0
     fi
 
+    echo "Failed to list multipart uploads for S3 bucket ${bucket}:" >&2
     echo "${upload_error}" >&2
     return 1
   fi
@@ -429,12 +430,17 @@ for upload in data.get("Uploads", []) or []:
 PY
 
   local key upload_id
+  local abort_error
   while IFS=$'\t' read -r key upload_id; do
     [[ -n "${key}" && -n "${upload_id}" ]] || continue
-    aws s3api abort-multipart-upload \
+    if ! abort_error="$(aws s3api abort-multipart-upload \
       --bucket "${bucket}" \
       --key "${key}" \
-      --upload-id "${upload_id}" >/dev/null
+      --upload-id "${upload_id}" 2>&1 >/dev/null)"; then
+      echo "Failed to abort multipart upload for s3://${bucket}/${key}:" >&2
+      echo "${abort_error}" >&2
+      return 1
+    fi
   done <"${upload_entries_file}"
 
   local rm_error=""
@@ -444,6 +450,7 @@ PY
       return 0
     fi
 
+    echo "Failed to remove current objects from S3 bucket ${bucket}:" >&2
     echo "${rm_error}" >&2
     return 1
   fi
@@ -453,12 +460,13 @@ PY
     versions_file="$(mktemp "${TMP_ROOT}/s3-versions.XXXXXX.json")"
     delete_file="$(mktemp "${TMP_ROOT}/s3-delete.XXXXXX.json")"
 
-    if ! list_error="$(aws s3api list-object-versions --bucket "${bucket}" --output json >"${versions_file}" 2>&1)"; then
+    if ! list_error="$(aws s3api list-object-versions --bucket "${bucket}" --output json 2>&1 >"${versions_file}")"; then
       if grep -Eqi 'NoSuchBucket|Not Found|404' <<<"${list_error}"; then
         echo "S3 bucket ${bucket} is already absent."
         return 0
       fi
 
+      echo "Failed to list object versions for S3 bucket ${bucket}:" >&2
       echo "${list_error}" >&2
       return 1
     fi
@@ -492,9 +500,14 @@ PY
     fi
 
     echo "Deleting ${count} object version(s) from ${bucket}..."
-    aws s3api delete-objects \
+    local delete_error
+    if ! delete_error="$(aws s3api delete-objects \
       --bucket "${bucket}" \
-      --delete "file://${delete_file}" >/dev/null
+      --delete "file://${delete_file}" 2>&1 >/dev/null)"; then
+      echo "Failed to delete object versions from S3 bucket ${bucket}:" >&2
+      echo "${delete_error}" >&2
+      return 1
+    fi
   done
 }
 
