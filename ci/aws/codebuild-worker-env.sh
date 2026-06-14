@@ -95,13 +95,17 @@ if [[ "${1:-}" == "render-backend" ]]; then
 fi
 
 export REPO_ROOT
+export COINOPS_REPO_ROOT="${COINOPS_REPO_ROOT:-${REPO_ROOT}}"
 export TF_IN_AUTOMATION="${TF_IN_AUTOMATION:-true}"
 export TF_INPUT="${TF_INPUT:-false}"
 export K8S_CLOUD="${K8S_CLOUD:-aws}"
 export K8S_CLUSTER="${K8S_CLUSTER:-${K8S_CLOUD}}"
+export COINOPS_RUNTIME_CONFIG_CLOUD="${COINOPS_RUNTIME_CONFIG_CLOUD:-${K8S_CLOUD}}"
+export COINOPS_SECRET_BACKEND="${COINOPS_SECRET_BACKEND:-aws}"
 export ANSIBLE_CONFIG="${ANSIBLE_CONFIG:-${REPO_ROOT}/ansible.cfg}"
 export ANSIBLE_LOCAL_TEMP="${ANSIBLE_LOCAL_TEMP:-/tmp/ansible-local}"
 export ANSIBLE_REMOTE_TEMP="${ANSIBLE_REMOTE_TEMP:-/tmp/ansible-remote}"
+export SSH_KEY_PATH="${SSH_KEY_PATH:-${HOME}/.ssh/ssh-key-coin-ops}"
 
 mkdir -p "${ANSIBLE_LOCAL_TEMP}" "${ANSIBLE_REMOTE_TEMP}"
 
@@ -115,4 +119,12 @@ fi
 
 if [[ -z "${AWS_REGION:-}" ]]; then
   echo "AWS_REGION is not set; Terraform will fall back to terraform/config/*.json defaults." >&2
+fi
+
+if [[ -n "${COINOPS_SSH_PUBLIC_KEY:-}" ]]; then
+  mkdir -p /tmp/coinops-ci
+  printf '%s\n' "${COINOPS_SSH_PUBLIC_KEY}" > /tmp/coinops-ci/ssh-key-coin-ops.pub
+  export TF_VAR_ssh_public_key_path="${TF_VAR_ssh_public_key_path:-/tmp/coinops-ci/ssh-key-coin-ops.pub}"
+elif [[ -z "${TF_VAR_ssh_public_key_path:-}" && -f "${SSH_KEY_PATH}.pub" ]]; then
+  export TF_VAR_ssh_public_key_path="${SSH_KEY_PATH}.pub"
 fi

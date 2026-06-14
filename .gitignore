@@ -17,6 +17,8 @@ terraform/backend.active.tf
 terraform/*.tfstate
 terraform/*.tfstate.backup
 terraform/terraform.tfstate.*.backup
+terraform/plan.out
+terraform/plan.txt
 terraform/terraform.tfvars
 terraform/local.generated.auto.tfvars.json
 terraform/bootstrap.secrets.auto.tfvars
