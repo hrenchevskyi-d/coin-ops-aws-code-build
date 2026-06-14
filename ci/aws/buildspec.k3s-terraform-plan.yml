@@ -6,6 +6,10 @@ env:
 phases:
   install:
     commands:
+      - source ./ci/aws/codebuild-worker-env.sh
+      - ./ci/aws/codebuild-worker-env.sh verify-tools python3 make aws curl unzip
+      - ./ci/aws/codebuild-worker-env.sh install-terraform
+      - source ./ci/aws/codebuild-worker-env.sh
       - ./ci/aws/codebuild-worker-env.sh verify-tools terraform python3 make aws
       - terraform version
       - python3 --version

@@ -18,6 +18,44 @@ verify_tools() {
   fi
 }
 
+install_terraform() {
+  if command -v terraform >/dev/null 2>&1; then
+    terraform version
+    return 0
+  fi
+
+  verify_tools curl unzip
+
+  local version="${COINOPS_TERRAFORM_VERSION:-1.9.8}"
+  local machine
+  local arch
+  local zip_path
+  local bin_dir="${COINOPS_CI_BIN_DIR:-/tmp/coinops-ci/bin}"
+
+  machine="$(uname -m)"
+  case "${machine}" in
+    x86_64|amd64)
+      arch="amd64"
+      ;;
+    aarch64|arm64)
+      arch="arm64"
+      ;;
+    *)
+      echo "Unsupported machine architecture for Terraform install: ${machine}" >&2
+      return 1
+      ;;
+  esac
+
+  mkdir -p "${bin_dir}"
+  zip_path="/tmp/coinops-ci/terraform_${version}_linux_${arch}.zip"
+
+  echo "Installing Terraform ${version} for linux_${arch} into ${bin_dir}..."
+  curl -fsSLo "${zip_path}" "https://releases.hashicorp.com/terraform/${version}/terraform_${version}_linux_${arch}.zip"
+  unzip -o -q "${zip_path}" -d "${bin_dir}"
+  chmod +x "${bin_dir}/terraform"
+  "${bin_dir}/terraform" version
+}
+
 render_backend() {
   local backend_path="${REPO_ROOT}/terraform/backend.active.tf"
   local template_path="${REPO_ROOT}/terraform/backends/backend.aws.tf.tmpl"
@@ -89,6 +127,11 @@ if [[ "${1:-}" == "verify-tools" ]]; then
   exit 0
 fi
 
+if [[ "${1:-}" == "install-terraform" ]]; then
+  install_terraform
+  exit 0
+fi
+
 if [[ "${1:-}" == "render-backend" ]]; then
   render_backend
   exit 0
@@ -96,6 +139,8 @@ fi
 
 export REPO_ROOT
 export COINOPS_REPO_ROOT="${COINOPS_REPO_ROOT:-${REPO_ROOT}}"
+export COINOPS_CI_BIN_DIR="${COINOPS_CI_BIN_DIR:-/tmp/coinops-ci/bin}"
+export PATH="${COINOPS_CI_BIN_DIR}:${PATH}"
 export TF_IN_AUTOMATION="${TF_IN_AUTOMATION:-true}"
 export TF_INPUT="${TF_INPUT:-false}"
 export K8S_CLOUD="${K8S_CLOUD:-aws}"
