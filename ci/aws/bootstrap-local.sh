@@ -34,6 +34,17 @@ Optional environment:
   COINOPS_CI_CODEBUILD_COMPUTE_TYPE  Default: BUILD_GENERAL1_SMALL
   COINOPS_CI_DETECT_CHANGES          Default: false
   COINOPS_SSH_PUBLIC_KEY             Optional public key passed into CodeBuild for Terraform plans.
+
+Required seed values for fresh AWS accounts:
+  TF_VAR_db_password
+  TF_VAR_rabbitmq_password
+  TF_VAR_ghcr_token
+  TF_VAR_cloudflare_api_token
+
+Optional seed values:
+  TF_VAR_tailscale_auth_key
+  TF_VAR_github_oauth_client_id
+  TF_VAR_github_oauth_client_secret
 EOF
 }
 
@@ -217,7 +228,7 @@ ensure_role() {
 write_codebuild_policy() {
   local path="$1"
 
-  python3 - "${path}" "${AWS_REGION}" "${ACCOUNT_ID}" "${ARTIFACT_BUCKET}" "${STATE_BUCKET}" "${STATE_KEY}" "${DB_SECRET_NAME}" "${APP_SECRET_NAME}" "${CODEBUILD_LOG_GROUP}" <<'PY'
+  python3 - "${path}" "${AWS_REGION}" "${ACCOUNT_ID}" "${ARTIFACT_BUCKET}" "${STATE_BUCKET}" "${STATE_KEY}" "${DB_SECRET_NAME}" "${APP_SECRET_NAME}" "${CODEBUILD_LOG_GROUP}" "${SEED_PARAMETER_PREFIX}" <<'PY'
 import json
 import pathlib
 import sys
@@ -232,6 +243,7 @@ import sys
     db_secret_name,
     app_secret_name,
     log_group,
+    seed_parameter_prefix,
 ) = sys.argv[1:]
 
 policy = {
@@ -284,10 +296,59 @@ policy = {
                 f"arn:aws:secretsmanager:{region}:{account_id}:secret:{app_secret_name}*",
             ],
         },
+        {
+            "Sid": "ReadCiSeedParameters",
+            "Effect": "Allow",
+            "Action": ["ssm:GetParameter", "ssm:GetParameters"],
+            "Resource": f"arn:aws:ssm:{region}:{account_id}:parameter{seed_parameter_prefix}/*",
+        },
+        {
+            "Sid": "DecryptCiSeedParameters",
+            "Effect": "Allow",
+            "Action": ["kms:Decrypt"],
+            "Resource": "*",
+            "Condition": {
+                "StringEquals": {
+                    "kms:ViaService": f"ssm.{region}.amazonaws.com"
+                }
+            },
+        },
     ],
 }
 pathlib.Path(path).write_text(json.dumps(policy), encoding="utf-8")
 PY
+}
+
+put_seed_parameter() {
+  local env_name="$1"
+  local parameter_name="$2"
+  local required="$3"
+  local value="${!env_name:-}"
+
+  if [[ -z "${value}" ]]; then
+    if [[ "${required}" == "true" ]]; then
+      echo "${env_name} is required for CI seed_secret_manager=true." >&2
+      exit 1
+    fi
+    return 0
+  fi
+
+  echo "Writing CI seed parameter: ${parameter_name}"
+  aws ssm put-parameter \
+    --name "${parameter_name}" \
+    --type SecureString \
+    --value "${value}" \
+    --overwrite >/dev/null
+}
+
+ensure_seed_parameters() {
+  put_seed_parameter TF_VAR_db_password "${SEED_PARAMETER_PREFIX}/db_password" true
+  put_seed_parameter TF_VAR_rabbitmq_password "${SEED_PARAMETER_PREFIX}/rabbitmq_password" true
+  put_seed_parameter TF_VAR_ghcr_token "${SEED_PARAMETER_PREFIX}/ghcr_token" true
+  put_seed_parameter TF_VAR_cloudflare_api_token "${SEED_PARAMETER_PREFIX}/cloudflare_api_token" true
+  put_seed_parameter TF_VAR_tailscale_auth_key "${SEED_PARAMETER_PREFIX}/tailscale_auth_key" false
+  put_seed_parameter TF_VAR_github_oauth_client_id "${SEED_PARAMETER_PREFIX}/github_oauth_client_id" false
+  put_seed_parameter TF_VAR_github_oauth_client_secret "${SEED_PARAMETER_PREFIX}/github_oauth_client_secret" false
 }
 
 write_codepipeline_policy() {
@@ -378,7 +439,7 @@ ensure_log_group() {
 write_codebuild_project_json() {
   local path="$1"
 
-  python3 - "${path}" "${PROJECT_NAME}" "${CODEBUILD_PROJECT_NAME}" "${CODEBUILD_ROLE_ARN}" "${CODEBUILD_IMAGE}" "${CODEBUILD_COMPUTE_TYPE}" "${AWS_REGION}" "${STATE_BUCKET}" "${COINOPS_SSH_PUBLIC_KEY:-}" "${CODEBUILD_LOG_GROUP}" <<'PY'
+  python3 - "${path}" "${PROJECT_NAME}" "${CODEBUILD_PROJECT_NAME}" "${CODEBUILD_ROLE_ARN}" "${CODEBUILD_IMAGE}" "${CODEBUILD_COMPUTE_TYPE}" "${AWS_REGION}" "${STATE_BUCKET}" "${COINOPS_SSH_PUBLIC_KEY:-}" "${CODEBUILD_LOG_GROUP}" "${SEED_PARAMETER_PREFIX}" <<'PY'
 import json
 import pathlib
 import sys
@@ -394,6 +455,7 @@ import sys
     state_bucket,
     ssh_public_key,
     log_group,
+    seed_parameter_prefix,
 ) = sys.argv[1:]
 
 env_vars = [
@@ -401,6 +463,11 @@ env_vars = [
     {"name": "K8S_CLOUD", "value": "aws", "type": "PLAINTEXT"},
     {"name": "K8S_CLUSTER", "value": "aws", "type": "PLAINTEXT"},
     {"name": "COINOPS_TF_STATE_BUCKET", "value": state_bucket, "type": "PLAINTEXT"},
+    {"name": "TF_VAR_seed_secret_manager", "value": "true", "type": "PLAINTEXT"},
+    {"name": "TF_VAR_db_password", "value": f"{seed_parameter_prefix}/db_password", "type": "PARAMETER_STORE"},
+    {"name": "TF_VAR_rabbitmq_password", "value": f"{seed_parameter_prefix}/rabbitmq_password", "type": "PARAMETER_STORE"},
+    {"name": "TF_VAR_ghcr_token", "value": f"{seed_parameter_prefix}/ghcr_token", "type": "PARAMETER_STORE"},
+    {"name": "TF_VAR_cloudflare_api_token", "value": f"{seed_parameter_prefix}/cloudflare_api_token", "type": "PARAMETER_STORE"},
 ]
 if ssh_public_key:
     env_vars.append({
@@ -571,6 +638,7 @@ CODEBUILD_COMPUTE_TYPE="${COINOPS_CI_CODEBUILD_COMPUTE_TYPE:-BUILD_GENERAL1_SMAL
 CODEBUILD_ROLE_NAME="${COINOPS_CI_CODEBUILD_ROLE_NAME:-${PIPELINE_NAME}-codebuild}"
 CODEPIPELINE_ROLE_NAME="${COINOPS_CI_CODEPIPELINE_ROLE_NAME:-${PIPELINE_NAME}-codepipeline}"
 CODEBUILD_LOG_GROUP="${COINOPS_CI_CODEBUILD_LOG_GROUP:-/aws/codebuild/${CODEBUILD_PROJECT_NAME}}"
+SEED_PARAMETER_PREFIX="${COINOPS_CI_SEED_PARAMETER_PREFIX:-/${PROJECT_NAME}/ci/terraform}"
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "${WORK_DIR}"' EXIT
 
@@ -583,6 +651,7 @@ GITHUB_CONNECTION_ARN="$(ensure_connection_arn)"
 
 ensure_artifact_bucket
 ensure_log_group
+ensure_seed_parameters
 ensure_iam
 
 # IAM role propagation is eventually consistent.

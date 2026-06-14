@@ -166,6 +166,12 @@ if [[ -z "${AWS_REGION:-}" ]]; then
   echo "AWS_REGION is not set; Terraform will fall back to terraform/config/*.json defaults." >&2
 fi
 
+export ARM_USE_CLI="${ARM_USE_CLI:-false}"
+export ARM_CLIENT_ID="${ARM_CLIENT_ID:-00000000-0000-0000-0000-000000000000}"
+export ARM_CLIENT_SECRET="${ARM_CLIENT_SECRET:-coinops-ci-disabled-azure-provider}"
+export ARM_TENANT_ID="${ARM_TENANT_ID:-00000000-0000-0000-0000-000000000000}"
+export ARM_SUBSCRIPTION_ID="${ARM_SUBSCRIPTION_ID:-00000000-0000-0000-0000-000000000000}"
+
 if [[ -n "${COINOPS_SSH_PUBLIC_KEY:-}" ]]; then
   mkdir -p /tmp/coinops-ci
   printf '%s\n' "${COINOPS_SSH_PUBLIC_KEY}" > /tmp/coinops-ci/ssh-key-coin-ops.pub
