@@ -37,13 +37,18 @@ ANSIBLE_CMD = $(ANSIBLE_ENV)
 LOCAL_ANSIBLE_CMD = $(LOCAL_ANSIBLE_ENV)
 
 .PHONY: help \
-	infra-check tf-check-backend tf-plan tf-apply tf-destroy-compute tf-full-destroy k8s-api-ready kubectl k8s-env \
+	infra-check config-validate terraform-fmt terraform-validate ansible-lint ci-validate tf-check-backend tf-plan tf-apply tf-destroy-compute tf-full-destroy k8s-api-ready kubectl k8s-env \
 	inventory-graph inventory-host ssh-host \
 	runtime-config ansible-check provision deploy k3s-cluster k3s-headlamp k3s-homepage k3s-coinops k3s-platform headlamp-start headlamp-token
 
 help:
 	@echo "Terraform / infrastructure:"
 	@echo "  make infra-check             - Run local Terraform and Ansible static checks"
+	@echo "  make config-validate         - Validate terraform/config/*.json against JSON Schema"
+	@echo "  make terraform-fmt           - Format Terraform files in place"
+	@echo "  make terraform-validate      - Run Terraform fmt check, init without backend, and validate"
+	@echo "  make ansible-lint            - Run ansible-lint against ansible/"
+	@echo "  make ci-validate             - Run local equivalents of GitHub Actions validation jobs"
 	@echo "  make tf-check-backend        - Verify backend.active.tf matches clouds.control_plane"
 	@echo "  make tf-plan                 - Source generated env and run terraform plan"
 	@echo "  make tf-apply                - Source generated env and run terraform apply"
@@ -85,6 +90,20 @@ infra-check:
 	cd "$(TF_DIR)" && terraform fmt -check -recursive
 	cd "$(TF_DIR)" && terraform validate
 	$(MAKE) ansible-check
+
+config-validate:
+	"$(REPO_ROOT)/scripts/validate-json-configs.sh"
+
+terraform-fmt:
+	cd "$(TF_DIR)" && terraform fmt -recursive
+
+terraform-validate:
+	"$(REPO_ROOT)/scripts/terraform-validate-local.sh"
+
+ansible-lint:
+	"$(REPO_ROOT)/scripts/ansible-lint-local.sh"
+
+ci-validate: config-validate terraform-validate ansible-lint
 
 tf-check-backend:
 	cd "$(TF_DIR)" && bash check-backend.sh

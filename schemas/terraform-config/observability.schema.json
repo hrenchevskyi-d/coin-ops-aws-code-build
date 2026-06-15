@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coin-ops.local/schemas/terraform-config/observability.schema.json",
+  "title": "Coin-Ops observability settings",
+  "description": "CloudWatch/logging/alerting settings. Dynamic filter and alarm names are allowed, while each definition keeps a typed structure.",
+  "type": "object",
+  "required": ["observability"],
+  "additionalProperties": false,
+  "properties": {
+    "observability": {
+      "type": "object",
+      "required": ["enabled", "alerts", "logs", "cloudwatch_agent", "alarms"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "description": "Whether observability resources are managed." },
+        "alerts": {
+          "type": "object",
+          "required": ["email"],
+          "additionalProperties": false,
+          "properties": {
+            "email": { "type": "string", "minLength": 1, "description": "Email target for infrastructure alerts." }
+          }
+        },
+        "logs": {
+          "type": "object",
+          "required": ["container_log_group_name", "retention_in_days", "container_log_silence_minutes", "metric_filters"],
+          "additionalProperties": false,
+          "properties": {
+            "container_log_group_name": { "type": "string", "minLength": 1, "description": "CloudWatch log group for k3s container logs." },
+            "retention_in_days": { "type": "integer", "minimum": 1, "description": "Log retention in days." },
+            "container_log_silence_minutes": { "type": "integer", "minimum": 1, "description": "Minutes without container logs before alerting." },
+            "metric_filters": {
+              "type": "object",
+              "description": "Metric filters keyed by logical filter name.",
+              "additionalProperties": { "$ref": "#/$defs/metricFilter" }
+            }
+          }
+        },
+        "cloudwatch_agent": {
+          "type": "object",
+          "required": ["parameter_name", "metrics_collection_interval", "run_as_user", "host_metric_groups"],
+          "additionalProperties": false,
+          "properties": {
+            "parameter_name": { "type": "string", "minLength": 1, "description": "SSM parameter name for the CloudWatch agent config." },
+            "metrics_collection_interval": { "type": "integer", "minimum": 1, "description": "CloudWatch agent metrics collection interval in seconds." },
+            "run_as_user": { "type": "string", "minLength": 1, "description": "Linux user that runs the CloudWatch agent." },
+            "host_metric_groups": {
+              "type": "object",
+              "description": "Host metric groups keyed by collector name.",
+              "additionalProperties": { "$ref": "#/$defs/hostMetricGroup" }
+            }
+          }
+        },
+        "alarms": {
+          "type": "object",
+          "description": "Alarm groups keyed by monitored service or resource type.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": { "$ref": "#/$defs/alarm" }
+          }
+        },
+        "dashboard": {
+          "type": "object",
+          "required": ["enabled"],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "description": "Whether Terraform should create observability dashboard resources." }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "metricFilter": {
+      "type": "object",
+      "required": ["name_suffix", "pattern", "metric_name", "namespace", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "name_suffix": { "type": "string", "minLength": 1, "description": "Suffix used in the generated metric filter name." },
+        "pattern": { "type": "string", "minLength": 1, "description": "CloudWatch Logs metric filter pattern." },
+        "metric_name": { "type": "string", "minLength": 1, "description": "CloudWatch metric name emitted by this filter." },
+        "namespace": { "type": "string", "minLength": 1, "description": "CloudWatch metric namespace." },
+        "value": { "type": "string", "minLength": 1, "description": "Metric value expression." }
+      }
+    },
+    "hostMetricGroup": {
+      "type": "object",
+      "required": ["enabled", "measurement"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "description": "Whether this host metric group is collected." },
+        "measurement": {
+          "type": "array",
+          "minItems": 1,
+          "description": "CloudWatch agent measurement names.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "resources": {
+          "type": "array",
+          "description": "Resource selectors for this metric group.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "drop_device": { "type": "boolean", "description": "Whether to drop device dimensions for disk metrics." }
+      }
+    },
+    "alarm": {
+      "type": "object",
+      "required": ["name_suffix", "description", "statistic", "period", "comparison_operator", "treat_missing_data"],
+      "additionalProperties": false,
+      "anyOf": [
+        { "required": ["metric_key"] },
+        { "required": ["namespace", "metric_name"] }
+      ],
+      "properties": {
+        "enabled": { "type": "boolean", "description": "Whether this alarm is enabled." },
+        "name_suffix": { "type": "string", "minLength": 1, "description": "Suffix used in the generated alarm name." },
+        "description": { "type": "string", "minLength": 1, "description": "Human-readable alarm description." },
+        "dimension_scope": { "type": "string", "description": "Dimension source used by Terraform when creating the alarm." },
+        "namespace": { "type": "string", "minLength": 1, "description": "CloudWatch metric namespace." },
+        "metric_name": { "type": "string", "minLength": 1, "description": "CloudWatch metric name." },
+        "metric_key": { "type": "string", "minLength": 1, "description": "Key of a metric_filters entry used as this alarm's metric source." },
+        "statistic": { "type": "string", "minLength": 1, "description": "CloudWatch statistic, for example Average, Maximum, Minimum, or Sum." },
+        "period": { "type": "integer", "minimum": 1, "description": "Alarm period in seconds." },
+        "evaluation_periods": { "type": "integer", "minimum": 1, "description": "Number of periods evaluated by the alarm." },
+        "threshold": { "type": "number", "description": "Numeric alarm threshold." },
+        "threshold_source": { "type": "string", "description": "Dynamic threshold source used by Terraform." },
+        "comparison_operator": { "type": "string", "minLength": 1, "description": "CloudWatch comparison operator." },
+        "treat_missing_data": { "type": "string", "minLength": 1, "description": "CloudWatch missing data behavior." }
+      }
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coin-ops.local/schemas/terraform-config/database.schema.json",
+  "title": "Coin-Ops managed database settings",
+  "description": "Managed PostgreSQL toggle, common database identity, and cloud-specific managed database sizing.",
+  "type": "object",
+  "required": ["database"],
+  "additionalProperties": false,
+  "properties": {
+    "database": {
+      "type": "object",
+      "required": ["enabled", "engine", "version", "name", "username", "port", "cloud_profiles"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "description": "Whether Terraform should create a managed database service." },
+        "engine": { "type": "string", "enum": ["postgres"], "description": "Managed database engine." },
+        "version": { "type": "string", "minLength": 1, "description": "Database major version." },
+        "name": { "type": "string", "minLength": 1, "description": "Application database name." },
+        "username": { "type": "string", "minLength": 1, "description": "Application database username." },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535, "description": "Database port." },
+        "cloud_profiles": {
+          "type": "object",
+          "required": ["gcp", "aws", "azure"],
+          "additionalProperties": false,
+          "properties": {
+            "gcp": {
+              "type": "object",
+              "required": ["edition", "tier", "disk_type", "disk_size"],
+              "additionalProperties": false,
+              "properties": {
+                "edition": { "type": "string", "minLength": 1, "description": "Cloud SQL edition." },
+                "tier": { "type": "string", "minLength": 1, "description": "Cloud SQL machine tier." },
+                "disk_type": { "type": "string", "minLength": 1, "description": "Cloud SQL disk type." },
+                "disk_size": { "type": "integer", "minimum": 1, "description": "Cloud SQL disk size in GiB." }
+              }
+            },
+            "aws": {
+              "type": "object",
+              "required": ["instance_class", "allocated_storage", "storage_type", "backup_retention_period", "multi_az"],
+              "additionalProperties": false,
+              "properties": {
+                "instance_class": { "type": "string", "minLength": 1, "description": "RDS instance class." },
+                "allocated_storage": { "type": "integer", "minimum": 1, "description": "RDS allocated storage in GiB." },
+                "storage_type": { "type": "string", "minLength": 1, "description": "RDS storage type." },
+                "backup_retention_period": { "type": "integer", "minimum": 0, "description": "RDS backup retention in days." },
+                "multi_az": { "type": "boolean", "description": "Whether RDS should use Multi-AZ deployment." }
+              }
+            },
+            "azure": {
+              "type": "object",
+              "required": ["sku_name", "storage_mb", "backup_retention_days"],
+              "additionalProperties": false,
+              "properties": {
+                "sku_name": { "type": "string", "minLength": 1, "description": "Azure PostgreSQL flexible server SKU." },
+                "storage_mb": { "type": "integer", "minimum": 1024, "description": "Azure PostgreSQL storage in MiB." },
+                "backup_retention_days": { "type": "integer", "minimum": 0, "description": "Azure PostgreSQL backup retention in days." }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

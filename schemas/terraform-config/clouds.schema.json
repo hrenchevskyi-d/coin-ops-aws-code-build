@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coin-ops.local/schemas/terraform-config/clouds.schema.json",
+  "title": "Coin-Ops cloud selection and provider accounts",
+  "description": "Defines which cloud is the control plane, which clouds are enabled, where secrets live, provider account identifiers, and Terraform backend settings.",
+  "type": "object",
+  "required": ["clouds"],
+  "additionalProperties": false,
+  "properties": {
+    "clouds": {
+      "type": "object",
+      "description": "Cloud-level settings consumed by Terraform bootstrap, providers, backend rendering, and runtime selection.",
+      "required": ["control_plane", "enabled", "default_instance_clouds", "secret_backend", "providers", "backends"],
+      "additionalProperties": false,
+      "properties": {
+        "control_plane": {
+          "$ref": "#/$defs/cloudName",
+          "description": "Cloud that owns the active Terraform backend and local control-plane metadata."
+        },
+        "enabled": {
+          "$ref": "#/$defs/cloudNameArray",
+          "description": "Clouds where Terraform is allowed to create workload infrastructure."
+        },
+        "default_instance_clouds": {
+          "$ref": "#/$defs/cloudNameArray",
+          "description": "Default target clouds for instances that do not define their own clouds list."
+        },
+        "secret_backend": {
+          "$ref": "#/$defs/cloudName",
+          "description": "Cloud secret manager used as the canonical runtime secret backend."
+        },
+        "providers": {
+          "type": "object",
+          "description": "Account and Terraform identity metadata per cloud provider.",
+          "required": ["gcp", "aws", "azure"],
+          "additionalProperties": false,
+          "properties": {
+            "gcp": {
+              "type": "object",
+              "required": ["account", "terraform_identity"],
+              "additionalProperties": false,
+              "properties": {
+                "account": {
+                  "type": "object",
+                  "required": ["project_id"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "project_id": {
+                      "type": "string",
+                      "description": "GCP project ID used by Terraform."
+                    }
+                  }
+                },
+                "terraform_identity": {
+                  "$ref": "#/$defs/terraformIdentity",
+                  "description": "GCP identity used for Terraform bootstrap and operations."
+                }
+              }
+            },
+            "aws": {
+              "type": "object",
+              "required": ["account", "terraform_identity"],
+              "additionalProperties": false,
+              "properties": {
+                "account": {
+                  "type": "object",
+                  "required": ["account_id"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "account_id": {
+                      "type": "string",
+                      "description": "AWS account ID. May be empty locally; bootstrap scripts can discover the caller account."
+                    }
+                  }
+                },
+                "terraform_identity": {
+                  "$ref": "#/$defs/terraformIdentity",
+                  "description": "AWS IAM identity metadata used by bootstrap automation."
+                }
+              }
+            },
+            "azure": {
+              "type": "object",
+              "required": ["account", "terraform_identity"],
+              "additionalProperties": false,
+              "properties": {
+                "account": {
+                  "type": "object",
+                  "required": ["subscription_id", "tenant_id", "resource_group_name", "state_resource_group_name", "storage_account_name", "storage_container_name", "key_vault_name"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "subscription_id": { "type": "string", "description": "Azure subscription ID used by Terraform." },
+                    "tenant_id": { "type": "string", "description": "Azure tenant ID used by Terraform." },
+                    "resource_group_name": { "type": "string", "description": "Azure workload resource group name." },
+                    "state_resource_group_name": { "type": "string", "description": "Azure resource group that contains Terraform state storage." },
+                    "storage_account_name": { "type": "string", "description": "Azure Storage account used for Terraform state." },
+                    "storage_container_name": { "type": "string", "description": "Azure Blob container used for Terraform state." },
+                    "key_vault_name": { "type": "string", "description": "Azure Key Vault used for runtime secrets." }
+                  }
+                },
+                "terraform_identity": {
+                  "$ref": "#/$defs/terraformIdentity",
+                  "description": "Azure identity used by Terraform bootstrap and operations."
+                }
+              }
+            }
+          }
+        },
+        "backends": {
+          "type": "object",
+          "description": "Remote Terraform state backend settings for each supported control-plane cloud.",
+          "required": ["gcp", "aws", "azure"],
+          "additionalProperties": false,
+          "properties": {
+            "gcp": {
+              "type": "object",
+              "required": ["bucket", "prefix"],
+              "additionalProperties": false,
+              "properties": {
+                "bucket": { "type": "string", "minLength": 1, "description": "GCS bucket for Terraform state." },
+                "prefix": { "type": "string", "minLength": 1, "description": "GCS object prefix for Terraform state." }
+              }
+            },
+            "aws": {
+              "type": "object",
+              "required": ["bucket_prefix", "key"],
+              "additionalProperties": false,
+              "properties": {
+                "bucket_prefix": { "type": "string", "minLength": 1, "description": "S3 state bucket prefix; account and region are appended by bootstrap automation." },
+                "key": { "type": "string", "minLength": 1, "description": "S3 object key for Terraform state." }
+              }
+            },
+            "azure": {
+              "type": "object",
+              "required": ["resource_group_name", "storage_account_name", "container_name", "key"],
+              "additionalProperties": false,
+              "properties": {
+                "resource_group_name": { "type": "string", "minLength": 1, "description": "Resource group containing the Azure state backend." },
+                "storage_account_name": { "type": "string", "minLength": 1, "description": "Storage account containing the Azure state backend." },
+                "container_name": { "type": "string", "minLength": 1, "description": "Blob container containing Terraform state." },
+                "key": { "type": "string", "minLength": 1, "description": "Blob key for Terraform state." }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "cloudName": {
+      "type": "string",
+      "enum": ["gcp", "aws", "azure"]
+    },
+    "cloudNameArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/cloudName" }
+    },
+    "terraformIdentity": {
+      "type": "object",
+      "required": ["kind", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "Identity type, for example iam_user, service_account, or service_principal."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable Terraform identity name."
+        }
+      }
+    }
+  }
+}

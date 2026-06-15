@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coin-ops.local/schemas/terraform-config/instances.schema.json",
+  "title": "Coin-Ops instance map",
+  "description": "Named VM instances and their per-host overrides. Keys under instances are resource names used by Terraform and Ansible inventory.",
+  "type": "object",
+  "required": ["instances"],
+  "additionalProperties": false,
+  "properties": {
+    "instances": {
+      "type": "object",
+      "description": "Map of instance name to VM configuration.",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/instance" }
+    }
+  },
+  "$defs": {
+    "instance": {
+      "type": "object",
+      "required": ["subnet", "role"],
+      "additionalProperties": false,
+      "properties": {
+        "subnet": { "type": "string", "minLength": 1, "description": "Subnet key from networks.json where the instance should be placed." },
+        "role": { "type": "string", "minLength": 1, "description": "Functional host role used by Terraform outputs and Ansible grouping." },
+        "has_public_ip": { "type": "boolean", "description": "Whether this instance receives a public IP address." },
+        "instance_size": { "type": "string", "minLength": 1, "description": "Logical instance size resolved through cloud_mappings.json." },
+        "disk_size": { "type": "integer", "minimum": 1, "description": "Boot disk size in GiB for this instance." },
+        "can_ip_forward": { "type": "boolean", "description": "Whether the VM can forward packets, usually for jump/NAT hosts." },
+        "startup_script": { "type": "string", "minLength": 1, "description": "Optional per-host startup script template." },
+        "image_profile": { "type": "string", "minLength": 1, "description": "Optional per-host image profile from cloud_mappings.json." },
+        "clouds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Clouds where this instance should exist. Missing means default_instance_clouds from clouds.json.",
+          "items": { "type": "string", "enum": ["gcp", "aws", "azure"] }
+        }
+      }
+    }
+  }
+}

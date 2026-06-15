@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coin-ops.local/schemas/terraform-config/deploy.schema.json",
+  "title": "Coin-Ops deployment settings",
+  "description": "Application domains, TLS mode, k3s settings, ingress features, image defaults, ports, and Ansible provisioning defaults.",
+  "type": "object",
+  "required": ["deploy", "images", "ports", "ansible"],
+  "additionalProperties": false,
+  "properties": {
+    "deploy": {
+      "type": "object",
+      "required": ["app_domain", "tls_mode", "runtime_backend", "k3s", "public_ingress", "headlamp", "homepage", "coinops", "ghcr_username", "internal_tls"],
+      "additionalProperties": false,
+      "properties": {
+        "app_domain": { "type": "string", "minLength": 1, "description": "Root application domain." },
+        "tls_mode": { "type": "string", "enum": ["certbot", "self-signed", "disabled"], "description": "Legacy top-level TLS mode retained for compatibility." },
+        "tls": { "$ref": "#/$defs/tls", "description": "Structured TLS settings." },
+        "certbot": { "$ref": "#/$defs/certbot", "description": "Legacy Certbot settings retained for compatibility." },
+        "runtime_backend": { "type": "string", "enum": ["postgres", "external"], "description": "Runtime state backend mode. external is RabbitMQ/Redis rollback support only." },
+        "k3s": { "$ref": "#/$defs/k3s", "description": "k3s install and server configuration." },
+        "public_ingress": { "$ref": "#/$defs/ingressFeature", "description": "Whether public ingress should be exposed." },
+        "headlamp": { "$ref": "#/$defs/headlamp", "description": "Headlamp dashboard deployment and access settings." },
+        "homepage": { "$ref": "#/$defs/namedIngressFeature", "description": "Homepage deployment and ingress settings." },
+        "coinops": { "$ref": "#/$defs/coinops", "description": "Coin-Ops workload deployment and ingress settings." },
+        "ghcr_username": { "type": "string", "minLength": 1, "description": "GitHub Container Registry username used for image pulls." },
+        "internal_tls": { "$ref": "#/$defs/internalTls", "description": "Internal service TLS settings." },
+        "cnpg_backup": { "$ref": "#/$defs/cnpgBackup", "description": "Optional CloudNativePG backup destination settings." }
+      }
+    },
+    "images": {
+      "type": "object",
+      "required": ["registry", "tag", "postgres_runtime_image"],
+      "additionalProperties": false,
+      "properties": {
+        "registry": { "type": "string", "minLength": 1, "description": "Default container image registry." },
+        "tag": { "type": "string", "minLength": 1, "description": "Default application image tag." },
+        "postgres_runtime_image": { "type": "string", "minLength": 1, "description": "PostgreSQL runtime image used by k3s data workloads." }
+      }
+    },
+    "ports": {
+      "type": "object",
+      "required": ["https", "postgres", "rabbitmq", "rabbitmq_management", "proxy", "history"],
+      "additionalProperties": false,
+      "properties": {
+        "https": { "$ref": "#/$defs/port", "description": "Public HTTPS port." },
+        "postgres": { "$ref": "#/$defs/port", "description": "PostgreSQL port." },
+        "rabbitmq": { "$ref": "#/$defs/port", "description": "RabbitMQ AMQP port." },
+        "rabbitmq_management": { "$ref": "#/$defs/port", "description": "RabbitMQ management UI port." },
+        "proxy": { "$ref": "#/$defs/port", "description": "Backend proxy service port." },
+        "history": { "$ref": "#/$defs/port", "description": "History API service port." }
+      }
+    },
+    "ansible": {
+      "type": "object",
+      "required": ["provisioning"],
+      "additionalProperties": false,
+      "properties": {
+        "provisioning": {
+          "type": "object",
+          "required": ["wait_for_connection_timeout", "wait_for_connection_delay", "wait_for_connection_sleep", "wait_for_cloud_init", "apt_lock_timeout", "become_timeout", "host_batch_size", "workload_batch_size", "upgrade_packages"],
+          "additionalProperties": false,
+          "properties": {
+            "wait_for_connection_timeout": { "type": "integer", "minimum": 1, "description": "Maximum seconds Ansible waits for SSH connectivity." },
+            "wait_for_connection_delay": { "type": "integer", "minimum": 0, "description": "Initial delay before waiting for SSH." },
+            "wait_for_connection_sleep": { "type": "integer", "minimum": 1, "description": "Sleep interval between SSH connectivity checks." },
+            "wait_for_cloud_init": { "type": "boolean", "description": "Whether provisioning waits for cloud-init completion." },
+            "apt_lock_timeout": { "type": "integer", "minimum": 1, "description": "APT lock wait timeout in seconds." },
+            "become_timeout": { "type": "integer", "minimum": 1, "description": "Privilege escalation timeout in seconds." },
+            "host_batch_size": { "type": "integer", "minimum": 1, "description": "Maximum host batch size for provisioning." },
+            "workload_batch_size": { "type": "integer", "minimum": 1, "description": "Maximum host batch size for workload deployment." },
+            "upgrade_packages": { "type": "boolean", "description": "Whether provisioning upgrades OS packages." }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+    "certbot": {
+      "type": "object",
+      "required": ["email_localpart", "staging"],
+      "additionalProperties": false,
+      "properties": {
+        "email_localpart": { "type": "string", "minLength": 1, "description": "Local part used to build the Certbot contact email." },
+        "staging": { "type": "boolean", "description": "Whether to use Let's Encrypt staging." }
+      }
+    },
+    "tls": {
+      "type": "object",
+      "required": ["mode", "certbot"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "type": "string", "enum": ["certbot", "self-signed", "disabled"], "description": "TLS provisioning mode." },
+        "certbot": { "$ref": "#/$defs/certbot" }
+      }
+    },
+    "k3s": {
+      "type": "object",
+      "required": ["channel", "version", "disable_cloud_controller", "disable_components", "flannel_backend"],
+      "additionalProperties": false,
+      "properties": {
+        "channel": { "type": "string", "minLength": 1, "description": "k3s release channel." },
+        "version": { "type": "string", "minLength": 1, "description": "Pinned k3s version." },
+        "disable_cloud_controller": { "type": "boolean", "description": "Whether to disable the built-in cloud controller." },
+        "disable_components": {
+          "type": "array",
+          "description": "Built-in k3s components to disable.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "flannel_backend": { "type": "string", "minLength": 1, "description": "Flannel backend used by k3s." }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "required": ["enabled", "class_name"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "description": "Whether Kubernetes ingress is enabled for this component." },
+        "class_name": { "type": "string", "minLength": 1, "description": "Ingress class name." }
+      }
+    },
+    "ingressFeature": {
+      "type": "object",
+      "required": ["enabled", "class_name"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "description": "Whether this ingress feature is enabled." },
+        "class_name": { "type": "string", "minLength": 1, "description": "Ingress class name." }
+      }
+    },
+    "namedIngressFeature": {
+      "type": "object",
+      "required": ["enabled", "hostname", "ingress"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "description": "Whether this component is deployed." },
+        "hostname": { "type": "string", "minLength": 1, "description": "Public hostname for this component." },
+        "ingress": { "$ref": "#/$defs/ingress" }
+      }
+    },
+    "headlamp": {
+      "type": "object",
+      "required": ["enabled", "hostname", "ingress", "cloudflare_tunnel"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "description": "Whether Headlamp is deployed." },
+        "hostname": { "type": "string", "minLength": 1, "description": "Public Headlamp hostname." },
+        "ingress": { "$ref": "#/$defs/ingress" },
+        "cloudflare_tunnel": {
+          "type": "object",
+          "required": ["enabled", "namespace", "release_name", "replica_count", "service", "chart_version", "access"],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "description": "Whether Headlamp access is exposed through Cloudflare Tunnel." },
+            "namespace": { "type": "string", "minLength": 1, "description": "Kubernetes namespace for the tunnel." },
+            "release_name": { "type": "string", "minLength": 1, "description": "Helm release name for the tunnel." },
+            "replica_count": { "type": "integer", "minimum": 1, "description": "Number of tunnel replicas." },
+            "service": { "type": "string", "minLength": 1, "description": "Internal Headlamp service URL reached by the tunnel." },
+            "chart_version": { "type": "string", "description": "Optional Helm chart version pin." },
+            "access": {
+              "type": "object",
+              "required": ["enabled", "allowed_emails"],
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean", "description": "Whether Cloudflare Access policy is enabled." },
+                "allowed_emails": {
+                  "type": "array",
+                  "description": "Email addresses allowed through Cloudflare Access.",
+                  "items": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "coinops": {
+      "type": "object",
+      "required": ["enabled", "hostname", "runtime_backend", "ingress"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "description": "Whether Coin-Ops workloads are deployed." },
+        "hostname": { "type": "string", "minLength": 1, "description": "Public Coin-Ops hostname." },
+        "runtime_backend": { "type": "string", "enum": ["postgres", "external"], "description": "Runtime backend used by Coin-Ops workloads." },
+        "ingress": { "$ref": "#/$defs/ingress" }
+      }
+    },
+    "internalTls": {
+      "type": "object",
+      "required": ["enabled", "port"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "description": "Whether internal backend TLS is enabled." },
+        "port": { "$ref": "#/$defs/port", "description": "Internal TLS listener port." }
+      }
+    },
+    "cnpgBackup": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "description": "Whether CloudNativePG backup support is enabled." },
+        "provider": { "type": "string", "enum": ["", "gcs", "s3"], "description": "Backup provider. Empty means derive from secret backend." },
+        "bucket_name": { "type": "string", "description": "Optional explicit backup bucket name." },
+        "path": { "type": "string", "description": "Backup object path prefix." },
+        "retention_days": { "type": "integer", "minimum": 1, "description": "Backup retention in days." },
+        "schedule": { "type": "string", "description": "Cron schedule for backups." }
+      }
+    }
+  }
+}

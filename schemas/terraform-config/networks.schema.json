@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coin-ops.local/schemas/terraform-config/networks.schema.json",
+  "title": "Coin-Ops network settings",
+  "description": "Routing, egress, cloud VPC/subnet settings, Tailscale routing, and firewall rule definitions.",
+  "type": "object",
+  "required": ["routing", "security", "cloud_networks", "tailscale", "firewall_rules"],
+  "additionalProperties": false,
+  "properties": {
+    "routing": {
+      "type": "object",
+      "required": ["private_default_route"],
+      "additionalProperties": false,
+      "properties": {
+        "private_default_route": {
+          "type": "object",
+          "required": ["name", "destination_cidr"],
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string", "minLength": 1, "description": "Name for the generated private default route." },
+            "destination_cidr": { "type": "string", "minLength": 1, "description": "CIDR routed through the private gateway or jump host." },
+            "priority": { "type": "integer", "minimum": 0, "description": "Optional provider-specific route priority." },
+            "target_tags": {
+              "type": "array",
+              "description": "Optional target tags for GCP routes.",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "remote_target_tags": {
+          "type": "array",
+          "description": "Default tags for generated remote routes.",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "security": {
+      "type": "object",
+      "required": ["egress_cidrs"],
+      "additionalProperties": false,
+      "properties": {
+        "egress_cidrs": {
+          "type": "array",
+          "minItems": 1,
+          "description": "CIDR ranges allowed for outbound traffic.",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "cloud_networks": {
+      "type": "object",
+      "required": ["gcp", "aws", "azure"],
+      "additionalProperties": false,
+      "properties": {
+        "gcp": { "$ref": "#/$defs/cloudNetwork" },
+        "aws": { "$ref": "#/$defs/cloudNetwork" },
+        "azure": { "$ref": "#/$defs/cloudNetwork" }
+      }
+    },
+    "tailscale": {
+      "type": "object",
+      "required": ["enabled", "control_plane", "auth_key_secret_name", "accept_routes", "snat_subnet_routes", "client_cidrs", "static_route_roles", "tags", "advertised_routes_per_cloud"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "description": "Whether Tailscale routing support is enabled." },
+        "control_plane": { "type": "string", "minLength": 1, "description": "Tailscale control plane type." },
+        "auth_key_secret_name": { "type": "string", "minLength": 1, "description": "Secret key name holding the Tailscale auth key." },
+        "accept_routes": { "type": "boolean", "description": "Whether Tailscale clients accept advertised routes." },
+        "snat_subnet_routes": { "type": "boolean", "description": "Whether subnet routes should be SNATed." },
+        "client_cidrs": {
+          "type": "array",
+          "description": "Tailscale client CIDR ranges.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "static_route_roles": {
+          "type": "array",
+          "description": "Host roles that should advertise static routes.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "tags": {
+          "type": "object",
+          "description": "Tailscale tag groups by purpose.",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        },
+        "advertised_routes_per_cloud": {
+          "type": "object",
+          "description": "Optional advertised routes keyed by cloud name.",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "firewall_rules": {
+      "type": "object",
+      "description": "Named firewall rules used by cloud security group/firewall modules.",
+      "additionalProperties": { "$ref": "#/$defs/firewallRule" }
+    }
+  },
+  "$defs": {
+    "cloudNetwork": {
+      "type": "object",
+      "required": ["vpc_name", "vpc_cidr", "subnets"],
+      "additionalProperties": true,
+      "properties": {
+        "vpc_name": { "type": "string", "minLength": 1, "description": "Provider VPC or virtual network name." },
+        "vpc_cidr": { "type": "string", "minLength": 1, "description": "Provider VPC CIDR block." },
+        "subnets": {
+          "type": "object",
+          "description": "Subnets keyed by logical subnet name.",
+          "additionalProperties": { "$ref": "#/$defs/subnet" }
+        },
+        "remote_routes": {
+          "type": "array",
+          "description": "Explicit cross-cloud routes. Missing or empty lets Terraform derive routes.",
+          "items": { "$ref": "#/$defs/route" }
+        },
+        "cloud_nat": { "type": "object", "description": "Provider-specific NAT settings." },
+        "k3s_api_load_balancer": { "type": "object", "description": "Provider-specific k3s API load balancer settings." },
+        "k3s_ingress_load_balancer": { "type": "object", "description": "Provider-specific private ingress load balancer settings." },
+        "k3s_public_ingress_load_balancer": { "type": "object", "description": "Provider-specific public ingress load balancer settings." }
+      }
+    },
+    "subnet": {
+      "type": "object",
+      "required": ["cidr"],
+      "additionalProperties": false,
+      "properties": {
+        "cidr": { "type": "string", "minLength": 1, "description": "Subnet CIDR block." },
+        "availability_zone_key": { "type": "string", "description": "Logical availability zone key resolved from cloud_mappings.json." },
+        "public": { "type": "boolean", "description": "Whether this subnet is public." }
+      }
+    },
+    "route": {
+      "type": "object",
+      "required": ["destination_cidr"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "description": "Optional route name." },
+        "destination_cidr": { "type": "string", "minLength": 1, "description": "Remote route destination CIDR." },
+        "priority": { "type": "integer", "minimum": 0, "description": "Optional provider-specific route priority." },
+        "target_tags": {
+          "type": "array",
+          "description": "Optional provider-specific target tags.",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "firewallRule": {
+      "type": "object",
+      "required": ["protocols", "target_role"],
+      "additionalProperties": false,
+      "anyOf": [
+        { "required": ["source_cidrs"] },
+        { "required": ["source_role"] }
+      ],
+      "properties": {
+        "protocols": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Protocols and ports allowed by this rule.",
+          "items": {
+            "type": "object",
+            "required": ["protocol"],
+            "additionalProperties": false,
+            "properties": {
+              "protocol": { "type": "string", "minLength": 1, "description": "Protocol such as tcp, udp, or icmp." },
+              "ports": {
+                "type": "array",
+                "description": "Allowed ports or port ranges. Omit for protocols without ports.",
+                "items": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        },
+        "source_cidrs": {
+          "type": "array",
+          "description": "Source CIDR ranges allowed by this rule.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "source_role": { "type": "string", "minLength": 1, "description": "Source host role used for provider-native security group or tag references." },
+        "target_role": { "type": "string", "minLength": 1, "description": "Host role that receives this firewall rule." },
+        "target_tags": {
+          "type": "array",
+          "description": "Optional provider-specific target tags.",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

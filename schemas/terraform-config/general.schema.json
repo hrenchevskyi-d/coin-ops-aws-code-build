@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coin-ops.local/schemas/terraform-config/general.schema.json",
+  "title": "Coin-Ops general infrastructure defaults",
+  "description": "Global defaults used by Terraform modules when a more specific cloud or instance setting is not provided.",
+  "type": "object",
+  "required": ["general"],
+  "additionalProperties": false,
+  "properties": {
+    "general": {
+      "type": "object",
+      "required": ["project_name", "region_profile", "image_profile", "instance_size", "disk_size", "has_public_ip", "username", "user_init_script", "ssh_port"],
+      "additionalProperties": false,
+      "properties": {
+        "project_name": { "type": "string", "minLength": 1, "description": "Short project name used in cloud resource names." },
+        "region_profile": { "type": "string", "minLength": 1, "description": "Logical region profile resolved through cloud_mappings.json." },
+        "image_profile": { "type": "string", "minLength": 1, "description": "Logical image profile resolved through cloud_mappings.json." },
+        "instance_size": { "type": "string", "minLength": 1, "description": "Logical instance size resolved through cloud_mappings.json." },
+        "disk_size": { "type": "integer", "minimum": 1, "description": "Default VM boot disk size in GiB." },
+        "has_public_ip": { "type": "boolean", "description": "Default public IP behavior for instances that do not override it." },
+        "username": { "type": "string", "minLength": 1, "description": "Linux user created and used for SSH/Ansible access." },
+        "user_init_script": { "type": "string", "minLength": 1, "description": "Path to the default cloud-init/user-data template." },
+        "ssh_port": { "type": "integer", "minimum": 1, "maximum": 65535, "description": "SSH port exposed by managed hosts." },
+        "gcp_region": { "type": "string", "description": "Optional direct GCP region override." },
+        "aws_region": { "type": "string", "description": "Optional direct AWS region override." },
+        "azure_location": { "type": "string", "description": "Optional direct Azure location override." }
+      }
+    }
+  }
+}

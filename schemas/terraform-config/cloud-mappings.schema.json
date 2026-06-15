@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coin-ops.local/schemas/terraform-config/cloud-mappings.schema.json",
+  "title": "Coin-Ops cloud mappings",
+  "description": "Maps logical profiles such as instance size, region, and image profile to provider-specific values.",
+  "type": "object",
+  "required": ["instance_sizes", "regions", "images"],
+  "additionalProperties": false,
+  "properties": {
+    "instance_sizes": {
+      "type": "object",
+      "description": "Logical size profile to provider machine type mappings.",
+      "required": ["gcp", "aws", "azure"],
+      "additionalProperties": false,
+      "properties": {
+        "gcp": { "$ref": "#/$defs/stringMap" },
+        "aws": { "$ref": "#/$defs/stringMap" },
+        "azure": { "$ref": "#/$defs/stringMap" }
+      }
+    },
+    "regions": {
+      "type": "object",
+      "description": "Logical region profile to provider region/zone mappings.",
+      "required": ["gcp", "aws", "azure"],
+      "additionalProperties": false,
+      "properties": {
+        "gcp": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/gcpRegion" }
+        },
+        "aws": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/awsRegion" }
+        },
+        "azure": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/azureRegion" }
+        }
+      }
+    },
+    "images": {
+      "type": "object",
+      "description": "Logical image profile to provider image selectors.",
+      "required": ["gcp", "aws", "azure"],
+      "additionalProperties": false,
+      "properties": {
+        "gcp": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/gcpImage" }
+        },
+        "aws": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/awsImage" }
+        },
+        "azure": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/azureImage" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "stringMap": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "gcpRegion": {
+      "type": "object",
+      "required": ["region", "zone"],
+      "additionalProperties": false,
+      "properties": {
+        "region": { "type": "string", "minLength": 1, "description": "GCP region." },
+        "zone": { "type": "string", "minLength": 1, "description": "Default GCP zone." }
+      }
+    },
+    "awsRegion": {
+      "type": "object",
+      "required": ["region", "zone"],
+      "additionalProperties": false,
+      "properties": {
+        "region": { "type": "string", "minLength": 1, "description": "AWS region." },
+        "zone": { "type": "string", "minLength": 1, "description": "Default AWS availability zone." },
+        "zones": {
+          "type": "object",
+          "description": "Named AWS availability zones used by subnets.",
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "azureRegion": {
+      "type": "object",
+      "required": ["location"],
+      "additionalProperties": false,
+      "properties": {
+        "location": { "type": "string", "minLength": 1, "description": "Azure location." }
+      }
+    },
+    "gcpImage": {
+      "type": "object",
+      "additionalProperties": false,
+      "anyOf": [
+        { "required": ["os_image"] },
+        { "required": ["image_family"] }
+      ],
+      "properties": {
+        "os_image": { "type": "string", "minLength": 1, "description": "GCP public image self-link or family reference." },
+        "image_family": { "type": "string", "minLength": 1, "description": "GCP custom image family in the active project." }
+      }
+    },
+    "awsImage": {
+      "type": "object",
+      "required": ["ami_filter", "ami_owner"],
+      "additionalProperties": false,
+      "properties": {
+        "ami_filter": { "type": "string", "minLength": 1, "description": "AMI name filter." },
+        "ami_owner": { "type": "string", "minLength": 1, "description": "AMI owner account ID or alias." }
+      }
+    },
+    "azureImage": {
+      "type": "object",
+      "required": ["publisher", "offer", "sku", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "publisher": { "type": "string", "minLength": 1, "description": "Azure marketplace image publisher." },
+        "offer": { "type": "string", "minLength": 1, "description": "Azure marketplace image offer." },
+        "sku": { "type": "string", "minLength": 1, "description": "Azure marketplace image SKU." },
+        "version": { "type": "string", "minLength": 1, "description": "Azure marketplace image version." },
+        "image_id": { "type": "string", "description": "Optional custom Azure image ID." }
+      }
+    }
+  }
+}

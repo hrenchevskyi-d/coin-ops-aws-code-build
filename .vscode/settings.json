@@ -1,0 +1,44 @@
+{
+  "json.schemas": [
+    {
+      "fileMatch": ["terraform/config/clouds.json"],
+      "url": "./schemas/terraform-config/clouds.schema.json"
+    },
+    {
+      "fileMatch": ["terraform/config/general.json"],
+      "url": "./schemas/terraform-config/general.schema.json"
+    },
+    {
+      "fileMatch": ["terraform/config/deploy.json"],
+      "url": "./schemas/terraform-config/deploy.schema.json"
+    },
+    {
+      "fileMatch": ["terraform/config/database.json"],
+      "url": "./schemas/terraform-config/database.schema.json"
+    },
+    {
+      "fileMatch": ["terraform/config/dns.json"],
+      "url": "./schemas/terraform-config/dns.schema.json"
+    },
+    {
+      "fileMatch": ["terraform/config/secrets.json"],
+      "url": "./schemas/terraform-config/secrets.schema.json"
+    },
+    {
+      "fileMatch": ["terraform/config/instances.json"],
+      "url": "./schemas/terraform-config/instances.schema.json"
+    },
+    {
+      "fileMatch": ["terraform/config/networks.json"],
+      "url": "./schemas/terraform-config/networks.schema.json"
+    },
+    {
+      "fileMatch": ["terraform/config/cloud_mappings.json"],
+      "url": "./schemas/terraform-config/cloud-mappings.schema.json"
+    },
+    {
+      "fileMatch": ["terraform/config/observability.json"],
+      "url": "./schemas/terraform-config/observability.schema.json"
+    }
+  ]
+}
