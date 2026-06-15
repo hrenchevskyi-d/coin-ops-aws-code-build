@@ -28,6 +28,21 @@ It validates the hand-written config files against JSON Schema:
 - `cloud_mappings.json`
 - `observability.json`
 
+After schema validation, the same command runs semantic cross-file checks with
+`scripts/validate-terraform-config-semantics.py`. These checks catch references
+that are structurally valid JSON but operationally wrong, for example:
+
+- `clouds.control_plane`, `clouds.secret_backend`, and `dns.primary_cloud` must
+  be enabled clouds.
+- `general.region_profile`, `general.image_profile`, and
+  `general.instance_size` must exist in `cloud_mappings.json` for enabled
+  clouds.
+- Instance subnets, image profiles, and size profiles must exist for the enabled
+  clouds where that instance is active.
+- Firewall `source_role` and `target_role` values must match roles declared in
+  `instances.json`.
+- Enabled k3s load balancers must reference existing subnets.
+
 Generated/local files are intentionally excluded:
 
 - `terraform/config/hosts.json`

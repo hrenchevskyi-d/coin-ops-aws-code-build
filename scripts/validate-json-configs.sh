@@ -41,3 +41,6 @@ validate schemas/terraform-config/instances.schema.json terraform/config/instanc
 validate schemas/terraform-config/networks.schema.json terraform/config/networks.json
 validate schemas/terraform-config/cloud-mappings.schema.json terraform/config/cloud_mappings.json
 validate schemas/terraform-config/observability.schema.json terraform/config/observability.json
+
+echo "Validating terraform/config/*.json semantic references"
+python3 "$REPO_ROOT/scripts/validate-terraform-config-semantics.py"
