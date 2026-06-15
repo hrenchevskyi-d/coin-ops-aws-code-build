@@ -3,11 +3,21 @@
 This repository uses GitHub Actions as the first validation gate before AWS
 CodeBuild/CodePipeline runs Terraform plans.
 
+The current workflow is `.github/workflows/ci-validation.yml`. It has separate
+jobs, so each validation area still runs on its own GitHub-hosted worker:
+
+- `Config validation`
+- `Terraform validation`
+- `Ansible validation`
+- `Trigger AWS CodePipeline`
+
+The trigger job runs only after the relevant validation jobs succeed.
+
 ## Validation Jobs
 
 ### Config validation
 
-Workflow: `.github/workflows/config-validation.yml`
+Workflow job: `Config validation`
 
 Runs when manual Terraform JSON configs or schemas change:
 
@@ -61,7 +71,7 @@ The schemas also provide editor hover descriptions through `.vscode/settings.jso
 
 ### Terraform validation
 
-Workflow: `.github/workflows/terraform-validation.yml`
+Workflow job: `Terraform validation`
 
 Runs when Terraform, AWS CI scripts, or the Makefile change.
 
@@ -91,7 +101,7 @@ make terraform-fmt
 
 ### Ansible validation
 
-Workflow: `.github/workflows/ansible-validation.yml`
+Workflow job: `Ansible validation`
 
 Runs when Ansible files, Compose templates, or the Makefile change.
 
@@ -128,3 +138,75 @@ contracts, Terraform syntax, and Ansible linting.
 
 AWS CodeBuild remains the managed AWS runtime for infrastructure planning and,
 later, apply/provisioning workflows.
+
+On push, GitHub Actions can start the AWS CodePipeline after the validation jobs
+finish successfully. This avoids running AWS plans for commits that already fail
+repository checks.
+
+The trigger is intentionally guarded so the same branch pushed to multiple
+repositories does not start duplicate AWS pipeline executions. By default, it
+only runs from:
+
+```text
+repository: hrenchevskyi-d/coin-ops-aws-code-build
+branch:     hrenchevskyi-codebuild
+```
+
+Override those defaults with repository variables if needed:
+
+```text
+AWS_CODEPIPELINE_TRIGGER_REPOSITORY
+AWS_CODEPIPELINE_TRIGGER_BRANCH
+```
+
+Required repository variable:
+
+```text
+AWS_CODEPIPELINE_TRIGGER_ROLE_ARN
+```
+
+Optional repository variables:
+
+```text
+AWS_REGION                 default: eu-central-1
+AWS_CODEPIPELINE_NAME      default: coin-ops-k3s-plan
+```
+
+Prefer a GitHub OIDC role instead of long-lived AWS access keys. The role only
+needs permission to start the plan pipeline:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "codepipeline:StartPipelineExecution",
+      "Resource": "arn:aws:codepipeline:eu-central-1:231648037082:coin-ops-k3s-plan"
+    }
+  ]
+}
+```
+
+Example trust policy for the personal repository and branch:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::231648037082:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:sub": "repo:hrenchevskyi-d/coin-ops-aws-code-build:ref:refs/heads/hrenchevskyi-codebuild"
+        }
+      }
+    }
+  ]
+}
+```
