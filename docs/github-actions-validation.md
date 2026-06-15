@@ -80,9 +80,15 @@ Workflow: `.github/workflows/ansible-validation.yml`
 
 Runs when Ansible files, Compose templates, or the Makefile change.
 
+The workflow installs Ansible Galaxy collections from `ansible/requirements.yml`
+before linting. Without that step, `ansible-lint` cannot load playbooks that use
+modules from collections such as `kubernetes.core`, `community.docker`,
+`community.general`, or cloud provider collections.
+
 Run locally:
 
 ```bash
+make ansible-install-requirements
 make ansible-lint
 ```
 

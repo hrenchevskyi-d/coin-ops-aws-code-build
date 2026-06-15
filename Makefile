@@ -37,7 +37,7 @@ ANSIBLE_CMD = $(ANSIBLE_ENV)
 LOCAL_ANSIBLE_CMD = $(LOCAL_ANSIBLE_ENV)
 
 .PHONY: help \
-	infra-check config-validate terraform-fmt terraform-validate ansible-lint ci-validate tf-check-backend tf-plan tf-apply tf-destroy-compute tf-full-destroy k8s-api-ready kubectl k8s-env \
+	infra-check config-validate terraform-fmt terraform-validate ansible-install-requirements ansible-lint ci-validate tf-check-backend tf-plan tf-apply tf-destroy-compute tf-full-destroy k8s-api-ready kubectl k8s-env \
 	inventory-graph inventory-host ssh-host \
 	runtime-config ansible-check provision deploy k3s-cluster k3s-headlamp k3s-homepage k3s-coinops k3s-platform headlamp-start headlamp-token
 
@@ -47,6 +47,8 @@ help:
 	@echo "  make config-validate         - Validate terraform/config/*.json against JSON Schema"
 	@echo "  make terraform-fmt           - Format Terraform files in place"
 	@echo "  make terraform-validate      - Run Terraform fmt check, init without backend, and validate"
+	@echo "  make ansible-install-requirements"
+	@echo "                               - Install Ansible Galaxy collections"
 	@echo "  make ansible-lint            - Run ansible-lint against ansible/"
 	@echo "  make ci-validate             - Run local equivalents of GitHub Actions validation jobs"
 	@echo "  make tf-check-backend        - Verify backend.active.tf matches clouds.control_plane"
@@ -99,6 +101,9 @@ terraform-fmt:
 
 terraform-validate:
 	"$(REPO_ROOT)/scripts/terraform-validate-local.sh"
+
+ansible-install-requirements:
+	ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ansible-galaxy collection install -r "$(ANSIBLE_DIR)/requirements.yml"
 
 ansible-lint:
 	"$(REPO_ROOT)/scripts/ansible-lint-local.sh"
