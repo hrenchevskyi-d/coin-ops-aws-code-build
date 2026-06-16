@@ -30,6 +30,10 @@ Optional environment:
   COINOPS_CI_BRANCH                  Default: current git branch
   COINOPS_CI_PIPELINE_NAME           Default: <project>-k3s-plan
   COINOPS_CI_ARTIFACT_BUCKET         Default: <project>-codepipeline-artifacts-<account>-<region>
+  COINOPS_CI_PLAN_CODEBUILD_PROJECT_NAME
+                                      Default: <pipeline-name>
+  COINOPS_CI_APPLY_CODEBUILD_PROJECT_NAME
+                                      Default: <pipeline-name>-apply
   COINOPS_CI_CODEBUILD_IMAGE         Default: aws/codebuild/standard:7.0
   COINOPS_CI_CODEBUILD_COMPUTE_TYPE  Default: BUILD_GENERAL1_SMALL
   COINOPS_CI_DETECT_CHANGES          Default: false
@@ -327,6 +331,11 @@ put_seed_parameter() {
 
   if [[ -z "${value}" ]]; then
     if [[ "${required}" == "true" ]]; then
+      if aws ssm get-parameter --name "${parameter_name}" --with-decryption >/dev/null 2>&1; then
+        echo "Keeping existing CI seed parameter: ${parameter_name}"
+        return 0
+      fi
+
       echo "${env_name} is required for CI seed_secret_manager=true." >&2
       exit 1
     fi
@@ -354,12 +363,12 @@ ensure_seed_parameters() {
 write_codepipeline_policy() {
   local path="$1"
 
-  python3 - "${path}" "${AWS_REGION}" "${ACCOUNT_ID}" "${ARTIFACT_BUCKET}" "${GITHUB_CONNECTION_ARN}" "${CODEBUILD_PROJECT_NAME}" <<'PY'
+  python3 - "${path}" "${AWS_REGION}" "${ACCOUNT_ID}" "${ARTIFACT_BUCKET}" "${GITHUB_CONNECTION_ARN}" "${PLAN_CODEBUILD_PROJECT_NAME}" "${APPLY_CODEBUILD_PROJECT_NAME}" <<'PY'
 import json
 import pathlib
 import sys
 
-path, region, account_id, artifact_bucket, connection_arn, project_name = sys.argv[1:]
+path, region, account_id, artifact_bucket, connection_arn, plan_project_name, apply_project_name = sys.argv[1:]
 policy = {
     "Version": "2012-10-17",
     "Statement": [
@@ -387,7 +396,10 @@ policy = {
             "Sid": "RunCodeBuild",
             "Effect": "Allow",
             "Action": ["codebuild:BatchGetBuilds", "codebuild:StartBuild"],
-            "Resource": f"arn:aws:codebuild:{region}:{account_id}:project/{project_name}",
+            "Resource": [
+                f"arn:aws:codebuild:{region}:{account_id}:project/{plan_project_name}",
+                f"arn:aws:codebuild:{region}:{account_id}:project/{apply_project_name}",
+            ],
         },
     ],
 }
@@ -396,50 +408,74 @@ PY
 }
 
 ensure_iam() {
-  ensure_role "${CODEBUILD_ROLE_NAME}" codebuild.amazonaws.com
+  ensure_role "${PLAN_CODEBUILD_ROLE_NAME}" codebuild.amazonaws.com
+  ensure_role "${APPLY_CODEBUILD_ROLE_NAME}" codebuild.amazonaws.com
   ensure_role "${CODEPIPELINE_ROLE_NAME}" codepipeline.amazonaws.com
 
   aws iam attach-role-policy \
-    --role-name "${CODEBUILD_ROLE_NAME}" \
+    --role-name "${PLAN_CODEBUILD_ROLE_NAME}" \
     --policy-arn arn:aws:iam::aws:policy/ReadOnlyAccess >/dev/null
 
-  local codebuild_policy="${WORK_DIR}/codebuild-policy.json"
+  aws iam attach-role-policy \
+    --role-name "${APPLY_CODEBUILD_ROLE_NAME}" \
+    --policy-arn arn:aws:iam::aws:policy/PowerUserAccess >/dev/null
+
+  aws iam attach-role-policy \
+    --role-name "${APPLY_CODEBUILD_ROLE_NAME}" \
+    --policy-arn arn:aws:iam::aws:policy/IAMFullAccess >/dev/null
+
+  local plan_codebuild_policy="${WORK_DIR}/plan-codebuild-policy.json"
+  local apply_codebuild_policy="${WORK_DIR}/apply-codebuild-policy.json"
   local codepipeline_policy="${WORK_DIR}/codepipeline-policy.json"
-  write_codebuild_policy "${codebuild_policy}"
+  CODEBUILD_LOG_GROUP="${PLAN_CODEBUILD_LOG_GROUP}" write_codebuild_policy "${plan_codebuild_policy}"
+  CODEBUILD_LOG_GROUP="${APPLY_CODEBUILD_LOG_GROUP}" write_codebuild_policy "${apply_codebuild_policy}"
   write_codepipeline_policy "${codepipeline_policy}"
 
   aws iam put-role-policy \
-    --role-name "${CODEBUILD_ROLE_NAME}" \
-    --policy-name "${CODEBUILD_ROLE_NAME}" \
-    --policy-document "file://${codebuild_policy}" >/dev/null
+    --role-name "${PLAN_CODEBUILD_ROLE_NAME}" \
+    --policy-name "${PLAN_CODEBUILD_ROLE_NAME}" \
+    --policy-document "file://${plan_codebuild_policy}" >/dev/null
+
+  aws iam put-role-policy \
+    --role-name "${APPLY_CODEBUILD_ROLE_NAME}" \
+    --policy-name "${APPLY_CODEBUILD_ROLE_NAME}" \
+    --policy-document "file://${apply_codebuild_policy}" >/dev/null
 
   aws iam put-role-policy \
     --role-name "${CODEPIPELINE_ROLE_NAME}" \
     --policy-name "${CODEPIPELINE_ROLE_NAME}" \
     --policy-document "file://${codepipeline_policy}" >/dev/null
 
-  CODEBUILD_ROLE_ARN="$(aws_text iam get-role --role-name "${CODEBUILD_ROLE_NAME}" --query Role.Arn)"
+  PLAN_CODEBUILD_ROLE_ARN="$(aws_text iam get-role --role-name "${PLAN_CODEBUILD_ROLE_NAME}" --query Role.Arn)"
+  APPLY_CODEBUILD_ROLE_ARN="$(aws_text iam get-role --role-name "${APPLY_CODEBUILD_ROLE_NAME}" --query Role.Arn)"
   CODEPIPELINE_ROLE_ARN="$(aws_text iam get-role --role-name "${CODEPIPELINE_ROLE_NAME}" --query Role.Arn)"
 }
 
 ensure_log_group() {
+  local log_group="$1"
+
   if ! aws logs describe-log-groups \
-    --log-group-name-prefix "${CODEBUILD_LOG_GROUP}" \
-    --query "logGroups[?logGroupName=='${CODEBUILD_LOG_GROUP}'].logGroupName | [0]" \
-    --output text | grep -qx "${CODEBUILD_LOG_GROUP}"; then
-    echo "Creating CloudWatch log group: ${CODEBUILD_LOG_GROUP}"
-    aws logs create-log-group --log-group-name "${CODEBUILD_LOG_GROUP}" >/dev/null
+    --log-group-name-prefix "${log_group}" \
+    --query "logGroups[?logGroupName=='${log_group}'].logGroupName | [0]" \
+    --output text | grep -qx "${log_group}"; then
+    echo "Creating CloudWatch log group: ${log_group}"
+    aws logs create-log-group --log-group-name "${log_group}" >/dev/null
   fi
 
   aws logs put-retention-policy \
-    --log-group-name "${CODEBUILD_LOG_GROUP}" \
+    --log-group-name "${log_group}" \
     --retention-in-days "${COINOPS_CI_LOG_RETENTION_DAYS:-7}" >/dev/null
 }
 
 write_codebuild_project_json() {
   local path="$1"
+  local project_name="$2"
+  local role_arn="$3"
+  local buildspec="$4"
+  local log_group="$5"
+  local purpose="$6"
 
-  python3 - "${path}" "${PROJECT_NAME}" "${CODEBUILD_PROJECT_NAME}" "${CODEBUILD_ROLE_ARN}" "${CODEBUILD_IMAGE}" "${CODEBUILD_COMPUTE_TYPE}" "${AWS_REGION}" "${STATE_BUCKET}" "${COINOPS_SSH_PUBLIC_KEY:-}" "${CODEBUILD_LOG_GROUP}" "${SEED_PARAMETER_PREFIX}" <<'PY'
+  python3 - "${path}" "${PROJECT_NAME}" "${project_name}" "${role_arn}" "${CODEBUILD_IMAGE}" "${CODEBUILD_COMPUTE_TYPE}" "${AWS_REGION}" "${STATE_BUCKET}" "${COINOPS_SSH_PUBLIC_KEY:-}" "${log_group}" "${SEED_PARAMETER_PREFIX}" "${buildspec}" "${purpose}" <<'PY'
 import json
 import pathlib
 import sys
@@ -456,6 +492,8 @@ import sys
     ssh_public_key,
     log_group,
     seed_parameter_prefix,
+    buildspec,
+    purpose,
 ) = sys.argv[1:]
 
 env_vars = [
@@ -478,7 +516,7 @@ if ssh_public_key:
 
 project = {
     "name": project_name,
-    "description": "Terraform plan-only build for the Coin-Ops AWS k3s path.",
+    "description": f"Terraform {purpose} build for the Coin-Ops AWS k3s path.",
     "serviceRole": role_arn,
     "artifacts": {"type": "CODEPIPELINE"},
     "environment": {
@@ -490,18 +528,18 @@ project = {
     },
     "source": {
         "type": "CODEPIPELINE",
-        "buildspec": "ci/aws/buildspec.k3s-terraform-plan.yml",
+        "buildspec": buildspec,
     },
     "logsConfig": {
         "cloudWatchLogs": {
             "status": "ENABLED",
             "groupName": log_group,
-            "streamName": "terraform-plan",
+            "streamName": f"terraform-{purpose}",
         }
     },
     "tags": [
         {"key": "Project", "value": project_tag},
-        {"key": "Purpose", "value": "terraform-plan"},
+        {"key": "Purpose", "value": f"terraform-{purpose}"},
     ],
 }
 pathlib.Path(path).write_text(json.dumps(project), encoding="utf-8")
@@ -509,20 +547,25 @@ PY
 }
 
 ensure_codebuild_project() {
-  local project_json="${WORK_DIR}/codebuild-project.json"
-  write_codebuild_project_json "${project_json}"
+  local project_name="$1"
+  local role_arn="$2"
+  local buildspec="$3"
+  local log_group="$4"
+  local purpose="$5"
+  local project_json="${WORK_DIR}/${project_name}-codebuild-project.json"
+  write_codebuild_project_json "${project_json}" "${project_name}" "${role_arn}" "${buildspec}" "${log_group}" "${purpose}"
 
   local existing
   existing="$(aws codebuild batch-get-projects \
-    --names "${CODEBUILD_PROJECT_NAME}" \
+    --names "${project_name}" \
     --query 'projects[0].name' \
     --output text)"
 
-  if [[ "${existing}" == "${CODEBUILD_PROJECT_NAME}" ]]; then
-    echo "Updating CodeBuild project: ${CODEBUILD_PROJECT_NAME}"
+  if [[ "${existing}" == "${project_name}" ]]; then
+    echo "Updating CodeBuild project: ${project_name}"
     aws codebuild update-project --cli-input-json "file://${project_json}" >/dev/null
   else
-    echo "Creating CodeBuild project: ${CODEBUILD_PROJECT_NAME}"
+    echo "Creating CodeBuild project: ${project_name}"
     aws codebuild create-project --cli-input-json "file://${project_json}" >/dev/null
   fi
 }
@@ -530,7 +573,7 @@ ensure_codebuild_project() {
 write_pipeline_json() {
   local path="$1"
 
-  python3 - "${path}" "${PIPELINE_NAME}" "${CODEPIPELINE_ROLE_ARN}" "${ARTIFACT_BUCKET}" "${GITHUB_CONNECTION_ARN}" "${GITHUB_REPO}" "${PIPELINE_BRANCH}" "${DETECT_CHANGES}" "${CODEBUILD_PROJECT_NAME}" <<'PY'
+  python3 - "${path}" "${PIPELINE_NAME}" "${CODEPIPELINE_ROLE_ARN}" "${ARTIFACT_BUCKET}" "${GITHUB_CONNECTION_ARN}" "${GITHUB_REPO}" "${PIPELINE_BRANCH}" "${DETECT_CHANGES}" "${PLAN_CODEBUILD_PROJECT_NAME}" "${APPLY_CODEBUILD_PROJECT_NAME}" <<'PY'
 import json
 import pathlib
 import sys
@@ -544,7 +587,8 @@ import sys
     github_repo,
     branch,
     detect_changes,
-    codebuild_project,
+    plan_codebuild_project,
+    apply_codebuild_project,
 ) = sys.argv[1:]
 
 pipeline = {
@@ -588,7 +632,48 @@ pipeline = {
                         },
                         "inputArtifacts": [{"name": "source_output"}],
                         "outputArtifacts": [{"name": "plan_output"}],
-                        "configuration": {"ProjectName": codebuild_project},
+                        "configuration": {"ProjectName": plan_codebuild_project},
+                        "runOrder": 1,
+                    }
+                ],
+            },
+            {
+                "name": "ApproveApply",
+                "actions": [
+                    {
+                        "name": "ApproveTerraformApply",
+                        "actionTypeId": {
+                            "category": "Approval",
+                            "owner": "AWS",
+                            "provider": "Manual",
+                            "version": "1",
+                        },
+                        "configuration": {
+                            "CustomData": "Review terraform/plan.txt from the Plan artifact before approving apply."
+                        },
+                        "runOrder": 1,
+                    }
+                ],
+            },
+            {
+                "name": "Apply",
+                "actions": [
+                    {
+                        "name": "TerraformApply",
+                        "actionTypeId": {
+                            "category": "Build",
+                            "owner": "AWS",
+                            "provider": "CodeBuild",
+                            "version": "1",
+                        },
+                        "inputArtifacts": [
+                            {"name": "source_output"},
+                            {"name": "plan_output"},
+                        ],
+                        "configuration": {
+                            "ProjectName": apply_codebuild_project,
+                            "PrimarySource": "source_output",
+                        },
                         "runOrder": 1,
                     }
                 ],
@@ -627,7 +712,8 @@ export AWS_REGION
 ACCOUNT_ID="$(aws_text sts get-caller-identity --query Account)"
 STATE_BUCKET="${COINOPS_TF_STATE_BUCKET:-${STATE_BUCKET_PREFIX}-${ACCOUNT_ID}-${AWS_REGION}}"
 PIPELINE_NAME="${COINOPS_CI_PIPELINE_NAME:-${PROJECT_NAME}-k3s-plan}"
-CODEBUILD_PROJECT_NAME="${COINOPS_CI_CODEBUILD_PROJECT_NAME:-${PIPELINE_NAME}}"
+PLAN_CODEBUILD_PROJECT_NAME="${COINOPS_CI_PLAN_CODEBUILD_PROJECT_NAME:-${COINOPS_CI_CODEBUILD_PROJECT_NAME:-${PIPELINE_NAME}}}"
+APPLY_CODEBUILD_PROJECT_NAME="${COINOPS_CI_APPLY_CODEBUILD_PROJECT_NAME:-${PIPELINE_NAME}-apply}"
 ARTIFACT_BUCKET="${COINOPS_CI_ARTIFACT_BUCKET:-${PROJECT_NAME}-codepipeline-artifacts-${ACCOUNT_ID}-${AWS_REGION}}"
 PIPELINE_BRANCH="${COINOPS_CI_BRANCH:-$(git -C "${REPO_ROOT}" branch --show-current 2>/dev/null || echo hrenchevskyi-codebuild)}"
 GITHUB_REPO="${COINOPS_CI_GITHUB_REPO:-}"
@@ -635,9 +721,11 @@ CONNECTION_NAME="${COINOPS_CI_GITHUB_CONNECTION_NAME:-${PROJECT_NAME}-github}"
 DETECT_CHANGES="${COINOPS_CI_DETECT_CHANGES:-false}"
 CODEBUILD_IMAGE="${COINOPS_CI_CODEBUILD_IMAGE:-aws/codebuild/standard:7.0}"
 CODEBUILD_COMPUTE_TYPE="${COINOPS_CI_CODEBUILD_COMPUTE_TYPE:-BUILD_GENERAL1_SMALL}"
-CODEBUILD_ROLE_NAME="${COINOPS_CI_CODEBUILD_ROLE_NAME:-${PIPELINE_NAME}-codebuild}"
+PLAN_CODEBUILD_ROLE_NAME="${COINOPS_CI_PLAN_CODEBUILD_ROLE_NAME:-${COINOPS_CI_CODEBUILD_ROLE_NAME:-${PIPELINE_NAME}-codebuild}}"
+APPLY_CODEBUILD_ROLE_NAME="${COINOPS_CI_APPLY_CODEBUILD_ROLE_NAME:-${PIPELINE_NAME}-apply-codebuild}"
 CODEPIPELINE_ROLE_NAME="${COINOPS_CI_CODEPIPELINE_ROLE_NAME:-${PIPELINE_NAME}-codepipeline}"
-CODEBUILD_LOG_GROUP="${COINOPS_CI_CODEBUILD_LOG_GROUP:-/aws/codebuild/${CODEBUILD_PROJECT_NAME}}"
+PLAN_CODEBUILD_LOG_GROUP="${COINOPS_CI_PLAN_CODEBUILD_LOG_GROUP:-${COINOPS_CI_CODEBUILD_LOG_GROUP:-/aws/codebuild/${PLAN_CODEBUILD_PROJECT_NAME}}}"
+APPLY_CODEBUILD_LOG_GROUP="${COINOPS_CI_APPLY_CODEBUILD_LOG_GROUP:-/aws/codebuild/${APPLY_CODEBUILD_PROJECT_NAME}}"
 SEED_PARAMETER_PREFIX="${COINOPS_CI_SEED_PARAMETER_PREFIX:-/${PROJECT_NAME}/ci/terraform}"
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "${WORK_DIR}"' EXIT
@@ -650,14 +738,16 @@ fi
 GITHUB_CONNECTION_ARN="$(ensure_connection_arn)"
 
 ensure_artifact_bucket
-ensure_log_group
+ensure_log_group "${PLAN_CODEBUILD_LOG_GROUP}"
+ensure_log_group "${APPLY_CODEBUILD_LOG_GROUP}"
 ensure_seed_parameters
 ensure_iam
 
 # IAM role propagation is eventually consistent.
 sleep "${COINOPS_CI_IAM_PROPAGATION_SLEEP_SECONDS:-10}"
 
-ensure_codebuild_project
+ensure_codebuild_project "${PLAN_CODEBUILD_PROJECT_NAME}" "${PLAN_CODEBUILD_ROLE_ARN}" "ci/aws/buildspec.k3s-terraform-plan.yml" "${PLAN_CODEBUILD_LOG_GROUP}" "plan"
+ensure_codebuild_project "${APPLY_CODEBUILD_PROJECT_NAME}" "${APPLY_CODEBUILD_ROLE_ARN}" "ci/aws/buildspec.k3s-terraform-apply.yml" "${APPLY_CODEBUILD_LOG_GROUP}" "apply"
 ensure_pipeline
 
 cat <<EOF
@@ -665,7 +755,8 @@ cat <<EOF
 AWS CodeBuild plan pipeline bootstrap completed.
 
 Pipeline:              ${PIPELINE_NAME}
-CodeBuild project:     ${CODEBUILD_PROJECT_NAME}
+Plan CodeBuild project:${PLAN_CODEBUILD_PROJECT_NAME}
+Apply CodeBuild project:${APPLY_CODEBUILD_PROJECT_NAME}
 Artifact bucket:       ${ARTIFACT_BUCKET}
 Terraform state bucket:${STATE_BUCKET}
 GitHub repository:     ${GITHUB_REPO}

@@ -1,0 +1,48 @@
+version: 0.2
+
+env:
+  shell: bash
+
+phases:
+  install:
+    commands:
+      - source ./ci/aws/codebuild-worker-env.sh
+      - ./ci/aws/codebuild-worker-env.sh verify-tools python3 make aws curl unzip
+      - ./ci/aws/codebuild-worker-env.sh install-terraform
+      - source ./ci/aws/codebuild-worker-env.sh
+      - ./ci/aws/codebuild-worker-env.sh verify-tools terraform python3 make aws find
+      - terraform version
+      - python3 --version
+  pre_build:
+    commands:
+      - source ./ci/aws/codebuild-worker-env.sh
+      - ./ci/aws/codebuild-worker-env.sh render-backend
+      - make tf-check-backend
+      - terraform -chdir=terraform init -reconfigure
+  build:
+    commands:
+      - source ./ci/aws/codebuild-worker-env.sh
+      - |
+        PLAN_FILE=""
+        for candidate_dir in \
+          "${CODEBUILD_SRC_DIR_plan_output:-}" \
+          "${CODEBUILD_SRC_DIR_PLAN_OUTPUT:-}" \
+          "${CODEBUILD_SRC_DIR_PlanOutput:-}" \
+          "${CODEBUILD_SRC_DIR_planoutput:-}" \
+          "${CODEBUILD_SRC_DIR:-}" \
+          "$(dirname "${CODEBUILD_SRC_DIR:-/tmp}")"; do
+          if [ -n "${candidate_dir}" ] && [ -d "${candidate_dir}" ]; then
+            found="$(find "${candidate_dir}" -path '*/terraform/plan.out' -print -quit)"
+            if [ -n "${found}" ]; then
+              PLAN_FILE="${found}"
+              break
+            fi
+          fi
+        done
+        if [ -z "${PLAN_FILE}" ]; then
+          echo "Unable to find terraform/plan.out in CodePipeline input artifacts." >&2
+          find /tmp -path '*/terraform/plan.out' -print >&2 || true
+          exit 1
+        fi
+        cp "${PLAN_FILE}" terraform/plan.out
+        terraform -chdir=terraform apply -input=false -auto-approve plan.out

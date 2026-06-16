@@ -111,24 +111,74 @@ jobs:
       - name: Run ansible-lint
         run: make ansible-lint
 
-  trigger-aws-codepipeline:
-    name: Trigger AWS CodePipeline
+  validation-complete:
+    name: Validation complete
     runs-on: ubuntu-latest
     needs:
       - changes
       - config
       - terraform
       - ansible
+    if: always()
+
+    steps:
+      - name: Check validation results
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          CONFIG_CHANGED: ${{ needs.changes.outputs.config }}
+          TERRAFORM_CHANGED: ${{ needs.changes.outputs.terraform }}
+          ANSIBLE_CHANGED: ${{ needs.changes.outputs.ansible }}
+          CONFIG_RESULT: ${{ needs.config.result }}
+          TERRAFORM_RESULT: ${{ needs.terraform.result }}
+          ANSIBLE_RESULT: ${{ needs.ansible.result }}
+        run: |
+          failed=0
+
+          if [ "$CHANGES_RESULT" != "success" ]; then
+            echo "Change detection did not succeed: $CHANGES_RESULT" >&2
+            exit 1
+          fi
+
+          check_result() {
+            local name="$1"
+            local changed="$2"
+            local result="$3"
+
+            if [ "$changed" != "true" ]; then
+              echo "$name validation skipped because no matching files changed."
+              return
+            fi
+
+            if [ "$result" = "success" ]; then
+              echo "$name validation succeeded."
+              return
+            fi
+
+            echo "$name validation did not succeed: $result" >&2
+            failed=1
+          }
+
+          check_result "Config" "$CONFIG_CHANGED" "$CONFIG_RESULT"
+          check_result "Terraform" "$TERRAFORM_CHANGED" "$TERRAFORM_RESULT"
+          check_result "Ansible" "$ANSIBLE_CHANGED" "$ANSIBLE_RESULT"
+
+          exit "$failed"
+
+  trigger-aws-codepipeline:
+    name: Trigger AWS CodePipeline
+    runs-on: ubuntu-latest
+    needs:
+      - changes
+      - validation-complete
     if: >-
       ${{
         always()
         && github.event_name == 'push'
         && vars.AWS_CODEPIPELINE_TRIGGER_ROLE_ARN != ''
+        && needs.validation-complete.result == 'success'
         && github.repository == (vars.AWS_CODEPIPELINE_TRIGGER_REPOSITORY || 'hrenchevskyi-d/coin-ops-aws-code-build')
         && github.ref == format('refs/heads/{0}', vars.AWS_CODEPIPELINE_TRIGGER_BRANCH || 'hrenchevskyi-codebuild')
         && (needs.changes.outputs.config == 'true' || needs.changes.outputs.terraform == 'true' || needs.changes.outputs.ansible == 'true')
-        && !contains(needs.*.result, 'failure')
-        && !contains(needs.*.result, 'cancelled')
       }}
 
     env:

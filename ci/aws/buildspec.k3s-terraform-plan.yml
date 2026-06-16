@@ -18,13 +18,11 @@ phases:
       - source ./ci/aws/codebuild-worker-env.sh
       - ./ci/aws/codebuild-worker-env.sh render-backend
       - make tf-check-backend
-      - terraform -chdir=terraform init -upgrade
+      - terraform -chdir=terraform init -reconfigure
   build:
     commands:
       - source ./ci/aws/codebuild-worker-env.sh
       - set -o pipefail
-      - terraform -chdir=terraform fmt -check -recursive
-      - terraform -chdir=terraform validate
       - terraform -chdir=terraform plan -input=false -no-color -out=plan.out 2>&1 | tee terraform/plan.txt
       - terraform -chdir=terraform show -no-color plan.out > terraform/plan.txt
 

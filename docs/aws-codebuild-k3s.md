@@ -13,9 +13,9 @@ ci/aws/bootstrap-local.sh
   -> S3 artifact bucket
   -> SSM SecureString seed parameters
   -> IAM roles and inline policies
-  -> CloudWatch log group
-  -> CodeBuild project
-  -> CodePipeline Source -> Plan
+  -> CloudWatch log groups
+  -> CodeBuild plan/apply projects
+  -> CodePipeline Source -> Plan -> ApproveApply -> Apply
 ```
 
 CodeBuild runs the workload Terraform plan:
@@ -25,9 +25,27 @@ ci/aws/buildspec.k3s-terraform-plan.yml
   -> source ci/aws/codebuild-worker-env.sh
   -> render terraform/backend.active.tf
   -> terraform init
-  -> terraform fmt/validate/plan
+  -> terraform plan
   -> upload terraform/plan.out and terraform/plan.txt
 ```
+
+After manual approval, a separate CodeBuild project runs Terraform apply:
+
+```text
+ci/aws/buildspec.k3s-terraform-apply.yml
+  -> source ci/aws/codebuild-worker-env.sh
+  -> render terraform/backend.active.tf
+  -> terraform init
+  -> copy approved terraform/plan.out from the Plan artifact
+  -> terraform apply plan.out
+```
+
+Terraform formatting and validation are intentionally handled earlier by GitHub
+Actions. The AWS worker should not repeat `terraform fmt -check` or
+`terraform validate`; it should spend AWS runtime only on the real backend plan
+and approved apply path. The worker also uses `terraform init -reconfigure`
+instead of `terraform init -upgrade`, so provider upgrades remain an explicit
+repository change.
 
 The main `terraform/` root does not create CodeBuild or CodePipeline. It is the
 workload infrastructure that the pipeline plans and later should apply.
@@ -117,7 +135,7 @@ Do not commit these values. Re-run bootstrap after changing any seed value.
 
 ## Bootstrap Or Update CI
 
-Use this command to create or update the plan-only CI control plane:
+Use this command to create or update the CI control plane:
 
 ```bash
 COINOPS_CI_GITHUB_REPO="$COINOPS_CI_GITHUB_REPO" \
@@ -140,12 +158,13 @@ Expected output includes:
 
 ```text
 Pipeline:              coin-ops-k3s-plan
-CodeBuild project:     coin-ops-k3s-plan
+Plan CodeBuild project:coin-ops-k3s-plan
+Apply CodeBuild project:coin-ops-k3s-plan-apply
 Artifact bucket:       coin-ops-codepipeline-artifacts-ACCOUNT-eu-central-1
 Terraform state bucket:coinops-terraform-state-ACCOUNT-eu-central-1
 ```
 
-## Run Plan
+## Run Plan And Apply
 
 Start the pipeline:
 
@@ -172,6 +191,17 @@ aws codebuild list-builds-for-project \
   --sort-order DESCENDING \
   --max-items 1
 ```
+
+After the Plan stage succeeds, CodePipeline stops at:
+
+```text
+ApproveApply -> ApproveTerraformApply
+```
+
+Before approving, inspect `terraform/plan.txt` from the Plan artifact or the
+Plan CodeBuild logs. Approving this stage allows the separate apply worker to run
+`terraform apply` against the exact binary plan artifact from the Plan stage.
+Reject the approval if the plan is not expected.
 
 ## Read Logs
 
@@ -205,6 +235,28 @@ aws logs get-log-events \
 
 The plan also appears in logs because the buildspec runs Terraform through
 `tee terraform/plan.txt`.
+
+Read apply logs by switching the project and log group:
+
+```bash
+APPLY_BUILD_ID="$(
+  aws codebuild list-builds-for-project \
+    --region eu-central-1 \
+    --project-name coin-ops-k3s-plan-apply \
+    --sort-order DESCENDING \
+    --max-items 1 \
+    --query 'ids[0]' \
+    --output text
+)"
+APPLY_BUILD_UUID="${APPLY_BUILD_ID#coin-ops-k3s-plan-apply:}"
+
+aws logs get-log-events \
+  --region eu-central-1 \
+  --log-group-name /aws/codebuild/coin-ops-k3s-plan-apply \
+  --log-stream-name "terraform-apply/${APPLY_BUILD_UUID}" \
+  --query 'events[].message' \
+  --output text
+```
 
 ## Read Plan Artifacts
 
@@ -309,15 +361,18 @@ git push personal hrenchevskyi-codebuild
 
 If `bootstrap-local.sh` changed, rerun bootstrap so AWS resources are updated.
 
-If only `buildspec.k3s-terraform-plan.yml` or `codebuild-worker-env.sh` changed,
-pushing the branch is enough for the next pipeline execution.
+If only a buildspec or `codebuild-worker-env.sh` changed, pushing the branch is
+enough for the next pipeline execution.
 
 ## Current Limitations
 
-- The pipeline is plan-only.
-- It does not run `terraform apply`.
 - It does not run Ansible or k3s playbooks.
 - Optional seed parameters are written when present, but only required seed
   values are currently wired into CodeBuild.
-- Apply must eventually consume an approved `plan.out`; it should not create a
-  new unapproved plan.
+- The apply worker is separated from the plan worker, but its IAM role is still
+  intentionally broad (`PowerUserAccess` plus `IAMFullAccess`) because the
+  Terraform root can create networking, compute, load balancing, database,
+  secrets, IAM, S3, and CloudWatch resources. Tighten this after the final AWS
+  resource set is stable.
+- Apply consumes the approved `plan.out`; it does not create a new unapproved
+  plan.

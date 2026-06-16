@@ -9,9 +9,11 @@ jobs, so each validation area still runs on its own GitHub-hosted worker:
 - `Config validation`
 - `Terraform validation`
 - `Ansible validation`
+- `Validation complete`
 - `Trigger AWS CodePipeline`
 
-The trigger job runs only after the relevant validation jobs succeed.
+The trigger job runs only after the relevant validation jobs succeed and the
+aggregate `Validation complete` job passes.
 
 ## Validation Jobs
 
@@ -123,6 +125,18 @@ existing repository debt such as FQCN usage, role variable naming, truthy YAML
 values, and idempotency hints. Tighten the profile only after that debt is fixed
 or explicitly baselined.
 
+### Validation complete
+
+Workflow job: `Validation complete`
+
+This is an aggregate status job. It checks whether each path-filtered validation
+job was required for the current change and whether that required job succeeded.
+It also fails if the initial path detection job fails.
+
+Use this as the future required GitHub check for branch protection. Individual
+jobs can be skipped when unrelated files change, but `Validation complete`
+always runs and gives one stable pass/fail result.
+
 ## Full Local Validation
 
 Run the local equivalent of all GitHub Actions validation jobs:
@@ -136,12 +150,22 @@ make ci-validate
 GitHub Actions is the fast validation layer. It checks repo structure, config
 contracts, Terraform syntax, and Ansible linting.
 
-AWS CodeBuild remains the managed AWS runtime for infrastructure planning and,
-later, apply/provisioning workflows.
+AWS CodeBuild remains the managed AWS runtime for infrastructure planning and
+approved Terraform apply.
 
 On push, GitHub Actions can start the AWS CodePipeline after the validation jobs
 finish successfully. This avoids running AWS plans for commits that already fail
 repository checks.
+
+The AWS pipeline flow is:
+
+```text
+Source -> Plan -> ApproveApply -> Apply
+```
+
+The Plan worker does not run `terraform fmt -check` or `terraform validate`.
+Those checks belong in GitHub Actions so the expensive AWS runtime starts only
+after repository validation has passed.
 
 The trigger is intentionally guarded so the same branch pushed to multiple
 repositories does not start duplicate AWS pipeline executions. By default, it
