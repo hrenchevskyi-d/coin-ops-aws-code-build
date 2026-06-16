@@ -66,10 +66,10 @@ locals {
     www_cname = {
       enabled         = local.dns_enabled && local.dns_primary_has_public_ingress
       name            = "www"
-      content         = local.app_domain
+      content         = local.coinops_tunnel_enabled ? local.headlamp_tunnel_target : local.app_domain
       type            = "CNAME"
-      proxied         = local.dns_proxied
-      ttl             = local.dns_ttl
+      proxied         = local.coinops_tunnel_enabled ? true : local.dns_proxied
+      ttl             = local.coinops_tunnel_enabled ? 1 : local.dns_ttl
       allow_overwrite = true
     }
     headlamp_private_a = {
