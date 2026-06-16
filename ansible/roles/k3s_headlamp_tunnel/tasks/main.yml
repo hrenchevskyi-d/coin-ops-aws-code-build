@@ -18,7 +18,10 @@
       - k3s_headlamp_tunnel_token | length > 0
     fail_msg: >-
       Cloudflare Tunnel is enabled for Headlamp, but terraform/config/ansible-runtime.json does not yet contain
-      headlamp_tunnel_token. Run terraform apply after filling Cloudflare account/GitHub OAuth settings.
+      headlamp_tunnel_token. Check that AWS Secrets Manager app secret contains non-empty
+      CLOUDFLARE_API_TOKEN, GITHUB_OAUTH_CLIENT_ID, and GITHUB_OAUTH_CLIENT_SECRET values,
+      then run terraform apply with seed_secret_manager=true so Terraform can create the
+      Cloudflare tunnel and update Jenkins runtime metadata.
   when: k3s_headlamp_tunnel_enabled | bool
   tags: [headlamp, cloudflare, tunnel, k3s]
 
