@@ -85,6 +85,8 @@ REGION_PROFILE="$(read_config 'data["general"]["region_profile"]')"
 REGION="$(python3 -c 'import json,sys; data=json.load(open(sys.argv[1], encoding="utf-8")); print(data["regions"]["aws"][sys.argv[2]]["region"])' "${MAPPING_PATH}" "${REGION_PROFILE}")"
 STATE_BUCKET_PREFIX="$(read_config 'data["clouds"]["backends"]["aws"].get("bucket_prefix", "coinops-terraform-state")')"
 STATE_KEY="$(read_config 'data["clouds"]["backends"]["aws"].get("key", "infra/state/terraform.tfstate")')"
+EKS_CLUSTER_NAME="$(read_config 'data["deploy"].get("eks", {}).get("cluster_name", data["general"].get("project_name", "coin-ops") + "-eks")')"
+EKS_NODE_GROUP_NAME="$(read_config 'data["deploy"].get("eks", {}).get("node_group", {}).get("name", "system")')"
 
 CALLER_IDENTITY="$(aws sts get-caller-identity --output json)"
 ACCOUNT_ID="$(python3 - <<'PY' "$CALLER_IDENTITY"
@@ -115,6 +117,10 @@ CNPG_BACKUP_USER_ARN="arn:aws:iam::${ACCOUNT_ID}:user/${CNPG_BACKUP_USER_NAME}"
 EC2_OBSERVABILITY_ROLE_NAME="${PROJECT_NAME}-ec2-observability"
 EC2_OBSERVABILITY_ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${EC2_OBSERVABILITY_ROLE_NAME}"
 EC2_OBSERVABILITY_INSTANCE_PROFILE_ARN="arn:aws:iam::${ACCOUNT_ID}:instance-profile/${EC2_OBSERVABILITY_ROLE_NAME}"
+EKS_CLUSTER_ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${EKS_CLUSTER_NAME}-cluster"
+EKS_NODE_ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${EKS_CLUSTER_NAME}-${EKS_NODE_GROUP_NAME}-node"
+EKS_EBS_CSI_ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${EKS_CLUSTER_NAME}-ebs-csi"
+EKS_OIDC_PROVIDER_ARN="arn:aws:iam::${ACCOUNT_ID}:oidc-provider/oidc.eks.${REGION}.amazonaws.com/id/*"
 K3S_CONTAINER_LOG_GROUP_NAME="/${PROJECT_NAME}/k3s/containers"
 K3S_CONTAINER_LOG_GROUP_BASE_ARN="arn:aws:logs:${REGION}:${ACCOUNT_ID}:log-group:${K3S_CONTAINER_LOG_GROUP_NAME}"
 K3S_CONTAINER_LOG_GROUP_ARN="arn:aws:logs:${REGION}:${ACCOUNT_ID}:log-group:${K3S_CONTAINER_LOG_GROUP_NAME}:*"
@@ -139,7 +145,7 @@ echo "Starting AWS bootstrap process in account ${ACCOUNT_ID}, region ${REGION}"
 echo "Active AWS identity: ${CALLER_ARN}"
 
 build_scoped_management_policy_document() {
-  python3 - <<'PY' "${CNPG_BACKUP_USER_ARN}" "${TARGET_USER_ARN}" "${EC2_OBSERVABILITY_ROLE_ARN}" "${EC2_OBSERVABILITY_INSTANCE_PROFILE_ARN}" "${K3S_CONTAINER_LOG_GROUP_BASE_ARN}" "${K3S_CONTAINER_LOG_GROUP_ARN}" "${OBSERVABILITY_ALERTS_TOPIC_ARN}" "${OBSERVABILITY_ALARM_ARN}" "${CLOUDWATCH_AGENT_PARAMETER_ARN}"
+  python3 - <<'PY' "${CNPG_BACKUP_USER_ARN}" "${TARGET_USER_ARN}" "${EC2_OBSERVABILITY_ROLE_ARN}" "${EC2_OBSERVABILITY_INSTANCE_PROFILE_ARN}" "${K3S_CONTAINER_LOG_GROUP_BASE_ARN}" "${K3S_CONTAINER_LOG_GROUP_ARN}" "${OBSERVABILITY_ALERTS_TOPIC_ARN}" "${OBSERVABILITY_ALARM_ARN}" "${CLOUDWATCH_AGENT_PARAMETER_ARN}" "${EKS_CLUSTER_ROLE_ARN}" "${EKS_NODE_ROLE_ARN}" "${EKS_EBS_CSI_ROLE_ARN}" "${EKS_OIDC_PROVIDER_ARN}"
 import json
 import sys
 
@@ -152,6 +158,8 @@ k3s_container_log_group_arn = sys.argv[6]
 observability_alerts_topic_arn = sys.argv[7]
 observability_alarm_arn = sys.argv[8]
 cloudwatch_agent_parameter_arn = sys.argv[9]
+eks_role_arns = sys.argv[10:13]
+eks_oidc_provider_arn = sys.argv[13]
 print(json.dumps({
     "Version": "2012-10-17",
     "Statement": [
@@ -198,6 +206,56 @@ print(json.dumps({
                 "iam:ListInstanceProfilesForRole"
             ],
             "Resource": ec2_observability_role_arn
+        },
+        {
+            "Sid": "ManageEksIamRoles",
+            "Effect": "Allow",
+            "Action": [
+                "iam:CreateRole",
+                "iam:DeleteRole",
+                "iam:GetRole",
+                "iam:TagRole",
+                "iam:UntagRole",
+                "iam:ListRoleTags",
+                "iam:AttachRolePolicy",
+                "iam:DetachRolePolicy",
+                "iam:ListAttachedRolePolicies",
+                "iam:ListRolePolicies",
+                "iam:GetRolePolicy",
+                "iam:PutRolePolicy",
+                "iam:DeleteRolePolicy",
+                "iam:UpdateAssumeRolePolicy"
+            ],
+            "Resource": eks_role_arns
+        },
+        {
+            "Sid": "PassEksIamRoles",
+            "Effect": "Allow",
+            "Action": [
+                "iam:PassRole"
+            ],
+            "Resource": eks_role_arns,
+            "Condition": {
+                "StringEquals": {
+                    "iam:PassedToService": [
+                        "eks.amazonaws.com",
+                        "ec2.amazonaws.com"
+                    ]
+                }
+            }
+        },
+        {
+            "Sid": "ManageEksOidcProvider",
+            "Effect": "Allow",
+            "Action": [
+                "iam:CreateOpenIDConnectProvider",
+                "iam:DeleteOpenIDConnectProvider",
+                "iam:GetOpenIDConnectProvider",
+                "iam:TagOpenIDConnectProvider",
+                "iam:UntagOpenIDConnectProvider",
+                "iam:ListOpenIDConnectProviderTags"
+            ],
+            "Resource": eks_oidc_provider_arn
         },
         {
             "Sid": "PassEc2ObservabilityRoleToEc2",
