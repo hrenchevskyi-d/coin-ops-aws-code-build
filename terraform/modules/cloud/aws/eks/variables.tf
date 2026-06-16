@@ -46,10 +46,7 @@ variable "node_group" {
 }
 
 variable "addons" {
-  type = map(object({
-    enabled = bool
-    version = optional(string, "")
-  }))
+  type    = any
   default = {}
 }
 
