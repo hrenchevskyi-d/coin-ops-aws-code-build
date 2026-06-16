@@ -658,6 +658,7 @@ pipeline = {
         "name": pipeline_name,
         "roleArn": role_arn,
         "artifactStore": {"type": "S3", "location": artifact_bucket},
+        "executionMode": "QUEUED",
         "stages": [
             {
                 "name": "Source",

@@ -19,6 +19,10 @@ ci/aws/bootstrap-local.sh
   -> CodePipeline Source -> Plan -> ApproveApply -> Apply -> Smoke
 ```
 
+The pipeline uses CodePipeline `QUEUED` execution mode. This prevents newer
+executions from overtaking an older execution that is waiting for manual
+approval, which reduces stale Terraform saved-plan failures.
+
 CodeBuild runs the workload Terraform plan:
 
 ```text
@@ -242,6 +246,10 @@ Plan CodeBuild logs. Approving this stage allows the separate apply worker to ru
 `terraform apply` against the exact binary plan artifact from the Plan stage.
 Reject the approval if the plan is not expected.
 
+Approve only the newest expected execution. If another pipeline execution or a
+local Terraform apply changed the same backend state after this plan was
+created, reject the old approval and start a new pipeline execution.
+
 After Apply succeeds, the Smoke stage runs automatically. It reads Terraform
 outputs and state from the same backend and fails if the state is empty.
 
@@ -423,6 +431,17 @@ AADSTS700038: 00000000-0000-0000-0000-000000000000 is not a valid application id
 This means the pipeline is running an old worker that exported dummy Azure
 credentials instead of pruning disabled Azure provider wiring. Confirm the
 branch contains the latest `codebuild-worker-env.sh`, then rerun the pipeline.
+
+Terraform apply fails with a stale saved plan:
+
+```text
+Error: Saved plan is stale
+```
+
+The binary `terraform/plan.out` was created against an older Terraform state
+snapshot. Do not retry the same Apply action. Reject or abandon that execution,
+make sure no older pending approval is still active, and start a fresh pipeline
+execution so Plan runs against the latest state.
 
 ## Update Procedure
 
