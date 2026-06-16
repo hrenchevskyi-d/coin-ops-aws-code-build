@@ -121,6 +121,7 @@ EKS_CLUSTER_ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${EKS_CLUSTER_NAME}-cluste
 EKS_NODE_ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${EKS_CLUSTER_NAME}-${EKS_NODE_GROUP_NAME}-node"
 EKS_EBS_CSI_ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${EKS_CLUSTER_NAME}-ebs-csi"
 EKS_OIDC_PROVIDER_ARN="arn:aws:iam::${ACCOUNT_ID}:oidc-provider/oidc.eks.${REGION}.amazonaws.com/id/*"
+EKS_CLUSTER_ARN="arn:aws:eks:${REGION}:${ACCOUNT_ID}:cluster/${EKS_CLUSTER_NAME}"
 K3S_CONTAINER_LOG_GROUP_NAME="/${PROJECT_NAME}/k3s/containers"
 K3S_CONTAINER_LOG_GROUP_BASE_ARN="arn:aws:logs:${REGION}:${ACCOUNT_ID}:log-group:${K3S_CONTAINER_LOG_GROUP_NAME}"
 K3S_CONTAINER_LOG_GROUP_ARN="arn:aws:logs:${REGION}:${ACCOUNT_ID}:log-group:${K3S_CONTAINER_LOG_GROUP_NAME}:*"
@@ -145,7 +146,7 @@ echo "Starting AWS bootstrap process in account ${ACCOUNT_ID}, region ${REGION}"
 echo "Active AWS identity: ${CALLER_ARN}"
 
 build_scoped_management_policy_document() {
-  python3 - <<'PY' "${CNPG_BACKUP_USER_ARN}" "${TARGET_USER_ARN}" "${EC2_OBSERVABILITY_ROLE_ARN}" "${EC2_OBSERVABILITY_INSTANCE_PROFILE_ARN}" "${K3S_CONTAINER_LOG_GROUP_BASE_ARN}" "${K3S_CONTAINER_LOG_GROUP_ARN}" "${OBSERVABILITY_ALERTS_TOPIC_ARN}" "${OBSERVABILITY_ALARM_ARN}" "${CLOUDWATCH_AGENT_PARAMETER_ARN}" "${EKS_CLUSTER_ROLE_ARN}" "${EKS_NODE_ROLE_ARN}" "${EKS_EBS_CSI_ROLE_ARN}" "${EKS_OIDC_PROVIDER_ARN}"
+  python3 - <<'PY' "${CNPG_BACKUP_USER_ARN}" "${TARGET_USER_ARN}" "${EC2_OBSERVABILITY_ROLE_ARN}" "${EC2_OBSERVABILITY_INSTANCE_PROFILE_ARN}" "${K3S_CONTAINER_LOG_GROUP_BASE_ARN}" "${K3S_CONTAINER_LOG_GROUP_ARN}" "${OBSERVABILITY_ALERTS_TOPIC_ARN}" "${OBSERVABILITY_ALARM_ARN}" "${CLOUDWATCH_AGENT_PARAMETER_ARN}" "${EKS_CLUSTER_ROLE_ARN}" "${EKS_NODE_ROLE_ARN}" "${EKS_EBS_CSI_ROLE_ARN}" "${EKS_OIDC_PROVIDER_ARN}" "${EKS_CLUSTER_ARN}"
 import json
 import sys
 
@@ -160,6 +161,7 @@ observability_alarm_arn = sys.argv[8]
 cloudwatch_agent_parameter_arn = sys.argv[9]
 eks_role_arns = sys.argv[10:13]
 eks_oidc_provider_arn = sys.argv[13]
+eks_cluster_arn = sys.argv[14]
 print(json.dumps({
     "Version": "2012-10-17",
     "Statement": [
@@ -435,6 +437,12 @@ print(json.dumps({
                 "iam:ListInstanceProfiles",
                 "iam:ListPolicies"
             ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "ManageEksCluster",
+            "Effect": "Allow",
+            "Action": "eks:*",
             "Resource": "*"
         }
     ]
