@@ -255,6 +255,23 @@ module "azure_secrets" {
 PY
 }
 
+guard_ci_secret_seed() {
+  local seed_secret_manager="${TF_VAR_seed_secret_manager:-false}"
+  local allow_ci_seed="${COINOPS_ALLOW_CI_SECRET_SEED:-false}"
+
+  if [[ "${seed_secret_manager}" == "true" && "${allow_ci_seed}" != "true" ]]; then
+    cat >&2 <<'EOF'
+Refusing to run CodeBuild with TF_VAR_seed_secret_manager=true.
+
+Regular CI/CD must read existing cloud secrets, not seed them from CI
+environment variables. Re-run ci/aws/bootstrap-local.sh to update the
+CodeBuild project environment, or set COINOPS_ALLOW_CI_SECRET_SEED=true only
+for an intentional one-off secret seed operation.
+EOF
+    return 1
+  fi
+}
+
 if [[ "${1:-}" == "verify-tools" ]]; then
   shift
   verify_tools "$@"
@@ -273,6 +290,11 @@ fi
 
 if [[ "${1:-}" == "prune-disabled-clouds" ]]; then
   prune_disabled_clouds
+  exit 0
+fi
+
+if [[ "${1:-}" == "guard-ci-secret-seed" ]]; then
+  guard_ci_secret_seed
   exit 0
 fi
 

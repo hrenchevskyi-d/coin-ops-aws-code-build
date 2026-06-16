@@ -43,8 +43,10 @@ Optional environment:
   COINOPS_CI_CODEBUILD_COMPUTE_TYPE  Default: BUILD_GENERAL1_SMALL
   COINOPS_CI_DETECT_CHANGES          Default: false
   COINOPS_SSH_PUBLIC_KEY             Optional public key passed into CodeBuild for Terraform plans.
+  COINOPS_CI_SEED_SECRET_MANAGER     Default: false. Set true only for an
+                                      intentional one-off CI secret seed.
 
-Required seed values for fresh AWS accounts:
+Required seed values when COINOPS_CI_SEED_SECRET_MANAGER=true:
   TF_VAR_db_password
   TF_VAR_rabbitmq_password
   TF_VAR_ghcr_token
@@ -365,6 +367,10 @@ ensure_seed_parameters() {
   put_seed_parameter TF_VAR_github_oauth_client_secret "${SEED_PARAMETER_PREFIX}/github_oauth_client_secret" false
 }
 
+seed_parameter_exists() {
+  aws ssm get-parameter --name "$1" --with-decryption >/dev/null 2>&1
+}
+
 ensure_approval_topic() {
   APPROVAL_TOPIC_ARN="$(aws sns create-topic \
     --name "${APPROVAL_TOPIC_NAME}" \
@@ -534,8 +540,17 @@ write_codebuild_project_json() {
   local buildspec="$4"
   local log_group="$5"
   local purpose="$6"
+  local has_tailscale_seed_parameter=false
+  local has_github_oauth_client_id_seed_parameter=false
+  local has_github_oauth_client_secret_seed_parameter=false
 
-  python3 - "${path}" "${PROJECT_NAME}" "${project_name}" "${role_arn}" "${CODEBUILD_IMAGE}" "${CODEBUILD_COMPUTE_TYPE}" "${AWS_REGION}" "${STATE_BUCKET}" "${COINOPS_SSH_PUBLIC_KEY:-}" "${log_group}" "${SEED_PARAMETER_PREFIX}" "${buildspec}" "${purpose}" <<'PY'
+  if [[ "${CI_SEED_SECRET_MANAGER}" == "true" ]]; then
+    seed_parameter_exists "${SEED_PARAMETER_PREFIX}/tailscale_auth_key" && has_tailscale_seed_parameter=true
+    seed_parameter_exists "${SEED_PARAMETER_PREFIX}/github_oauth_client_id" && has_github_oauth_client_id_seed_parameter=true
+    seed_parameter_exists "${SEED_PARAMETER_PREFIX}/github_oauth_client_secret" && has_github_oauth_client_secret_seed_parameter=true
+  fi
+
+  python3 - "${path}" "${PROJECT_NAME}" "${project_name}" "${role_arn}" "${CODEBUILD_IMAGE}" "${CODEBUILD_COMPUTE_TYPE}" "${AWS_REGION}" "${STATE_BUCKET}" "${COINOPS_SSH_PUBLIC_KEY:-}" "${log_group}" "${SEED_PARAMETER_PREFIX}" "${buildspec}" "${purpose}" "${CI_SEED_SECRET_MANAGER}" "${has_tailscale_seed_parameter}" "${has_github_oauth_client_id_seed_parameter}" "${has_github_oauth_client_secret_seed_parameter}" <<'PY'
 import json
 import pathlib
 import sys
@@ -554,6 +569,10 @@ import sys
     seed_parameter_prefix,
     buildspec,
     purpose,
+    ci_seed_secret_manager,
+    has_tailscale_seed_parameter,
+    has_github_oauth_client_id_seed_parameter,
+    has_github_oauth_client_secret_seed_parameter,
 ) = sys.argv[1:]
 
 env_vars = [
@@ -561,12 +580,30 @@ env_vars = [
     {"name": "K8S_CLOUD", "value": "aws", "type": "PLAINTEXT"},
     {"name": "K8S_CLUSTER", "value": "aws", "type": "PLAINTEXT"},
     {"name": "COINOPS_TF_STATE_BUCKET", "value": state_bucket, "type": "PLAINTEXT"},
-    {"name": "TF_VAR_seed_secret_manager", "value": "true", "type": "PLAINTEXT"},
-    {"name": "TF_VAR_db_password", "value": f"{seed_parameter_prefix}/db_password", "type": "PARAMETER_STORE"},
-    {"name": "TF_VAR_rabbitmq_password", "value": f"{seed_parameter_prefix}/rabbitmq_password", "type": "PARAMETER_STORE"},
-    {"name": "TF_VAR_ghcr_token", "value": f"{seed_parameter_prefix}/ghcr_token", "type": "PARAMETER_STORE"},
-    {"name": "TF_VAR_cloudflare_api_token", "value": f"{seed_parameter_prefix}/cloudflare_api_token", "type": "PARAMETER_STORE"},
 ]
+
+if ci_seed_secret_manager == "true":
+    env_vars.extend([
+        {"name": "TF_VAR_seed_secret_manager", "value": "true", "type": "PLAINTEXT"},
+        {"name": "COINOPS_ALLOW_CI_SECRET_SEED", "value": "true", "type": "PLAINTEXT"},
+        {"name": "TF_VAR_db_password", "value": f"{seed_parameter_prefix}/db_password", "type": "PARAMETER_STORE"},
+        {"name": "TF_VAR_rabbitmq_password", "value": f"{seed_parameter_prefix}/rabbitmq_password", "type": "PARAMETER_STORE"},
+        {"name": "TF_VAR_ghcr_token", "value": f"{seed_parameter_prefix}/ghcr_token", "type": "PARAMETER_STORE"},
+        {"name": "TF_VAR_cloudflare_api_token", "value": f"{seed_parameter_prefix}/cloudflare_api_token", "type": "PARAMETER_STORE"},
+    ])
+    optional_seed_parameters = {
+        "TF_VAR_tailscale_auth_key": ("tailscale_auth_key", has_tailscale_seed_parameter),
+        "TF_VAR_github_oauth_client_id": ("github_oauth_client_id", has_github_oauth_client_id_seed_parameter),
+        "TF_VAR_github_oauth_client_secret": ("github_oauth_client_secret", has_github_oauth_client_secret_seed_parameter),
+    }
+    for env_name, (parameter_name, enabled) in optional_seed_parameters.items():
+        if enabled == "true":
+            env_vars.append({
+                "name": env_name,
+                "value": f"{seed_parameter_prefix}/{parameter_name}",
+                "type": "PARAMETER_STORE",
+            })
+
 if ssh_public_key:
     env_vars.append({
         "name": "COINOPS_SSH_PUBLIC_KEY",
@@ -806,6 +843,7 @@ APPROVAL_TOPIC_NAME="${COINOPS_CI_APPROVAL_TOPIC_NAME:-${PIPELINE_NAME}-approval
 APPROVAL_NOTIFICATION_EMAIL="${COINOPS_CI_APPROVAL_NOTIFICATION_EMAIL:-}"
 CODEBUILD_IMAGE="${COINOPS_CI_CODEBUILD_IMAGE:-aws/codebuild/standard:7.0}"
 CODEBUILD_COMPUTE_TYPE="${COINOPS_CI_CODEBUILD_COMPUTE_TYPE:-BUILD_GENERAL1_SMALL}"
+CI_SEED_SECRET_MANAGER="${COINOPS_CI_SEED_SECRET_MANAGER:-false}"
 PLAN_CODEBUILD_ROLE_NAME="${COINOPS_CI_PLAN_CODEBUILD_ROLE_NAME:-${COINOPS_CI_CODEBUILD_ROLE_NAME:-${PIPELINE_NAME}-codebuild}}"
 APPLY_CODEBUILD_ROLE_NAME="${COINOPS_CI_APPLY_CODEBUILD_ROLE_NAME:-${PIPELINE_NAME}-apply-codebuild}"
 SMOKE_CODEBUILD_ROLE_NAME="${COINOPS_CI_SMOKE_CODEBUILD_ROLE_NAME:-${PIPELINE_NAME}-smoke-codebuild}"
@@ -816,6 +854,11 @@ SMOKE_CODEBUILD_LOG_GROUP="${COINOPS_CI_SMOKE_CODEBUILD_LOG_GROUP:-/aws/codebuil
 SEED_PARAMETER_PREFIX="${COINOPS_CI_SEED_PARAMETER_PREFIX:-/${PROJECT_NAME}/ci/terraform}"
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "${WORK_DIR}"' EXIT
+
+if [[ "${CI_SEED_SECRET_MANAGER}" != "true" && "${CI_SEED_SECRET_MANAGER}" != "false" ]]; then
+  echo "COINOPS_CI_SEED_SECRET_MANAGER must be either true or false." >&2
+  exit 1
+fi
 
 if [[ -z "${GITHUB_REPO}" ]]; then
   echo "COINOPS_CI_GITHUB_REPO is required, for example owner/repository." >&2
@@ -828,7 +871,9 @@ ensure_artifact_bucket
 ensure_log_group "${PLAN_CODEBUILD_LOG_GROUP}"
 ensure_log_group "${APPLY_CODEBUILD_LOG_GROUP}"
 ensure_log_group "${SMOKE_CODEBUILD_LOG_GROUP}"
-ensure_seed_parameters
+if [[ "${CI_SEED_SECRET_MANAGER}" == "true" ]]; then
+  ensure_seed_parameters
+fi
 ensure_approval_topic
 ensure_iam
 

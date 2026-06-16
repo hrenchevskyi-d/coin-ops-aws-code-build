@@ -132,14 +132,27 @@ export COINOPS_CI_GITHUB_CONNECTION_ARN='arn:aws:codestar-connections:REGION:ACC
 
 ## Seed Secrets
 
-Fresh AWS accounts need Terraform to seed AWS Secrets Manager, so CI uses:
+Fresh AWS accounts need Terraform to seed AWS Secrets Manager once. Regular
+CI/CD must not run in seed mode because a partial CodeBuild environment can
+overwrite existing secret payloads with empty values.
+
+Default CodeBuild projects are created in read mode:
 
 ```bash
-TF_VAR_seed_secret_manager=true
+TF_VAR_seed_secret_manager=false
+```
+
+In read mode, Terraform reads the current AWS Secrets Manager values and uses
+them during plan/apply. To perform an intentional one-off seed from CI, set this
+only while running `ci/aws/bootstrap-local.sh`:
+
+```bash
+export COINOPS_CI_SEED_SECRET_MANAGER=true
 ```
 
 The local bootstrap writes required seed values to SSM Parameter Store as
-`SecureString`, then wires those parameters into CodeBuild as secure env vars.
+`SecureString`, then wires those parameters into CodeBuild as secure env vars
+only for that explicit seed mode.
 
 Required local env before bootstrap:
 
@@ -158,7 +171,8 @@ export TF_VAR_github_oauth_client_id='REPLACE_ME'
 export TF_VAR_github_oauth_client_secret='REPLACE_ME'
 ```
 
-Do not commit these values. Re-run bootstrap after changing any seed value.
+Do not commit these values. After the seed succeeds, rerun bootstrap without
+`COINOPS_CI_SEED_SECRET_MANAGER=true` so normal plan/apply returns to read mode.
 
 ## Bootstrap Or Update CI
 
@@ -408,8 +422,15 @@ Terraform plan fails reading AWS Secrets Manager:
 couldn't find resource coinops-db-secrets|AWSCURRENT
 ```
 
-Re-run bootstrap with required `TF_VAR_*` seed values. CodeBuild must receive
-`TF_VAR_seed_secret_manager=true`.
+Run one explicit seed with required `TF_VAR_*` values:
+
+```bash
+COINOPS_CI_SEED_SECRET_MANAGER=true ci/aws/bootstrap-local.sh
+```
+
+After AWS Secrets Manager contains the expected secret payloads, rerun bootstrap
+without `COINOPS_CI_SEED_SECRET_MANAGER=true` to restore the normal read-mode
+CodeBuild environment.
 
 Terraform plan fails on Azure CLI:
 
@@ -462,8 +483,9 @@ enough for the next pipeline execution.
 ## Current Limitations
 
 - It does not run Ansible or k3s playbooks.
-- Optional seed parameters are written when present, but only required seed
-  values are currently wired into CodeBuild.
+- CI secret seed is intentionally opt-in. Normal plan/apply reads cloud secrets
+  and refuses to run if `TF_VAR_seed_secret_manager=true` appears without
+  `COINOPS_ALLOW_CI_SECRET_SEED=true`.
 - The apply worker is separated from the plan worker, but its IAM role is still
   intentionally broad (`PowerUserAccess` plus `IAMFullAccess`) because the
   Terraform root can create networking, compute, load balancing, database,
