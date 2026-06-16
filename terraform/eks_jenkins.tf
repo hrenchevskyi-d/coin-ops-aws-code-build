@@ -18,13 +18,14 @@ resource "helm_release" "jenkins" {
 
   values = [
     templatefile("${path.module}/helm/jenkins/values.yaml.tftpl", {
-      controller_tag       = try(local.jenkins_cfg.controller_tag, "2.516.1-jdk21")
+      controller_tag       = try(local.jenkins_cfg.controller_tag, "2.555.3-jdk21")
       storage_class        = try(local.jenkins_cfg.storage_class, "gp2")
       storage_size         = try(local.jenkins_cfg.storage_size, "8Gi")
       service_account_name = try(local.jenkins_cfg.release_name, "jenkins")
       casc_config = templatefile("${path.module}/helm/jenkins/casc.yaml.tftpl", {
         namespace            = try(local.jenkins_cfg.namespace, "jenkins")
         release_name         = try(local.jenkins_cfg.release_name, "jenkins")
+        public_url           = try(local.jenkins_cfg.public_url, "http://localhost:8080/")
         job_name             = try(local.jenkins_cfg.job_name, "coinops-eks-deploy")
         repository_url       = try(local.jenkins_cfg.repository_url, "")
         branch               = try(local.jenkins_cfg.branch, "main")
