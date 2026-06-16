@@ -71,21 +71,34 @@ provider "google" {
   access_token = local.gcp_enabled ? null : "disabled-provider-placeholder"
 }
 
-data "aws_eks_cluster_auth" "aws_eks" {
-  count = local.aws_eks_enabled ? 1 : 0
-  name  = module.aws_eks[0].cluster_name
-}
 
 provider "kubernetes" {
   host                   = local.aws_eks_enabled ? module.aws_eks[0].cluster_endpoint : "https://127.0.0.1"
   cluster_ca_certificate = local.aws_eks_enabled ? base64decode(module.aws_eks[0].cluster_ca_certificate) : ""
-  token                  = local.aws_eks_enabled ? data.aws_eks_cluster_auth.aws_eks[0].token : ""
+
+  dynamic "exec" {
+    for_each = local.aws_eks_enabled ? [1] : []
+    content {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args        = ["eks", "get-token", "--cluster-name", module.aws_eks[0].cluster_name, "--region", local.aws_region]
+    }
+  }
 }
 
 provider "helm" {
   kubernetes {
     host                   = local.aws_eks_enabled ? module.aws_eks[0].cluster_endpoint : "https://127.0.0.1"
     cluster_ca_certificate = local.aws_eks_enabled ? base64decode(module.aws_eks[0].cluster_ca_certificate) : ""
-    token                  = local.aws_eks_enabled ? data.aws_eks_cluster_auth.aws_eks[0].token : ""
+
+    dynamic "exec" {
+      for_each = local.aws_eks_enabled ? [1] : []
+      content {
+        api_version = "client.authentication.k8s.io/v1beta1"
+        command     = "aws"
+        args        = ["eks", "get-token", "--cluster-name", module.aws_eks[0].cluster_name, "--region", local.aws_region]
+      }
+    }
   }
 }
+
