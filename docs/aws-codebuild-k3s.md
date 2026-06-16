@@ -24,6 +24,7 @@ CodeBuild runs the workload Terraform plan:
 ci/aws/buildspec.k3s-terraform-plan.yml
   -> source ci/aws/codebuild-worker-env.sh
   -> render terraform/backend.active.tf
+  -> prune disabled Azure provider wiring for the ephemeral AWS worktree
   -> terraform init
   -> terraform plan
   -> upload terraform/plan.out and terraform/plan.txt
@@ -35,6 +36,7 @@ After manual approval, a separate CodeBuild project runs Terraform apply:
 ci/aws/buildspec.k3s-terraform-apply.yml
   -> source ci/aws/codebuild-worker-env.sh
   -> render terraform/backend.active.tf
+  -> prune disabled Azure provider wiring for the ephemeral AWS worktree
   -> terraform init
   -> copy approved terraform/plan.out from the Plan artifact
   -> terraform apply plan.out
@@ -46,6 +48,13 @@ Actions. The AWS worker should not repeat `terraform fmt -check` or
 and approved apply path. The worker also uses `terraform init -reconfigure`
 instead of `terraform init -upgrade`, so provider upgrades remain an explicit
 repository change.
+
+The prune step edits only the disposable CodeBuild checkout. It exists because
+the repository is multi-cloud, but this pipeline is AWS-only. When
+`terraform/config/clouds.json` enables only AWS, the worker removes the disabled
+Azure provider block and replaces Azure modules with zero-count disabled stubs
+before `terraform init`. Without this, the `azurerm` provider can try to
+authenticate even though no Azure resources should be planned.
 
 The main `terraform/` root does not create CodeBuild or CodePipeline. It is the
 workload infrastructure that the pipeline plans and later should apply.
@@ -344,9 +353,20 @@ Terraform plan fails on Azure CLI:
 exec: "az": executable file not found
 ```
 
-The worker exports dummy `ARM_*` values and `ARM_USE_CLI=false` for the disabled
-Azure provider. Confirm the latest `codebuild-worker-env.sh` is in the source
-branch.
+The AWS worker should prune disabled Azure provider wiring before
+`terraform init`. Confirm the latest `codebuild-worker-env.sh` is in the source
+branch and that `terraform/config/clouds.json` does not include `azure` in
+`clouds.enabled`.
+
+Terraform plan fails on Azure client credentials:
+
+```text
+AADSTS700038: 00000000-0000-0000-0000-000000000000 is not a valid application identifier
+```
+
+This means the pipeline is running an old worker that exported dummy Azure
+credentials instead of pruning disabled Azure provider wiring. Confirm the
+branch contains the latest `codebuild-worker-env.sh`, then rerun the pipeline.
 
 ## Update Procedure
 

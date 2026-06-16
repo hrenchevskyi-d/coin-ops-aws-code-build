@@ -17,6 +17,7 @@ phases:
     commands:
       - source ./ci/aws/codebuild-worker-env.sh
       - ./ci/aws/codebuild-worker-env.sh render-backend
+      - ./ci/aws/codebuild-worker-env.sh prune-disabled-clouds
       - make tf-check-backend
       - terraform -chdir=terraform init -reconfigure
   build:

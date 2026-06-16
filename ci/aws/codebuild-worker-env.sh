@@ -121,6 +121,140 @@ PY
   echo "Rendered ${backend_path} for AWS S3 backend."
 }
 
+prune_disabled_clouds() {
+  python3 - "${REPO_ROOT}/terraform" <<'PY'
+import json
+import pathlib
+import re
+import shutil
+import sys
+
+terraform_dir = pathlib.Path(sys.argv[1])
+clouds_path = terraform_dir / "config" / "clouds.json"
+clouds = json.loads(clouds_path.read_text(encoding="utf-8")).get("clouds", {})
+enabled_clouds = set(clouds.get("enabled", []))
+
+def remove_hcl_block(content, start):
+    line_start = content.rfind("\n", 0, start) + 1
+    open_brace = content.find("{", start)
+    if open_brace == -1:
+        return content
+
+    depth = 0
+    in_string = False
+    escape = False
+    for pos in range(open_brace, len(content)):
+        char = content[pos]
+        if in_string:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            continue
+
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                line_end = content.find("\n", pos)
+                line_end = len(content) if line_end == -1 else line_end + 1
+                return content[:line_start] + content[line_end:]
+
+    return content
+
+def remove_required_provider(content, provider_name):
+    match = re.search(rf"(?m)^\s*{re.escape(provider_name)}\s*=\s*\{{", content)
+    return remove_hcl_block(content, match.start()) if match else content
+
+def remove_provider_block(content, provider_name):
+    match = re.search(rf'(?m)^provider\s+"{re.escape(provider_name)}"\s*\{{', content)
+    return remove_hcl_block(content, match.start()) if match else content
+
+if "azure" not in enabled_clouds:
+    locals_path = terraform_dir / "locals.tf"
+    locals_content = locals_path.read_text(encoding="utf-8")
+    for name in ("azure",):
+        locals_content = re.sub(
+            rf"(\s*)read_{name}_secret_backend\s*=.*",
+            rf"\1read_{name}_secret_backend = false",
+            locals_content,
+        )
+        locals_content = re.sub(
+            rf"(\s*){name}_db_secrets\s*=.*",
+            rf"\1{name}_db_secrets  = {{}}",
+            locals_content,
+        )
+        locals_content = re.sub(
+            rf"(\s*){name}_app_secrets\s*=.*",
+            rf"\1{name}_app_secrets = {{}}",
+            locals_content,
+        )
+    locals_path.write_text(locals_content, encoding="utf-8")
+
+    shutil.rmtree(terraform_dir / "modules" / "cloud" / "azure", ignore_errors=True)
+
+    disabled_module_dir = terraform_dir / "modules" / "cloud" / "disabled"
+    disabled_module_dir.mkdir(parents=True, exist_ok=True)
+    (disabled_module_dir / "main.tf").write_text("", encoding="utf-8")
+
+    (terraform_dir / "azure.tf").write_text(
+        """module "azure_network" {
+  count  = 0
+  source = "./modules/cloud/disabled"
+}
+
+module "azure_security_groups" {
+  count  = 0
+  source = "./modules/cloud/disabled"
+}
+
+module "azure_instances" {
+  count  = 0
+  source = "./modules/cloud/disabled"
+}
+
+module "azure_nat_route" {
+  count  = 0
+  source = "./modules/cloud/disabled"
+}
+
+module "azure_database" {
+  count  = 0
+  source = "./modules/cloud/disabled"
+}
+
+module "azure_secrets" {
+  count  = 0
+  source = "./modules/cloud/disabled"
+}
+""",
+        encoding="utf-8",
+    )
+
+    providers_path = terraform_dir / "providers.tf"
+    providers = providers_path.read_text(encoding="utf-8")
+    providers = remove_required_provider(providers, "azurerm")
+    providers = remove_provider_block(providers, "azurerm")
+    providers_path.write_text(providers, encoding="utf-8")
+
+    azurerm_refs = [
+        str(path.relative_to(terraform_dir))
+        for path in terraform_dir.rglob("*.tf")
+        if ".terraform" not in path.parts
+        and "azurerm" in path.read_text(encoding="utf-8", errors="ignore")
+    ]
+    if azurerm_refs:
+        raise SystemExit("Azure provider references remain after pruning: " + ", ".join(azurerm_refs))
+
+    print("Pruned disabled Azure provider from CodeBuild Terraform worktree.")
+PY
+}
+
 if [[ "${1:-}" == "verify-tools" ]]; then
   shift
   verify_tools "$@"
@@ -134,6 +268,11 @@ fi
 
 if [[ "${1:-}" == "render-backend" ]]; then
   render_backend
+  exit 0
+fi
+
+if [[ "${1:-}" == "prune-disabled-clouds" ]]; then
+  prune_disabled_clouds
   exit 0
 fi
 
@@ -167,10 +306,6 @@ if [[ -z "${AWS_REGION:-}" ]]; then
 fi
 
 export ARM_USE_CLI="${ARM_USE_CLI:-false}"
-export ARM_CLIENT_ID="${ARM_CLIENT_ID:-00000000-0000-0000-0000-000000000000}"
-export ARM_CLIENT_SECRET="${ARM_CLIENT_SECRET:-coinops-ci-disabled-azure-provider}"
-export ARM_TENANT_ID="${ARM_TENANT_ID:-00000000-0000-0000-0000-000000000000}"
-export ARM_SUBSCRIPTION_ID="${ARM_SUBSCRIPTION_ID:-00000000-0000-0000-0000-000000000000}"
 
 if [[ -n "${COINOPS_SSH_PUBLIC_KEY:-}" ]]; then
   mkdir -p /tmp/coinops-ci
