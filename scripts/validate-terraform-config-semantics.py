@@ -7,6 +7,7 @@ import json
 import sys
 from pathlib import Path
 from typing import Any
+from ipaddress import ip_network
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -33,6 +34,7 @@ def main() -> int:
     general_cfg = load_json("general.json")["general"]
     instances_cfg = load_json("instances.json")["instances"]
     networks_cfg = load_json("networks.json")
+    deploy_cfg = load_json("deploy.json")["deploy"]
     mappings_cfg = load_json("cloud_mappings.json")
     database_cfg = load_json("database.json")["database"]
     dns_cfg = load_json("dns.json")["dns"]
@@ -84,6 +86,9 @@ def main() -> int:
         errors.append(f"dns.primary_cloud '{dns_primary_cloud}' must be listed in clouds.enabled")
 
     cloud_networks = networks_cfg.get("cloud_networks", {})
+    kubernetes_runtime = str(deploy_cfg.get("kubernetes", {}).get("runtime", "k3s"))
+    eks_cfg = deploy_cfg.get("eks", {})
+    aws_eks_active = "aws" in enabled_clouds and kubernetes_runtime == "eks" and eks_cfg.get("enabled", True)
     instance_roles: set[str] = set()
 
     for instance_name, instance_cfg in instances_cfg.items():
@@ -96,6 +101,8 @@ def main() -> int:
         instance_image_profile = str(instance_cfg.get("image_profile", image_profile))
 
         for cloud in instance_clouds & enabled_clouds:
+            if aws_eks_active and cloud == "aws" and instance_role == "k3s-server":
+                continue
             cloud_network = cloud_networks.get(cloud, {})
             subnets = cloud_network.get("subnets", {}) if isinstance(cloud_network, dict) else {}
             if subnet_name not in subnets:
@@ -133,6 +140,57 @@ def main() -> int:
             for subnet_ref in subnet_refs:
                 if subnet_ref not in subnets:
                     errors.append(f"cloud_networks.{cloud}.{lb_key} references unknown subnet '{subnet_ref}'")
+
+    if aws_eks_active:
+        aws_network = cloud_networks.get("aws", {})
+        aws_subnets = aws_network.get("subnets", {}) if isinstance(aws_network, dict) else {}
+        nat_cfg = aws_network.get("managed_nat_gateway", {}) if isinstance(aws_network, dict) else {}
+        node_group = eks_cfg.get("node_group", {}) if isinstance(eks_cfg, dict) else {}
+
+        if not eks_cfg.get("endpoint_public", True) and not eks_cfg.get("endpoint_private", True):
+            errors.append("deploy.eks must enable at least one of endpoint_public or endpoint_private")
+
+        try:
+            ip_network(str(eks_cfg.get("service_ipv4_cidr", "10.43.0.0/16")))
+        except ValueError as exc:
+            errors.append(f"deploy.eks.service_ipv4_cidr is not a valid CIDR: {exc}")
+
+        if int(node_group.get("min_size", 0)) > int(node_group.get("desired_size", 0)):
+            errors.append("deploy.eks.node_group.min_size cannot be greater than desired_size")
+        if int(node_group.get("desired_size", 0)) > int(node_group.get("max_size", 0)):
+            errors.append("deploy.eks.node_group.desired_size cannot be greater than max_size")
+
+        if not isinstance(nat_cfg, dict) or not nat_cfg.get("enabled", False):
+            errors.append("deploy.kubernetes.runtime 'eks' requires cloud_networks.aws.managed_nat_gateway.enabled=true")
+        else:
+            nat_public_subnet = str(nat_cfg.get("public_subnet", ""))
+            if nat_public_subnet not in aws_subnets:
+                errors.append(f"cloud_networks.aws.managed_nat_gateway.public_subnet '{nat_public_subnet}' is not defined")
+            elif not aws_subnets.get(nat_public_subnet, {}).get("public", False):
+                errors.append(f"cloud_networks.aws.managed_nat_gateway.public_subnet '{nat_public_subnet}' must reference a public subnet")
+
+        for subnet_ref in eks_cfg.get("private_subnets", []):
+            if subnet_ref not in aws_subnets:
+                errors.append(f"deploy.eks.private_subnets references unknown AWS subnet '{subnet_ref}'")
+            elif aws_subnets.get(subnet_ref, {}).get("public", False):
+                errors.append(f"deploy.eks.private_subnets '{subnet_ref}' must reference a private subnet")
+
+        for subnet_ref in eks_cfg.get("public_subnets", []):
+            if subnet_ref not in aws_subnets:
+                errors.append(f"deploy.eks.public_subnets references unknown AWS subnet '{subnet_ref}'")
+            elif not aws_subnets.get(subnet_ref, {}).get("public", False):
+                errors.append(f"deploy.eks.public_subnets '{subnet_ref}' must reference a public subnet")
+
+        for lb_key in ("k3s_api_load_balancer", "k3s_public_ingress_load_balancer"):
+            lb_cfg = aws_network.get(lb_key, {}) if isinstance(aws_network, dict) else {}
+            if isinstance(lb_cfg, dict) and lb_cfg.get("enabled", False):
+                errors.append(f"cloud_networks.aws.{lb_key}.enabled must be false when deploy.kubernetes.runtime is 'eks'")
+
+        jenkins_cfg = deploy_cfg.get("jenkins", {})
+        if isinstance(jenkins_cfg, dict) and jenkins_cfg.get("enabled", False):
+            for key in ("repository_url", "branch", "job_name"):
+                if not str(jenkins_cfg.get(key, "")).strip():
+                    errors.append(f"deploy.jenkins.{key} is required when Jenkins is enabled")
 
     if errors:
         print("Terraform config semantic validation failed:", file=sys.stderr)

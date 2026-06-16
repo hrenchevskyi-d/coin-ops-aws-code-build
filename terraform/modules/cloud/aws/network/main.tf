@@ -9,6 +9,9 @@ locals {
   # public=true is the only flag that receives Internet Gateway routing here.
   public_subnets  = { for name, cfg in local.subnets : name => cfg if lookup(cfg, "public", false) }
   private_subnets = { for name, cfg in local.subnets : name => cfg if !lookup(cfg, "public", false) }
+
+  managed_nat_gateway_enabled       = try(var.managed_nat_gateway.enabled, false)
+  managed_nat_gateway_public_subnet = try(var.managed_nat_gateway.public_subnet, "")
 }
 
 resource "aws_vpc" "vpc" {
@@ -58,4 +61,30 @@ resource "aws_route_table_association" "private" {
   for_each       = local.private_subnets
   subnet_id      = aws_subnet.subnet[each.key].id
   route_table_id = aws_route_table.private.id
+}
+
+resource "aws_eip" "nat" {
+  count  = local.managed_nat_gateway_enabled ? 1 : 0
+  domain = "vpc"
+
+  tags = { Name = "${var.vpc_name}-nat-eip" }
+}
+
+resource "aws_nat_gateway" "this" {
+  count = local.managed_nat_gateway_enabled ? 1 : 0
+
+  allocation_id = aws_eip.nat[0].id
+  subnet_id     = aws_subnet.subnet[local.managed_nat_gateway_public_subnet].id
+
+  tags = { Name = "${var.vpc_name}-nat-gateway" }
+
+  depends_on = [aws_internet_gateway.igw]
+}
+
+resource "aws_route" "private_default_via_managed_nat" {
+  count = local.managed_nat_gateway_enabled ? 1 : 0
+
+  route_table_id         = aws_route_table.private.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.this[0].id
 }

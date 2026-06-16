@@ -14,6 +14,52 @@
             "staging": false
         },
         "runtime_backend": "external",
+        "kubernetes": {
+            "runtime": "eks"
+        },
+        "eks": {
+            "enabled": true,
+            "cluster_name": "coin-ops-eks",
+            "version": "1.33",
+            "service_ipv4_cidr": "10.43.0.0/16",
+            "endpoint_public": true,
+            "endpoint_private": true,
+            "public_access_cidrs": [
+                "0.0.0.0/0"
+            ],
+            "private_subnets": [
+                "private-a",
+                "private-b"
+            ],
+            "public_subnets": [
+                "public-a",
+                "public-b"
+            ],
+            "node_group": {
+                "name": "system",
+                "instance_types": [
+                    "t3.medium"
+                ],
+                "desired_size": 2,
+                "min_size": 1,
+                "max_size": 3,
+                "disk_size": 30
+            },
+            "addons": {
+                "vpc-cni": {
+                    "enabled": true
+                },
+                "coredns": {
+                    "enabled": true
+                },
+                "kube-proxy": {
+                    "enabled": true
+                },
+                "aws-ebs-csi-driver": {
+                    "enabled": true
+                }
+            }
+        },
         "k3s": {
             "channel": "stable",
             "version": "v1.35.4+k3s1",
@@ -46,6 +92,18 @@
                     "allowed_emails": ["grenchevskiyd@gmail.com"]
                 }
             }
+        },
+        "jenkins": {
+            "enabled": true,
+            "namespace": "jenkins",
+            "release_name": "jenkins",
+            "chart_version": "",
+            "controller_tag": "2.516.1-jdk21",
+            "storage_class": "gp2",
+            "storage_size": "8Gi",
+            "repository_url": "https://github.com/hrenchevskyi-d/coin-ops-aws-code-build.git",
+            "branch": "hrenchevskyi-codebuild",
+            "job_name": "coinops-eks-deploy"
         },
         "homepage": {
             "enabled": true,

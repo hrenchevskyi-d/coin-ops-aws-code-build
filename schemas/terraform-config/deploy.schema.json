@@ -9,7 +9,7 @@
   "properties": {
     "deploy": {
       "type": "object",
-      "required": ["app_domain", "tls_mode", "runtime_backend", "k3s", "public_ingress", "headlamp", "homepage", "coinops", "ghcr_username", "internal_tls"],
+      "required": ["app_domain", "tls_mode", "runtime_backend", "k3s", "public_ingress", "headlamp", "jenkins", "homepage", "coinops", "ghcr_username", "internal_tls"],
       "additionalProperties": false,
       "properties": {
         "app_domain": { "type": "string", "minLength": 1, "description": "Root application domain." },
@@ -17,9 +17,12 @@
         "tls": { "$ref": "#/$defs/tls", "description": "Structured TLS settings." },
         "certbot": { "$ref": "#/$defs/certbot", "description": "Legacy Certbot settings retained for compatibility." },
         "runtime_backend": { "type": "string", "enum": ["postgres", "external"], "description": "Runtime state backend mode. external is RabbitMQ/Redis rollback support only." },
+        "kubernetes": { "$ref": "#/$defs/kubernetes", "description": "Kubernetes runtime selection for infrastructure-managed clusters." },
+        "eks": { "$ref": "#/$defs/eks", "description": "AWS EKS managed Kubernetes settings." },
         "k3s": { "$ref": "#/$defs/k3s", "description": "k3s install and server configuration." },
         "public_ingress": { "$ref": "#/$defs/ingressFeature", "description": "Whether public ingress should be exposed." },
         "headlamp": { "$ref": "#/$defs/headlamp", "description": "Headlamp dashboard deployment and access settings." },
+        "jenkins": { "$ref": "#/$defs/jenkins", "description": "Jenkins controller and seeded automation job settings." },
         "homepage": { "$ref": "#/$defs/namedIngressFeature", "description": "Homepage deployment and ingress settings." },
         "coinops": { "$ref": "#/$defs/coinops", "description": "Coin-Ops workload deployment and ingress settings." },
         "ghcr_username": { "type": "string", "minLength": 1, "description": "GitHub Container Registry username used for image pulls." },
@@ -110,6 +113,92 @@
         "flannel_backend": { "type": "string", "minLength": 1, "description": "Flannel backend used by k3s." }
       }
     },
+    "kubernetes": {
+      "type": "object",
+      "required": ["runtime"],
+      "additionalProperties": false,
+      "properties": {
+        "runtime": {
+          "type": "string",
+          "enum": ["k3s", "eks"],
+          "description": "Kubernetes runtime. k3s uses self-managed VM nodes; eks uses AWS managed Kubernetes."
+        }
+      }
+    },
+    "eks": {
+      "type": "object",
+      "required": ["enabled", "cluster_name", "version", "private_subnets", "public_subnets", "node_group", "addons"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "description": "Whether AWS EKS resources are managed when kubernetes.runtime is eks." },
+        "cluster_name": { "type": "string", "minLength": 1, "description": "EKS cluster name." },
+        "version": { "type": "string", "minLength": 1, "description": "Kubernetes version for EKS control plane." },
+        "service_ipv4_cidr": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Kubernetes Service CIDR assigned by EKS at cluster creation."
+        },
+        "endpoint_public": {
+          "type": "boolean",
+          "description": "Whether the EKS Kubernetes API endpoint is reachable from the public internet."
+        },
+        "endpoint_private": {
+          "type": "boolean",
+          "description": "Whether the EKS Kubernetes API endpoint is reachable inside the VPC."
+        },
+        "public_access_cidrs": {
+          "type": "array",
+          "minItems": 1,
+          "description": "CIDR ranges allowed to reach the public EKS Kubernetes API endpoint.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "private_subnets": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Private subnet keys from networks.json used by EKS managed node groups.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "public_subnets": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Public subnet keys from networks.json available for public AWS load balancers and NAT Gateway.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "node_group": {
+          "type": "object",
+          "required": ["name", "instance_types", "desired_size", "min_size", "max_size", "disk_size"],
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string", "minLength": 1, "description": "Managed node group name." },
+            "instance_types": {
+              "type": "array",
+              "minItems": 1,
+              "description": "EC2 instance types used by the managed node group.",
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "desired_size": { "type": "integer", "minimum": 0, "description": "Desired managed node group size." },
+            "min_size": { "type": "integer", "minimum": 0, "description": "Minimum managed node group size." },
+            "max_size": { "type": "integer", "minimum": 1, "description": "Maximum managed node group size." },
+            "disk_size": { "type": "integer", "minimum": 1, "description": "Node root volume size in GiB." }
+          }
+        },
+        "addons": {
+          "type": "object",
+          "description": "EKS add-ons keyed by AWS add-on name.",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["enabled"],
+            "additionalProperties": false,
+            "properties": {
+              "enabled": { "type": "boolean", "description": "Whether this EKS add-on is installed." },
+              "version": { "type": "string", "description": "Optional explicit add-on version." }
+            }
+          }
+        }
+      }
+    },
     "ingress": {
       "type": "object",
       "required": ["enabled", "class_name"],
@@ -172,6 +261,23 @@
             }
           }
         }
+      }
+    },
+    "jenkins": {
+      "type": "object",
+      "required": ["enabled", "namespace", "release_name", "repository_url", "branch", "job_name"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "description": "Whether Terraform installs Jenkins into EKS." },
+        "namespace": { "type": "string", "minLength": 1, "description": "Kubernetes namespace for Jenkins." },
+        "release_name": { "type": "string", "minLength": 1, "description": "Helm release name for Jenkins." },
+        "chart_version": { "type": "string", "description": "Optional Jenkins Helm chart version. Empty means the provider uses the repository default." },
+        "controller_tag": { "type": "string", "description": "Jenkins controller image tag." },
+        "storage_class": { "type": "string", "description": "StorageClass used by Jenkins persistent volume claim." },
+        "storage_size": { "type": "string", "description": "Persistent volume size for Jenkins home." },
+        "repository_url": { "type": "string", "minLength": 1, "description": "Git repository URL used by the seeded Jenkins job." },
+        "branch": { "type": "string", "minLength": 1, "description": "Git branch used by the seeded Jenkins job." },
+        "job_name": { "type": "string", "minLength": 1, "description": "Seeded Jenkins pipeline job name." }
       }
     },
     "coinops": {

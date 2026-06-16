@@ -65,8 +65,12 @@
         "aws": {
             "vpc_name": "coin-ops-aws-vpc",
             "vpc_cidr": "10.30.0.0/16",
-            "k3s_api_load_balancer": {
+            "managed_nat_gateway": {
                 "enabled": true,
+                "public_subnet": "public-a"
+            },
+            "k3s_api_load_balancer": {
+                "enabled": false,
                 "name": "coin-ops-k3s-api",
                 "port": 6443,
                 "internal_subnets": [
@@ -75,7 +79,7 @@
                 "health_check_port": 6443
             },
             "k3s_public_ingress_load_balancer": {
-                "enabled": true,
+                "enabled": false,
                 "name": "coin-ops-k3s-public-ingress",
                 "port": 443,
                 "public_subnets": [
@@ -84,16 +88,26 @@
                 "health_check_port": 443
             },
             "subnets": {
-                "internal": {
+                "private-a": {
                     "cidr": "10.30.1.0/24",
                     "availability_zone_key": "primary"
+                },
+                "private-b": {
+                    "cidr": "10.30.4.0/24",
+                    "availability_zone_key": "secondary"
                 },
                 "database": {
                     "cidr": "10.30.3.0/24",
                     "availability_zone_key": "secondary"
                 },
-                "external": {
+                "public-a": {
                     "cidr": "10.30.2.0/24",
+                    "availability_zone_key": "primary",
+                    "public": true
+                },
+                "public-b": {
+                    "cidr": "10.30.5.0/24",
+                    "availability_zone_key": "secondary",
                     "public": true
                 }
             }

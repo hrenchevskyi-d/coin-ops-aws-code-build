@@ -1,0 +1,83 @@
+jenkins:
+  systemMessage: "CoinOps EKS automation is managed by Terraform and Jenkins Configuration as Code."
+  clouds:
+    - kubernetes:
+        name: "eks"
+        serverUrl: "https://kubernetes.default.svc"
+        namespace: "${namespace}"
+        jenkinsUrl: "http://${release_name}.${namespace}.svc.cluster.local:8080"
+        containerCapStr: "4"
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          password: ${admin_password}
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - usernamePassword:
+              scope: GLOBAL
+              id: "github-token"
+              username: ${github_username}
+              password: ${github_token}
+              description: "GitHub token used to clone the CoinOps automation repository."
+          - string:
+              scope: GLOBAL
+              id: "coinops-db-password"
+              secret: ${db_password}
+              description: "CoinOps PostgreSQL password consumed by Ansible."
+          - string:
+              scope: GLOBAL
+              id: "coinops-ghcr-token"
+              secret: ${github_token}
+              description: "GHCR token consumed by Ansible."
+          - string:
+              scope: GLOBAL
+              id: "coinops-cloudflare-api-token"
+              secret: ${cloudflare_api_token}
+              description: "Cloudflare API token consumed by Ansible when needed."
+          - string:
+              scope: GLOBAL
+              id: "coinops-headlamp-tunnel-token"
+              secret: ${headlamp_tunnel_token}
+              description: "Cloudflare Tunnel token created by Terraform for Headlamp."
+          - string:
+              scope: GLOBAL
+              id: "coinops-ansible-runtime-json"
+              secret: ${ansible_runtime_json}
+              description: "Terraform runtime metadata consumed by Ansible in Jenkins."
+          - string:
+              scope: GLOBAL
+              id: "coinops-cnpg-backup-s3-access-key-id"
+              secret: ${cnpg_backup_s3_access_key_id}
+              description: "CNPG backup S3 access key ID."
+          - string:
+              scope: GLOBAL
+              id: "coinops-cnpg-backup-s3-secret-access-key"
+              secret: ${cnpg_backup_s3_secret_access_key}
+              description: "CNPG backup S3 secret access key."
+
+jobs:
+  - script: >
+      pipelineJob('${job_name}') {
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url('${repository_url}')
+                  credentials('github-token')
+                }
+                branch('${branch}')
+              }
+            }
+            scriptPath('ci/jenkins/Jenkinsfile.eks-coinops')
+          }
+        }
+      }

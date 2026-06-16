@@ -166,6 +166,11 @@ module "local_operator_artifacts" {
     } : {},
     local.aws_enabled ? {
       aws = {
+        kubernetes_runtime                    = local.aws_eks_enabled ? "eks" : "k3s"
+        eks_cluster_name                      = local.aws_eks_enabled ? module.aws_eks[0].cluster_name : ""
+        eks_kubeconfig_path                   = local.aws_eks_enabled ? local_file.aws_eks_kubeconfig[0].filename : ""
+        eks_service_ipv4_cidr                 = local.aws_eks_enabled ? try(local.aws_eks_cfg.service_ipv4_cidr, "10.43.0.0/16") : ""
+        eks_pod_cidr                          = local.aws_eks_enabled ? local.aws_vpc_cidr : ""
         k3s_api_endpoint                      = local.aws_k3s_api_lb_enabled ? try(module.aws_k3s_api_lb[0].dns_name, "") : ""
         headlamp_tunnel_enabled               = local.headlamp_tunnel_enabled
         headlamp_tunnel_token                 = local.headlamp_tunnel_enabled ? cloudflare_zero_trust_tunnel_cloudflared.headlamp[0].tunnel_token : ""

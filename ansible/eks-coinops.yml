@@ -1,0 +1,64 @@
+---
+# CoinOps on EKS reuses the Kubernetes workload roles. Jenkins can run this
+# playbook after Terraform has created the cluster and kubeconfig artifact.
+- name: Validate CoinOps EKS prerequisites
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    cloud: aws
+  pre_tasks:
+    - name: Resolve runtime configuration for CoinOps EKS validation
+      include_role:
+        name: runtime_config
+        public: true
+      tags: [runtime_config, coinops, eks]
+  tasks:
+    - name: Assert CoinOps EKS runtime prerequisites
+      assert:
+        that:
+          - kubernetes_runtime == 'eks'
+          - deploy_config.coinops_runtime_backend | default('postgres') == 'postgres'
+          - registry_username | length > 0
+          - registry_token | length > 0
+          - db_password | length > 0
+          - postgres_runtime_image | length > 0
+          - postgres_runtime_image is regex('.+:[0-9]+([._-].+)?$')
+        fail_msg: >-
+          CoinOps EKS deployment expects kubernetes.runtime=eks,
+          runtime_backend=postgres, private registry credentials, a DB password
+          resolved from the configured secret backend, and a postgres_runtime_image
+          whose tag starts with a PostgreSQL major version such as 16-dev-latest.
+
+- name: Install CoinOps on EKS
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  vars:
+    cloud: aws
+  pre_tasks:
+    - name: Resolve runtime configuration for CoinOps EKS deployment
+      include_role:
+        name: runtime_config
+        public: true
+      tags: [runtime_config, coinops, eks]
+    - name: Resolve EKS kubeconfig for CoinOps deployment
+      include_role:
+        name: k3s_kubeconfig_access
+      tags: [runtime_config, coinops, kubeconfig, eks]
+    - name: Confirm EKS Kubernetes API is reachable from localhost
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
+        api_version: v1
+        kind: Namespace
+        name: kube-system
+      register: eks_coinops_kube_system
+      retries: 30
+      delay: 5
+      until: (eks_coinops_kube_system.resources | default([]) | length) > 0
+      tags: [coinops, eks]
+  roles:
+    - k3s_coinops_data
+    - k3s_coinops_app
+    - k3s_coinops_ui

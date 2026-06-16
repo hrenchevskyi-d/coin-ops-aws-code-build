@@ -113,6 +113,27 @@ output "aws_k3s_public_ingress_load_balancer_dns_name" {
   value       = local.aws_k3s_public_ingress_lb_enabled ? try(module.aws_k3s_public_ingress_lb[0].dns_name, "") : ""
 }
 
+output "aws_eks_cluster_name" {
+  description = "AWS EKS cluster name when deploy.kubernetes.runtime is eks."
+  value       = local.aws_eks_enabled ? module.aws_eks[0].cluster_name : ""
+}
+
+output "aws_eks_cluster_endpoint" {
+  description = "AWS EKS Kubernetes API endpoint."
+  value       = local.aws_eks_enabled ? module.aws_eks[0].cluster_endpoint : ""
+}
+
+output "aws_eks_kubeconfig_file" {
+  description = "Generated kubeconfig path for AWS EKS automation."
+  value       = local.aws_eks_enabled ? local_file.aws_eks_kubeconfig[0].filename : ""
+}
+
+output "jenkins_admin_password" {
+  description = "Generated Jenkins local admin password. Use terraform output -raw jenkins_admin_password."
+  value       = local.jenkins_enabled ? random_password.jenkins_admin[0].result : ""
+  sensitive   = true
+}
+
 output "homepage_public_url" {
   description = "Preferred public Homepage URL when a public k3s ingress load balancer is enabled."
   value       = local.gcp_k3s_public_ingress_lb_enabled || local.aws_k3s_public_ingress_lb_enabled ? "https://${local.homepage_domain}" : ""

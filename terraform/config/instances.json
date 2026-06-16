@@ -10,7 +10,6 @@
             "role": "jump-host",
             "clouds": [
                 "gcp",
-                "aws",
                 "azure"
             ]
         },

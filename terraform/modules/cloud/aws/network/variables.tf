@@ -25,3 +25,9 @@ variable "zones" {
   description = "Named AWS availability zones used by subnet availability_zone_key values."
   default     = {}
 }
+
+variable "managed_nat_gateway" {
+  type        = any
+  description = "Optional AWS managed NAT Gateway settings: { enabled = bool, public_subnet = string }."
+  default     = {}
+}

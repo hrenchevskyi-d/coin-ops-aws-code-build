@@ -58,8 +58,8 @@ k3s_coinops_data_barman_plugin_deployment_name: barman-cloud
 # NetworkPolicy enforcement can see the translated control-plane endpoint too.
 k3s_coinops_data_kubernetes_api_service_cidr: 10.43.0.1/32
 k3s_coinops_data_kubernetes_api_endpoint_cidr: "{{ cloud_subnets.get('internal', {}).get('cidr', '10.20.1.0/24') }}"
-k3s_coinops_data_k3s_pod_cidr: "{{ deploy_config.k3s_cluster_cidr | default('10.42.0.0/16') }}"
-k3s_coinops_data_k3s_service_cidr: "{{ deploy_config.k3s_service_cidr | default('10.43.0.0/16') }}"
+k3s_coinops_data_k3s_pod_cidr: "{{ cloud_runtime_metadata.get('eks_pod_cidr', deploy_config.k3s_cluster_cidr | default('10.42.0.0/16')) }}"
+k3s_coinops_data_k3s_service_cidr: "{{ cloud_runtime_metadata.get('eks_service_ipv4_cidr', deploy_config.k3s_service_cidr | default('10.43.0.0/16')) }}"
 
 k3s_coinops_data_bootstrap_run_as_user: 10004
 k3s_coinops_data_bootstrap_run_as_group: 10004

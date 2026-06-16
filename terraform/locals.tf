@@ -36,6 +36,30 @@ locals {
   default_instance_clouds = try(tolist(local.clouds.default_instance_clouds), tolist(local.enabled_clouds))
 
   instances = lookup(local.cfg, "instances", {})
+  kubernetes_cfg = merge({
+    runtime = "k3s"
+  }, try(local.deploy.kubernetes, {}))
+  kubernetes_runtime = lower(try(local.kubernetes_cfg.runtime, "k3s"))
+  aws_eks_cfg = merge({
+    enabled             = false
+    cluster_name        = "${try(local.general.project_name, "coin-ops")}-eks"
+    version             = "1.33"
+    private_subnets     = []
+    public_subnets      = []
+    service_ipv4_cidr   = "10.43.0.0/16"
+    endpoint_public     = true
+    endpoint_private    = true
+    public_access_cidrs = ["0.0.0.0/0"]
+    node_group = {
+      name           = "system"
+      instance_types = ["t3.medium"]
+      desired_size   = 2
+      min_size       = 1
+      max_size       = 3
+      disk_size      = 30
+    }
+    addons = {}
+  }, try(local.deploy.eks, {}))
   # Each instance can opt into a subset of clouds; missing clouds means "use the
   # repo default cloud set" so old configs do not need per-host cloud lists.
   instance_clouds = {
@@ -48,6 +72,7 @@ locals {
   aws_instances_base = {
     for name, cfg in local.instances : name => cfg
     if contains(local.instance_clouds[name], "aws")
+    && (local.aws_k3s_enabled || lookup(cfg, "role", "") != "k3s-server")
   }
   azure_instances_base = {
     for name, cfg in local.instances : name => cfg
@@ -57,6 +82,8 @@ locals {
   gcp_enabled           = contains(local.enabled_clouds, "gcp")
   aws_enabled           = contains(local.enabled_clouds, "aws")
   azure_enabled         = contains(local.enabled_clouds, "azure")
+  aws_eks_enabled       = local.aws_enabled && local.kubernetes_runtime == "eks" && try(local.aws_eks_cfg.enabled, false)
+  aws_k3s_enabled       = local.aws_enabled && !local.aws_eks_enabled
   gcp_compute_enabled   = local.gcp_enabled && length(local.gcp_instances_base) > 0
   aws_compute_enabled   = local.aws_enabled && length(local.aws_instances_base) > 0
   azure_compute_enabled = local.azure_enabled && length(local.azure_instances_base) > 0
@@ -292,7 +319,8 @@ locals {
     try(local.aws_network_cfg.k3s_api_load_balancer, {})
   )
   aws_k3s_api_lb_enabled = (
-    local.aws_compute_enabled
+    local.aws_k3s_enabled
+    && local.aws_compute_enabled
     && try(local.aws_k3s_api_lb_cfg.enabled, false)
     && length(local.aws_k3s_server_names) > 0
   )
@@ -307,7 +335,8 @@ locals {
     try(local.aws_network_cfg.k3s_public_ingress_load_balancer, {})
   )
   aws_k3s_public_ingress_lb_enabled = (
-    local.aws_compute_enabled
+    local.aws_k3s_enabled
+    && local.aws_compute_enabled
     && try(local.aws_k3s_public_ingress_lb_cfg.enabled, false)
     && length(local.aws_k3s_server_names) > 0
   )
@@ -485,6 +514,19 @@ locals {
   app_domain      = try(local.deploy.app_domain, var.app_domain)
   homepage_domain = try(local.deploy.homepage.hostname, "home.${local.app_domain}")
   headlamp_cfg    = try(local.deploy.headlamp, {})
+  jenkins_cfg = merge({
+    enabled        = false
+    namespace      = "jenkins"
+    release_name   = "jenkins"
+    chart_version  = ""
+    controller_tag = "2.516.1-jdk21"
+    storage_class  = "gp2"
+    storage_size   = "8Gi"
+    repository_url = ""
+    branch         = "main"
+    job_name       = "coinops-eks-deploy"
+  }, try(local.deploy.jenkins, {}))
+  jenkins_enabled = local.aws_eks_enabled && try(local.jenkins_cfg.enabled, false)
   # Cloudflare Tunnel is only for Headlamp access. Coin-Ops ingress continues
   # through the normal k3s/Traefik path so app routing stays observable.
   headlamp_tunnel_cfg = merge({

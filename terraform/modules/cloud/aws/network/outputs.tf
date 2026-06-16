@@ -30,3 +30,13 @@ output "public_route_table_id" {
   description = "ID of the public route table (owned by aws_network). Pass to aws_nat_route for remote cloud routes on public workloads."
   value       = aws_route_table.public.id
 }
+
+output "managed_nat_gateway_id" {
+  description = "AWS managed NAT Gateway ID when enabled."
+  value       = try(aws_nat_gateway.this[0].id, "")
+}
+
+output "managed_nat_gateway_public_ip" {
+  description = "Public IP address of the AWS managed NAT Gateway when enabled."
+  value       = try(aws_eip.nat[0].public_ip, "")
+}

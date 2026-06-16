@@ -75,6 +75,7 @@ json_deploy_config:
   db_user: "{{ infra_database.get('username', 'cognitor') }}"
   db_port: "{{ infra_database.get('port', 5432) }}"
   runtime_backend: "{{ infra_deploy.get('runtime_backend', 'external') }}"
+  kubernetes_runtime: "{{ infra_deploy.get('kubernetes', {}).get('runtime', 'k3s') }}"
   app_domain: "{{ infra_deploy.get('app_domain', 'coinops.test') }}"
   tls_mode: "{{ infra_deploy.get('tls_mode', 'selfsigned') }}"
   certbot_email_localpart: "{{ infra_deploy.get('tls', {}).get('certbot', {}).get('email_localpart', infra_deploy.get('certbot', {}).get('email_localpart', 'admin')) }}"
@@ -242,6 +243,7 @@ rabbitmq_user_urlencoded: "{{ rabbitmq_user | urlencode }}"
 rabbitmq_password_urlencoded: "{{ rabbitmq_password | urlencode }}"
 
 runtime_backend: "{{ lookup('env', 'RUNTIME_BACKEND') | default(deploy_config.runtime_backend, true) }}"
+kubernetes_runtime: "{{ lookup('env', 'K8S_RUNTIME') | default(cloud_runtime_metadata.get('kubernetes_runtime', deploy_config.kubernetes_runtime | default('k3s', true)), true) }}"
 app_domain: "{{ lookup('env', 'APP_DOMAIN') | default(deploy_config.app_domain, true) }}"
 tls_mode: "{{ lookup('env', 'TLS_MODE') | default(deploy_config.tls_mode, true) }}"
 tls_enabled: true

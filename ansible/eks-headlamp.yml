@@ -1,0 +1,23 @@
+---
+# Headlamp on EKS uses the same workload roles as k3s, but the kubeconfig comes
+# from Terraform's EKS artifact instead of a tunneled k3s control plane.
+- name: Install Headlamp on EKS
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  vars:
+    cloud: aws
+  pre_tasks:
+    - name: Resolve runtime configuration for EKS Headlamp deployment
+      include_role:
+        name: runtime_config
+        public: true
+      tags: [runtime_config, headlamp, eks]
+    - name: Resolve EKS kubeconfig for Headlamp deployment
+      include_role:
+        name: k3s_kubeconfig_access
+      tags: [runtime_config, headlamp, kubeconfig, eks]
+  roles:
+    - k3s_headlamp
+    - k3s_headlamp_tunnel

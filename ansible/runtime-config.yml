@@ -26,6 +26,7 @@
           cloud: "{{ cloud }}"
           secret_backend: "{{ secret_backend }}"
           runtime_backend: "{{ runtime_backend }}"
+          kubernetes_runtime: "{{ kubernetes_runtime }}"
           app_domain: "{{ app_domain }}"
           tls_mode: "{{ tls_mode }}"
           certbot_staging: "{{ certbot_staging }}"

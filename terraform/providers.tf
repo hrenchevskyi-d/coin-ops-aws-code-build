@@ -19,6 +19,14 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 7.0"
     }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.0"
+    }
     local = {
       source  = "hashicorp/local"
       version = "~> 2.0"
@@ -34,6 +42,10 @@ terraform {
     time = {
       source  = "hashicorp/time"
       version = "~> 0.12"
+    }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
     }
   }
 }
@@ -57,4 +69,23 @@ provider "google" {
   project      = local.gcp_project_id
   region       = local.gcp_region
   access_token = local.gcp_enabled ? null : "disabled-provider-placeholder"
+}
+
+data "aws_eks_cluster_auth" "aws_eks" {
+  count = local.aws_eks_enabled ? 1 : 0
+  name  = module.aws_eks[0].cluster_name
+}
+
+provider "kubernetes" {
+  host                   = local.aws_eks_enabled ? module.aws_eks[0].cluster_endpoint : "https://127.0.0.1"
+  cluster_ca_certificate = local.aws_eks_enabled ? base64decode(module.aws_eks[0].cluster_ca_certificate) : ""
+  token                  = local.aws_eks_enabled ? data.aws_eks_cluster_auth.aws_eks[0].token : ""
+}
+
+provider "helm" {
+  kubernetes {
+    host                   = local.aws_eks_enabled ? module.aws_eks[0].cluster_endpoint : "https://127.0.0.1"
+    cluster_ca_certificate = local.aws_eks_enabled ? base64decode(module.aws_eks[0].cluster_ca_certificate) : ""
+    token                  = local.aws_eks_enabled ? data.aws_eks_cluster_auth.aws_eks[0].token : ""
+  }
 }

@@ -80,7 +80,7 @@
   set_fact:
     headlamp_service: "{{ headlamp_service_info.resources[0] }}"
     headlamp_service_port: "{{ headlamp_service_info.resources[0].spec.ports[0].port }}"
-    headlamp_access_ip: "{{ cloud_runtime_metadata.get('headlamp_ingress_ip', cloud_runtime_metadata.get('public_ingress_load_balancer_dns_name', cloud_runtime_metadata.get('homepage_public_endpoint', ''))) | default(hostvars[groups['role_k3s_server'] | sort | first].ansible_host, true) }}"
+    headlamp_access_ip: "{{ cloud_runtime_metadata.get('headlamp_ingress_ip', cloud_runtime_metadata.get('public_ingress_load_balancer_dns_name', cloud_runtime_metadata.get('homepage_public_endpoint', ''))) }}"
     headlamp_access_scheme: "{{ 'https' if (cloud_runtime_metadata.get('headlamp_tunnel_enabled', false) | bool or k3s_headlamp_tls_enabled | bool) else 'http' }}"
   tags: [headlamp, k3s]
 

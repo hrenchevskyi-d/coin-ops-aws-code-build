@@ -120,9 +120,19 @@
           "items": { "$ref": "#/$defs/route" }
         },
         "cloud_nat": { "type": "object", "description": "Provider-specific NAT settings." },
+        "managed_nat_gateway": { "$ref": "#/$defs/managedNatGateway", "description": "AWS managed NAT Gateway settings for private subnet egress." },
         "k3s_api_load_balancer": { "type": "object", "description": "Provider-specific k3s API load balancer settings." },
         "k3s_ingress_load_balancer": { "type": "object", "description": "Provider-specific private ingress load balancer settings." },
         "k3s_public_ingress_load_balancer": { "type": "object", "description": "Provider-specific public ingress load balancer settings." }
+      }
+    },
+    "managedNatGateway": {
+      "type": "object",
+      "required": ["enabled", "public_subnet"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "description": "Whether Terraform creates an AWS NAT Gateway for private subnet outbound internet." },
+        "public_subnet": { "type": "string", "minLength": 1, "description": "Public subnet key where the NAT Gateway is placed." }
       }
     },
     "subnet": {

@@ -18,6 +18,10 @@ module "aws_network" {
   subnets  = local.aws_subnets
   zone     = lookup(local.aws_cfg, "zone", "${local.aws_region}a")
   zones    = lookup(local.aws_cfg, "zones", {})
+  managed_nat_gateway = try(local.aws_network_cfg.managed_nat_gateway, {
+    enabled       = false
+    public_subnet = ""
+  })
 }
 
 module "aws_security_groups" {
@@ -60,6 +64,72 @@ module "aws_nat_route" {
   public_routes            = local.aws_public_route_specs
 
   depends_on = [module.aws_instances]
+}
+
+module "aws_eks" {
+  count  = local.aws_eks_enabled ? 1 : 0
+  source = "./modules/cloud/aws/eks"
+
+  project_name       = local.project_name
+  cluster_name       = try(local.aws_eks_cfg.cluster_name, "${local.project_name}-eks")
+  kubernetes_version = try(local.aws_eks_cfg.version, "1.33")
+  cluster_subnet_ids = concat(
+    [for name in try(local.aws_eks_cfg.private_subnets, []) : module.aws_network[0].subnet_ids[name]],
+    [for name in try(local.aws_eks_cfg.public_subnets, []) : module.aws_network[0].subnet_ids[name]]
+  )
+  node_subnet_ids         = [for name in try(local.aws_eks_cfg.private_subnets, []) : module.aws_network[0].subnet_ids[name]]
+  service_ipv4_cidr       = try(local.aws_eks_cfg.service_ipv4_cidr, "10.43.0.0/16")
+  endpoint_public_access  = try(local.aws_eks_cfg.endpoint_public, true)
+  endpoint_private_access = try(local.aws_eks_cfg.endpoint_private, true)
+  public_access_cidrs     = try(local.aws_eks_cfg.public_access_cidrs, ["0.0.0.0/0"])
+  node_group              = local.aws_eks_cfg.node_group
+  addons                  = try(local.aws_eks_cfg.addons, {})
+
+  tags = {
+    Cloud = "aws"
+  }
+
+  depends_on = [module.aws_network]
+}
+
+resource "local_file" "aws_eks_kubeconfig" {
+  count    = local.aws_eks_enabled ? 1 : 0
+  filename = "${path.module}/../ansible/artifacts/kubeconfig-aws-eks.yaml"
+  content = yamlencode({
+    apiVersion      = "v1"
+    kind            = "Config"
+    current-context = module.aws_eks[0].cluster_name
+    clusters = [
+      {
+        name = module.aws_eks[0].cluster_name
+        cluster = {
+          server                     = module.aws_eks[0].cluster_endpoint
+          certificate-authority-data = module.aws_eks[0].cluster_ca_certificate
+        }
+      }
+    ]
+    contexts = [
+      {
+        name = module.aws_eks[0].cluster_name
+        context = {
+          cluster = module.aws_eks[0].cluster_name
+          user    = module.aws_eks[0].cluster_name
+        }
+      }
+    ]
+    users = [
+      {
+        name = module.aws_eks[0].cluster_name
+        user = {
+          exec = {
+            apiVersion = "client.authentication.k8s.io/v1beta1"
+            command    = "aws"
+            args       = ["eks", "get-token", "--region", local.aws_region, "--cluster-name", module.aws_eks[0].cluster_name]
+          }
+        }
+      }
+    ]
+  })
 }
 
 module "aws_k3s_api_lb" {

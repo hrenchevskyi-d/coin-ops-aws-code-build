@@ -14,6 +14,7 @@ K8S_ARTIFACTS_DIR := $(ANSIBLE_DIR)/artifacts
 K8S_OPERATOR_ENV := $(K8S_ARTIFACTS_DIR)/k8s-operator-env.sh
 HEADLAMP_START_SCRIPT := $(K8S_ARTIFACTS_DIR)/headlamp-start.sh
 K8S_API_TUNNEL_SCRIPT := $(K8S_ARTIFACTS_DIR)/k8s-api-tunnel.sh
+EKS_KUBECONFIG := $(K8S_ARTIFACTS_DIR)/kubeconfig-aws-eks.yaml
 VENV_PYTHON := $(REPO_ROOT)/.venv/bin/python
 KUBECTL ?= $(shell if [ -x /usr/bin/kubectl ]; then echo /usr/bin/kubectl; else command -v kubectl 2>/dev/null || echo kubectl; fi)
 
@@ -27,7 +28,7 @@ K8S_CLOUD ?= $(if $(K8S_CLUSTER),$(K8S_CLUSTER),$(CONFIG_CONTROL_PLANE_CLOUD))
 K8S_TUNNELED_KUBECONFIG := $(K8S_ARTIFACTS_DIR)/kubeconfig-$(K8S_CLOUD)-k3s-tunneled.yaml
 K3S_INVENTORY := $(if $(filter aws,$(K8S_CLOUD)),$(AWS_INVENTORY),$(if $(filter azure,$(K8S_CLOUD)),$(AZURE_INVENTORY),$(GCP_INVENTORY)))
 
-ENV_PREFIX = source "$(ENV_FILE)" &&
+ENV_PREFIX = if [ -f "$(ENV_FILE)" ]; then source "$(ENV_FILE)"; fi &&
 # Use the repo-local virtualenv only for localhost execution. Remote hosts
 # should keep using Ansible's interpreter discovery instead of trying to run
 # the workstation virtualenv path over SSH.
@@ -39,7 +40,7 @@ LOCAL_ANSIBLE_CMD = $(LOCAL_ANSIBLE_ENV)
 .PHONY: help \
 	infra-check config-validate terraform-fmt terraform-validate ansible-install-requirements ansible-lint ci-validate tf-check-backend tf-plan tf-apply tf-destroy-compute tf-full-destroy k8s-api-ready kubectl k8s-env \
 	inventory-graph inventory-host ssh-host \
-	runtime-config ansible-check provision deploy k3s-cluster k3s-headlamp k3s-homepage k3s-coinops k3s-platform headlamp-start headlamp-token
+	runtime-config ansible-check provision deploy k3s-cluster k3s-headlamp k3s-homepage k3s-coinops k3s-platform eks-platform eks-headlamp eks-coinops eks-kubectl headlamp-start headlamp-token
 
 help:
 	@echo "Terraform / infrastructure:"
@@ -75,6 +76,11 @@ help:
 	@echo "  make k3s-homepage            - Run ansible/k3s-homepage.yml against selected cloud inventory"
 	@echo "  make k3s-coinops             - Run ansible/k3s-coinops.yml against selected cloud inventory"
 	@echo "  make k3s-platform            - Run ansible/k3s-platform.yml against selected cloud inventory"
+	@echo "  make eks-platform            - Deploy EKS platform add-ons managed by Ansible"
+	@echo "  make eks-headlamp            - Deploy Headlamp and its Cloudflare Tunnel on EKS"
+	@echo "  make eks-coinops             - Deploy CoinOps workloads on EKS"
+	@echo "  make eks-kubectl ARGS='get ns'"
+	@echo "                               - Run kubectl through the generated EKS kubeconfig"
 	@echo "  make headlamp-start          - Start Headlamp access"
 	@echo "  make headlamp-token          - Print a Headlamp login token"
 	@echo "  make k8s-env                 - Print the source command for kubectl access"
@@ -156,6 +162,9 @@ ansible-check:
 	$(ANSIBLE_ENV) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/k3s-homepage.yml"
 	$(ANSIBLE_ENV) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/k3s-coinops.yml"
 	$(ANSIBLE_ENV) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/k3s-platform.yml"
+	$(ANSIBLE_ENV) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote K8S_RUNTIME=eks K8S_KUBECONFIG_PATH="$(EKS_KUBECONFIG)" ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/eks-headlamp.yml"
+	$(ANSIBLE_ENV) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote K8S_RUNTIME=eks K8S_KUBECONFIG_PATH="$(EKS_KUBECONFIG)" ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/eks-coinops.yml"
+	$(ANSIBLE_ENV) ANSIBLE_LOCAL_TEMP=/tmp/ansible-local ANSIBLE_REMOTE_TEMP=/tmp/ansible-remote K8S_RUNTIME=eks K8S_KUBECONFIG_PATH="$(EKS_KUBECONFIG)" ansible-playbook --syntax-check -i localhost, -c local "$(ANSIBLE_DIR)/eks-platform.yml"
 
 provision:
 	$(ANSIBLE_CMD) ansible-playbook $(CLOUD_INVENTORIES) "$(ANSIBLE_DIR)/provision.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
@@ -178,6 +187,15 @@ k3s-coinops: ensure-k8s-api-tunnel
 k3s-platform: ensure-k8s-api-tunnel
 	$(ANSIBLE_CMD) ansible-playbook -i "$(LOCALHOST_INVENTORY)" -i "$(K3S_INVENTORY)" "$(ANSIBLE_DIR)/k3s-platform.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
 
+eks-platform:
+	$(LOCAL_ANSIBLE_CMD) K8S_RUNTIME=eks K8S_KUBECONFIG_PATH="$(EKS_KUBECONFIG)" ansible-playbook -i "$(LOCALHOST_INVENTORY)" "$(ANSIBLE_DIR)/eks-platform.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
+
+eks-headlamp:
+	$(LOCAL_ANSIBLE_CMD) K8S_RUNTIME=eks K8S_KUBECONFIG_PATH="$(EKS_KUBECONFIG)" ansible-playbook -i "$(LOCALHOST_INVENTORY)" "$(ANSIBLE_DIR)/eks-headlamp.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
+
+eks-coinops:
+	$(LOCAL_ANSIBLE_CMD) K8S_RUNTIME=eks K8S_KUBECONFIG_PATH="$(EKS_KUBECONFIG)" ansible-playbook -i "$(LOCALHOST_INVENTORY)" "$(ANSIBLE_DIR)/eks-coinops.yml" $(if $(LIMIT),--limit "$(LIMIT)",)
+
 k8s-api-ready: ensure-k8s-api-tunnel
 
 k8s-env:
@@ -187,6 +205,11 @@ k8s-env:
 kubectl: ensure-k8s-api-tunnel
 	@if [ -z "$(ARGS)" ]; then echo "ARGS is required, for example: make kubectl ARGS='get nodes'"; exit 1; fi
 	KUBECONFIG="$(K8S_TUNNELED_KUBECONFIG)" "$(KUBECTL)" $(ARGS)
+
+eks-kubectl:
+	@test -f "$(EKS_KUBECONFIG)" || (echo "Missing $(EKS_KUBECONFIG). Run 'make tf-apply' first."; exit 1)
+	@if [ -z "$(ARGS)" ]; then echo "ARGS is required, for example: make eks-kubectl ARGS='get nodes'"; exit 1; fi
+	KUBECONFIG="$(EKS_KUBECONFIG)" "$(KUBECTL)" $(ARGS)
 
 headlamp-start:
 	@test -x "$(HEADLAMP_START_SCRIPT)" || (echo "Missing $(HEADLAMP_START_SCRIPT). Run 'make k3s-platform' first."; exit 1)

@@ -35,6 +35,7 @@
   changed_when: false
   failed_when: false
   when:
+    - k3s_kubeconfig_access_runtime == 'k3s'
     - k3s_kubeconfig_access_use_local_artifact
     - k3s_local_cluster_kubeconfig_stat.stat.exists | default(false)
 
@@ -43,6 +44,7 @@
     path: "{{ k3s_kubeconfig_access_local_artifact_dir }}/k8s-api-tunnel.sh"
   register: k3s_kubeconfig_access_local_tunnel_script_stat
   when:
+    - k3s_kubeconfig_access_runtime == 'k3s'
     - k3s_kubeconfig_access_use_local_artifact
     - k3s_local_cluster_kubeconfig_stat.stat.exists | default(false)
     - k3s_kubeconfig_access_local_tunnel_check.rc | default(1) != 0
@@ -56,6 +58,7 @@
       missing. Re-run ansible/k3s-cluster.yml postcheck to regenerate access
       artifacts.
   when:
+    - k3s_kubeconfig_access_runtime == 'k3s'
     - k3s_kubeconfig_access_use_local_artifact
     - k3s_local_cluster_kubeconfig_stat.stat.exists | default(false)
     - k3s_kubeconfig_access_local_tunnel_check.rc | default(1) != 0
@@ -67,6 +70,7 @@
   poll: 0
   changed_when: true
   when:
+    - k3s_kubeconfig_access_runtime == 'k3s'
     - k3s_kubeconfig_access_use_local_artifact
     - k3s_local_cluster_kubeconfig_stat.stat.exists | default(false)
     - k3s_kubeconfig_access_local_tunnel_check.rc | default(1) != 0
@@ -80,6 +84,7 @@
   delay: 2
   until: k3s_kubeconfig_access_local_tunnel_wait.rc == 0
   when:
+    - k3s_kubeconfig_access_runtime == 'k3s'
     - k3s_kubeconfig_access_use_local_artifact
     - k3s_local_cluster_kubeconfig_stat.stat.exists | default(false)
     - k3s_kubeconfig_access_local_tunnel_check.rc | default(1) != 0
