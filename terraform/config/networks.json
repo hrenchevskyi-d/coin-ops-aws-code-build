@@ -67,7 +67,7 @@
             "vpc_cidr": "10.30.0.0/16",
             "managed_nat_gateway": {
                 "enabled": true,
-                "public_subnet": "public-a"
+                "public_subnet": "external"
             },
             "k3s_api_load_balancer": {
                 "enabled": false,
@@ -88,7 +88,7 @@
                 "health_check_port": 443
             },
             "subnets": {
-                "private-a": {
+                "internal": {
                     "cidr": "10.30.1.0/24",
                     "availability_zone_key": "primary"
                 },
@@ -100,7 +100,7 @@
                     "cidr": "10.30.3.0/24",
                     "availability_zone_key": "secondary"
                 },
-                "public-a": {
+                "external": {
                     "cidr": "10.30.2.0/24",
                     "availability_zone_key": "primary",
                     "public": true

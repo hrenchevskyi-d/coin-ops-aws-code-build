@@ -28,11 +28,11 @@
                 "0.0.0.0/0"
             ],
             "private_subnets": [
-                "private-a",
+                "internal",
                 "private-b"
             ],
             "public_subnets": [
-                "public-a",
+                "external",
                 "public-b"
             ],
             "node_group": {
