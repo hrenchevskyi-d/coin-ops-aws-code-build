@@ -47,6 +47,8 @@ resource "helm_release" "jenkins" {
             headlamp_tunnel_enabled = local.headlamp_tunnel_enabled
             headlamp_tunnel_token   = local.headlamp_tunnel_enabled ? cloudflare_zero_trust_tunnel_cloudflared.headlamp[0].tunnel_token : ""
             headlamp_public_host    = local.headlamp_domain
+            coinops_tunnel_enabled  = local.coinops_tunnel_enabled
+            coinops_public_host     = local.coinops_domain
             homepage_public_host    = local.homepage_domain
             database = {
               host    = ""

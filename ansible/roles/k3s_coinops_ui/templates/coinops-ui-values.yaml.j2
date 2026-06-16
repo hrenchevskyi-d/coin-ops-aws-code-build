@@ -11,6 +11,7 @@ ui:
   historyServiceName: {{ k3s_coinops_ui_history_service_name | to_json }}
   historyServiceNamespace: {{ k3s_coinops_ui_history_service_namespace | to_json }}
   historyServicePort: {{ k3s_coinops_ui_history_service_port }}
+  tunnelNamespace: {{ k3s_coinops_ui_tunnel_namespace | to_json }}
   podSecurityContext:
     runAsNonRoot: true
     runAsUser: {{ k3s_coinops_ui_run_as_user }}

@@ -17,6 +17,8 @@ locals {
   coinops_public_dns     = local.aws_k3s_public_ingress_lb_enabled ? try(module.aws_k3s_public_ingress_lb[0].dns_name, "") : ""
   headlamp_private_ip    = local.gcp_k3s_ingress_lb_enabled ? try(module.gcp_k3s_ingress_lb[0].ip_address, "") : ""
   headlamp_tunnel_target = local.headlamp_tunnel_enabled ? "${cloudflare_zero_trust_tunnel_cloudflared.headlamp[0].id}.cfargotunnel.com" : ""
+  coinops_tunnel_enabled = local.aws_eks_enabled && try(local.deploy.coinops.enabled, true) && local.headlamp_tunnel_enabled
+  coinops_tunnel_service = "http://coinops-ui.coinops-ui.svc.cluster.local:80"
   homepage_public_ip     = local.gcp_k3s_public_ingress_lb_enabled ? try(module.gcp_k3s_public_ingress_lb[0].ip_address, "") : ""
   homepage_public_dns    = local.aws_k3s_public_ingress_lb_enabled ? try(module.aws_k3s_public_ingress_lb[0].dns_name, "") : ""
   dns_primary_is_gcp     = local.dns_primary_cloud == "gcp"
@@ -24,13 +26,20 @@ locals {
   dns_primary_has_public_ingress = (
     (local.dns_primary_is_gcp && local.gcp_k3s_public_ingress_lb_enabled)
     || (local.dns_primary_is_aws && local.aws_k3s_public_ingress_lb_enabled)
+    || (local.dns_primary_is_aws && local.coinops_tunnel_enabled)
   )
   coinops_dns_content = (
-    local.dns_primary_is_aws
-    ? local.coinops_public_dns
-    : local.coinops_public_ip
+    local.coinops_tunnel_enabled
+    ? local.headlamp_tunnel_target
+    : (
+      local.dns_primary_is_aws
+      ? local.coinops_public_dns
+      : local.coinops_public_ip
+    )
   )
-  coinops_dns_type = local.dns_primary_is_aws ? "CNAME" : "A"
+  coinops_dns_type    = (local.dns_primary_is_aws || local.coinops_tunnel_enabled) ? "CNAME" : "A"
+  coinops_dns_proxied = local.coinops_tunnel_enabled ? true : local.dns_proxied
+  coinops_dns_ttl     = local.coinops_tunnel_enabled ? 1 : local.dns_ttl
   homepage_dns_content = (
     local.dns_primary_is_aws
     ? local.homepage_public_dns
@@ -50,8 +59,8 @@ locals {
       name            = local.coinops_dns_name
       content         = local.coinops_dns_content
       type            = local.coinops_dns_type
-      proxied         = local.dns_proxied
-      ttl             = local.dns_ttl
+      proxied         = local.coinops_dns_proxied
+      ttl             = local.coinops_dns_ttl
       allow_overwrite = true
     }
     www_cname = {

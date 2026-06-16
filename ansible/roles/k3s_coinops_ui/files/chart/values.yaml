@@ -11,6 +11,7 @@ ui:
   historyServiceName: coinops-history-api
   historyServiceNamespace: coinops-history-api
   historyServicePort: 8000
+  tunnelNamespace: cloudflare-tunnel
 
   podSecurityContext:
     runAsNonRoot: true
