@@ -183,7 +183,7 @@ jobs:
 
     env:
       AWS_REGION: ${{ vars.AWS_REGION || 'eu-central-1' }}
-      AWS_CODEPIPELINE_NAME: ${{ vars.AWS_CODEPIPELINE_NAME || 'coin-ops-k3s-plan' }}
+      AWS_CODEPIPELINE_NAME: ${{ vars.AWS_CODEPIPELINE_NAME || 'coin-ops-k3s-deploy' }}
 
     steps:
       - name: Configure AWS credentials

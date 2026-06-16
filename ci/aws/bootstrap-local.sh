@@ -28,12 +28,17 @@ Alternative connection bootstrap:
 
 Optional environment:
   COINOPS_CI_BRANCH                  Default: current git branch
-  COINOPS_CI_PIPELINE_NAME           Default: <project>-k3s-plan
+  COINOPS_CI_PIPELINE_NAME           Default: <project>-k3s-deploy
   COINOPS_CI_ARTIFACT_BUCKET         Default: <project>-codepipeline-artifacts-<account>-<region>
   COINOPS_CI_PLAN_CODEBUILD_PROJECT_NAME
                                       Default: <pipeline-name>
   COINOPS_CI_APPLY_CODEBUILD_PROJECT_NAME
                                       Default: <pipeline-name>-apply
+  COINOPS_CI_SMOKE_CODEBUILD_PROJECT_NAME
+                                      Default: <pipeline-name>-smoke
+  COINOPS_CI_APPROVAL_TOPIC_NAME      Default: <pipeline-name>-approvals
+  COINOPS_CI_APPROVAL_NOTIFICATION_EMAIL
+                                      Optional email subscription for manual approval notifications.
   COINOPS_CI_CODEBUILD_IMAGE         Default: aws/codebuild/standard:7.0
   COINOPS_CI_CODEBUILD_COMPUTE_TYPE  Default: BUILD_GENERAL1_SMALL
   COINOPS_CI_DETECT_CHANGES          Default: false
@@ -360,15 +365,50 @@ ensure_seed_parameters() {
   put_seed_parameter TF_VAR_github_oauth_client_secret "${SEED_PARAMETER_PREFIX}/github_oauth_client_secret" false
 }
 
+ensure_approval_topic() {
+  APPROVAL_TOPIC_ARN="$(aws sns create-topic \
+    --name "${APPROVAL_TOPIC_NAME}" \
+    --query TopicArn \
+    --output text)"
+
+  if [[ -n "${APPROVAL_NOTIFICATION_EMAIL:-}" ]]; then
+    local existing_subscription
+    existing_subscription="$(aws sns list-subscriptions-by-topic \
+      --topic-arn "${APPROVAL_TOPIC_ARN}" \
+      --query "Subscriptions[?Endpoint=='${APPROVAL_NOTIFICATION_EMAIL}'].SubscriptionArn | [0]" \
+      --output text)"
+
+    if [[ -z "${existing_subscription}" || "${existing_subscription}" == "None" ]]; then
+      echo "Creating pending SNS email subscription for approval notifications: ${APPROVAL_NOTIFICATION_EMAIL}"
+      aws sns subscribe \
+        --topic-arn "${APPROVAL_TOPIC_ARN}" \
+        --protocol email \
+        --notification-endpoint "${APPROVAL_NOTIFICATION_EMAIL}" >/dev/null
+    else
+      echo "SNS email subscription already exists for approval notifications: ${APPROVAL_NOTIFICATION_EMAIL}"
+    fi
+  fi
+}
+
 write_codepipeline_policy() {
   local path="$1"
 
-  python3 - "${path}" "${AWS_REGION}" "${ACCOUNT_ID}" "${ARTIFACT_BUCKET}" "${GITHUB_CONNECTION_ARN}" "${PLAN_CODEBUILD_PROJECT_NAME}" "${APPLY_CODEBUILD_PROJECT_NAME}" <<'PY'
+  python3 - "${path}" "${AWS_REGION}" "${ACCOUNT_ID}" "${ARTIFACT_BUCKET}" "${GITHUB_CONNECTION_ARN}" "${PLAN_CODEBUILD_PROJECT_NAME}" "${APPLY_CODEBUILD_PROJECT_NAME}" "${SMOKE_CODEBUILD_PROJECT_NAME}" "${APPROVAL_TOPIC_ARN}" <<'PY'
 import json
 import pathlib
 import sys
 
-path, region, account_id, artifact_bucket, connection_arn, plan_project_name, apply_project_name = sys.argv[1:]
+(
+    path,
+    region,
+    account_id,
+    artifact_bucket,
+    connection_arn,
+    plan_project_name,
+    apply_project_name,
+    smoke_project_name,
+    approval_topic_arn,
+) = sys.argv[1:]
 policy = {
     "Version": "2012-10-17",
     "Statement": [
@@ -399,7 +439,14 @@ policy = {
             "Resource": [
                 f"arn:aws:codebuild:{region}:{account_id}:project/{plan_project_name}",
                 f"arn:aws:codebuild:{region}:{account_id}:project/{apply_project_name}",
+                f"arn:aws:codebuild:{region}:{account_id}:project/{smoke_project_name}",
             ],
+        },
+        {
+            "Sid": "PublishApprovalNotification",
+            "Effect": "Allow",
+            "Action": "sns:Publish",
+            "Resource": approval_topic_arn,
         },
     ],
 }
@@ -410,10 +457,15 @@ PY
 ensure_iam() {
   ensure_role "${PLAN_CODEBUILD_ROLE_NAME}" codebuild.amazonaws.com
   ensure_role "${APPLY_CODEBUILD_ROLE_NAME}" codebuild.amazonaws.com
+  ensure_role "${SMOKE_CODEBUILD_ROLE_NAME}" codebuild.amazonaws.com
   ensure_role "${CODEPIPELINE_ROLE_NAME}" codepipeline.amazonaws.com
 
   aws iam attach-role-policy \
     --role-name "${PLAN_CODEBUILD_ROLE_NAME}" \
+    --policy-arn arn:aws:iam::aws:policy/ReadOnlyAccess >/dev/null
+
+  aws iam attach-role-policy \
+    --role-name "${SMOKE_CODEBUILD_ROLE_NAME}" \
     --policy-arn arn:aws:iam::aws:policy/ReadOnlyAccess >/dev/null
 
   aws iam attach-role-policy \
@@ -426,9 +478,11 @@ ensure_iam() {
 
   local plan_codebuild_policy="${WORK_DIR}/plan-codebuild-policy.json"
   local apply_codebuild_policy="${WORK_DIR}/apply-codebuild-policy.json"
+  local smoke_codebuild_policy="${WORK_DIR}/smoke-codebuild-policy.json"
   local codepipeline_policy="${WORK_DIR}/codepipeline-policy.json"
   CODEBUILD_LOG_GROUP="${PLAN_CODEBUILD_LOG_GROUP}" write_codebuild_policy "${plan_codebuild_policy}"
   CODEBUILD_LOG_GROUP="${APPLY_CODEBUILD_LOG_GROUP}" write_codebuild_policy "${apply_codebuild_policy}"
+  CODEBUILD_LOG_GROUP="${SMOKE_CODEBUILD_LOG_GROUP}" write_codebuild_policy "${smoke_codebuild_policy}"
   write_codepipeline_policy "${codepipeline_policy}"
 
   aws iam put-role-policy \
@@ -442,12 +496,18 @@ ensure_iam() {
     --policy-document "file://${apply_codebuild_policy}" >/dev/null
 
   aws iam put-role-policy \
+    --role-name "${SMOKE_CODEBUILD_ROLE_NAME}" \
+    --policy-name "${SMOKE_CODEBUILD_ROLE_NAME}" \
+    --policy-document "file://${smoke_codebuild_policy}" >/dev/null
+
+  aws iam put-role-policy \
     --role-name "${CODEPIPELINE_ROLE_NAME}" \
     --policy-name "${CODEPIPELINE_ROLE_NAME}" \
     --policy-document "file://${codepipeline_policy}" >/dev/null
 
   PLAN_CODEBUILD_ROLE_ARN="$(aws_text iam get-role --role-name "${PLAN_CODEBUILD_ROLE_NAME}" --query Role.Arn)"
   APPLY_CODEBUILD_ROLE_ARN="$(aws_text iam get-role --role-name "${APPLY_CODEBUILD_ROLE_NAME}" --query Role.Arn)"
+  SMOKE_CODEBUILD_ROLE_ARN="$(aws_text iam get-role --role-name "${SMOKE_CODEBUILD_ROLE_NAME}" --query Role.Arn)"
   CODEPIPELINE_ROLE_ARN="$(aws_text iam get-role --role-name "${CODEPIPELINE_ROLE_NAME}" --query Role.Arn)"
 }
 
@@ -573,7 +633,7 @@ ensure_codebuild_project() {
 write_pipeline_json() {
   local path="$1"
 
-  python3 - "${path}" "${PIPELINE_NAME}" "${CODEPIPELINE_ROLE_ARN}" "${ARTIFACT_BUCKET}" "${GITHUB_CONNECTION_ARN}" "${GITHUB_REPO}" "${PIPELINE_BRANCH}" "${DETECT_CHANGES}" "${PLAN_CODEBUILD_PROJECT_NAME}" "${APPLY_CODEBUILD_PROJECT_NAME}" <<'PY'
+  python3 - "${path}" "${PIPELINE_NAME}" "${CODEPIPELINE_ROLE_ARN}" "${ARTIFACT_BUCKET}" "${GITHUB_CONNECTION_ARN}" "${GITHUB_REPO}" "${PIPELINE_BRANCH}" "${DETECT_CHANGES}" "${PLAN_CODEBUILD_PROJECT_NAME}" "${APPLY_CODEBUILD_PROJECT_NAME}" "${SMOKE_CODEBUILD_PROJECT_NAME}" "${APPROVAL_TOPIC_ARN}" <<'PY'
 import json
 import pathlib
 import sys
@@ -589,6 +649,8 @@ import sys
     detect_changes,
     plan_codebuild_project,
     apply_codebuild_project,
+    smoke_codebuild_project,
+    approval_topic_arn,
 ) = sys.argv[1:]
 
 pipeline = {
@@ -649,7 +711,8 @@ pipeline = {
                             "version": "1",
                         },
                         "configuration": {
-                            "CustomData": "Review terraform/plan.txt from the Plan artifact before approving apply."
+                            "CustomData": "Review terraform/plan.txt from the Plan artifact before approving apply.",
+                            "NotificationArn": approval_topic_arn,
                         },
                         "runOrder": 1,
                     }
@@ -674,6 +737,24 @@ pipeline = {
                             "ProjectName": apply_codebuild_project,
                             "PrimarySource": "source_output",
                         },
+                        "runOrder": 1,
+                    }
+                ],
+            },
+            {
+                "name": "Smoke",
+                "actions": [
+                    {
+                        "name": "PostApplySmoke",
+                        "actionTypeId": {
+                            "category": "Build",
+                            "owner": "AWS",
+                            "provider": "CodeBuild",
+                            "version": "1",
+                        },
+                        "inputArtifacts": [{"name": "source_output"}],
+                        "outputArtifacts": [{"name": "smoke_output"}],
+                        "configuration": {"ProjectName": smoke_codebuild_project},
                         "runOrder": 1,
                     }
                 ],
@@ -711,21 +792,26 @@ export AWS_REGION
 
 ACCOUNT_ID="$(aws_text sts get-caller-identity --query Account)"
 STATE_BUCKET="${COINOPS_TF_STATE_BUCKET:-${STATE_BUCKET_PREFIX}-${ACCOUNT_ID}-${AWS_REGION}}"
-PIPELINE_NAME="${COINOPS_CI_PIPELINE_NAME:-${PROJECT_NAME}-k3s-plan}"
+PIPELINE_NAME="${COINOPS_CI_PIPELINE_NAME:-${PROJECT_NAME}-k3s-deploy}"
 PLAN_CODEBUILD_PROJECT_NAME="${COINOPS_CI_PLAN_CODEBUILD_PROJECT_NAME:-${COINOPS_CI_CODEBUILD_PROJECT_NAME:-${PIPELINE_NAME}}}"
 APPLY_CODEBUILD_PROJECT_NAME="${COINOPS_CI_APPLY_CODEBUILD_PROJECT_NAME:-${PIPELINE_NAME}-apply}"
+SMOKE_CODEBUILD_PROJECT_NAME="${COINOPS_CI_SMOKE_CODEBUILD_PROJECT_NAME:-${PIPELINE_NAME}-smoke}"
 ARTIFACT_BUCKET="${COINOPS_CI_ARTIFACT_BUCKET:-${PROJECT_NAME}-codepipeline-artifacts-${ACCOUNT_ID}-${AWS_REGION}}"
 PIPELINE_BRANCH="${COINOPS_CI_BRANCH:-$(git -C "${REPO_ROOT}" branch --show-current 2>/dev/null || echo hrenchevskyi-codebuild)}"
 GITHUB_REPO="${COINOPS_CI_GITHUB_REPO:-}"
 CONNECTION_NAME="${COINOPS_CI_GITHUB_CONNECTION_NAME:-${PROJECT_NAME}-github}"
 DETECT_CHANGES="${COINOPS_CI_DETECT_CHANGES:-false}"
+APPROVAL_TOPIC_NAME="${COINOPS_CI_APPROVAL_TOPIC_NAME:-${PIPELINE_NAME}-approvals}"
+APPROVAL_NOTIFICATION_EMAIL="${COINOPS_CI_APPROVAL_NOTIFICATION_EMAIL:-}"
 CODEBUILD_IMAGE="${COINOPS_CI_CODEBUILD_IMAGE:-aws/codebuild/standard:7.0}"
 CODEBUILD_COMPUTE_TYPE="${COINOPS_CI_CODEBUILD_COMPUTE_TYPE:-BUILD_GENERAL1_SMALL}"
 PLAN_CODEBUILD_ROLE_NAME="${COINOPS_CI_PLAN_CODEBUILD_ROLE_NAME:-${COINOPS_CI_CODEBUILD_ROLE_NAME:-${PIPELINE_NAME}-codebuild}}"
 APPLY_CODEBUILD_ROLE_NAME="${COINOPS_CI_APPLY_CODEBUILD_ROLE_NAME:-${PIPELINE_NAME}-apply-codebuild}"
+SMOKE_CODEBUILD_ROLE_NAME="${COINOPS_CI_SMOKE_CODEBUILD_ROLE_NAME:-${PIPELINE_NAME}-smoke-codebuild}"
 CODEPIPELINE_ROLE_NAME="${COINOPS_CI_CODEPIPELINE_ROLE_NAME:-${PIPELINE_NAME}-codepipeline}"
 PLAN_CODEBUILD_LOG_GROUP="${COINOPS_CI_PLAN_CODEBUILD_LOG_GROUP:-${COINOPS_CI_CODEBUILD_LOG_GROUP:-/aws/codebuild/${PLAN_CODEBUILD_PROJECT_NAME}}}"
 APPLY_CODEBUILD_LOG_GROUP="${COINOPS_CI_APPLY_CODEBUILD_LOG_GROUP:-/aws/codebuild/${APPLY_CODEBUILD_PROJECT_NAME}}"
+SMOKE_CODEBUILD_LOG_GROUP="${COINOPS_CI_SMOKE_CODEBUILD_LOG_GROUP:-/aws/codebuild/${SMOKE_CODEBUILD_PROJECT_NAME}}"
 SEED_PARAMETER_PREFIX="${COINOPS_CI_SEED_PARAMETER_PREFIX:-/${PROJECT_NAME}/ci/terraform}"
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "${WORK_DIR}"' EXIT
@@ -740,7 +826,9 @@ GITHUB_CONNECTION_ARN="$(ensure_connection_arn)"
 ensure_artifact_bucket
 ensure_log_group "${PLAN_CODEBUILD_LOG_GROUP}"
 ensure_log_group "${APPLY_CODEBUILD_LOG_GROUP}"
+ensure_log_group "${SMOKE_CODEBUILD_LOG_GROUP}"
 ensure_seed_parameters
+ensure_approval_topic
 ensure_iam
 
 # IAM role propagation is eventually consistent.
@@ -748,15 +836,18 @@ sleep "${COINOPS_CI_IAM_PROPAGATION_SLEEP_SECONDS:-10}"
 
 ensure_codebuild_project "${PLAN_CODEBUILD_PROJECT_NAME}" "${PLAN_CODEBUILD_ROLE_ARN}" "ci/aws/buildspec.k3s-terraform-plan.yml" "${PLAN_CODEBUILD_LOG_GROUP}" "plan"
 ensure_codebuild_project "${APPLY_CODEBUILD_PROJECT_NAME}" "${APPLY_CODEBUILD_ROLE_ARN}" "ci/aws/buildspec.k3s-terraform-apply.yml" "${APPLY_CODEBUILD_LOG_GROUP}" "apply"
+ensure_codebuild_project "${SMOKE_CODEBUILD_PROJECT_NAME}" "${SMOKE_CODEBUILD_ROLE_ARN}" "ci/aws/buildspec.k3s-terraform-smoke.yml" "${SMOKE_CODEBUILD_LOG_GROUP}" "smoke"
 ensure_pipeline
 
 cat <<EOF
 
-AWS CodeBuild plan pipeline bootstrap completed.
+AWS CodeBuild deploy pipeline bootstrap completed.
 
 Pipeline:              ${PIPELINE_NAME}
 Plan CodeBuild project:${PLAN_CODEBUILD_PROJECT_NAME}
 Apply CodeBuild project:${APPLY_CODEBUILD_PROJECT_NAME}
+Smoke CodeBuild project:${SMOKE_CODEBUILD_PROJECT_NAME}
+Approval SNS topic:    ${APPROVAL_TOPIC_ARN}
 Artifact bucket:       ${ARTIFACT_BUCKET}
 Terraform state bucket:${STATE_BUCKET}
 GitHub repository:     ${GITHUB_REPO}

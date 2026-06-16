@@ -1,0 +1,54 @@
+version: 0.2
+
+env:
+  shell: bash
+
+phases:
+  install:
+    commands:
+      - source ./ci/aws/codebuild-worker-env.sh
+      - ./ci/aws/codebuild-worker-env.sh verify-tools python3 make aws curl unzip
+      - ./ci/aws/codebuild-worker-env.sh install-terraform
+      - source ./ci/aws/codebuild-worker-env.sh
+      - ./ci/aws/codebuild-worker-env.sh verify-tools terraform python3 make aws
+      - terraform version
+      - python3 --version
+  pre_build:
+    commands:
+      - source ./ci/aws/codebuild-worker-env.sh
+      - ./ci/aws/codebuild-worker-env.sh render-backend
+      - ./ci/aws/codebuild-worker-env.sh prune-disabled-clouds
+      - make tf-check-backend
+      - terraform -chdir=terraform init -reconfigure
+  build:
+    commands:
+      - source ./ci/aws/codebuild-worker-env.sh
+      - aws sts get-caller-identity
+      - terraform -chdir=terraform output -json > terraform/outputs.json
+      - terraform -chdir=terraform state list > terraform/state.txt
+      - test -s terraform/state.txt
+      - |
+        python3 - <<'PY'
+        import json
+        import pathlib
+
+        outputs = json.loads(pathlib.Path("terraform/outputs.json").read_text(encoding="utf-8"))
+        if not isinstance(outputs, dict):
+            raise SystemExit("terraform output -json did not return an object")
+
+        state_entries = [
+            line.strip()
+            for line in pathlib.Path("terraform/state.txt").read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        if not state_entries:
+            raise SystemExit("terraform state is empty after apply")
+
+        print(f"Smoke check passed: {len(state_entries)} Terraform state entries, {len(outputs)} outputs.")
+        PY
+
+artifacts:
+  files:
+    - terraform/outputs.json
+    - terraform/state.txt
+  discard-paths: no

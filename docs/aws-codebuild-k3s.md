@@ -14,8 +14,9 @@ ci/aws/bootstrap-local.sh
   -> SSM SecureString seed parameters
   -> IAM roles and inline policies
   -> CloudWatch log groups
-  -> CodeBuild plan/apply projects
-  -> CodePipeline Source -> Plan -> ApproveApply -> Apply
+  -> SNS approval notification topic
+  -> CodeBuild plan/apply/smoke projects
+  -> CodePipeline Source -> Plan -> ApproveApply -> Apply -> Smoke
 ```
 
 CodeBuild runs the workload Terraform plan:
@@ -40,6 +41,19 @@ ci/aws/buildspec.k3s-terraform-apply.yml
   -> terraform init
   -> copy approved terraform/plan.out from the Plan artifact
   -> terraform apply plan.out
+```
+
+After apply, a separate read-only smoke project verifies Terraform state:
+
+```text
+ci/aws/buildspec.k3s-terraform-smoke.yml
+  -> source ci/aws/codebuild-worker-env.sh
+  -> render terraform/backend.active.tf
+  -> prune disabled Azure provider wiring for the ephemeral AWS worktree
+  -> terraform init
+  -> terraform output -json
+  -> terraform state list
+  -> upload terraform/outputs.json and terraform/state.txt
 ```
 
 Terraform formatting and validation are intentionally handled earlier by GitHub
@@ -153,6 +167,16 @@ COINOPS_CI_GITHUB_CONNECTION_ARN="$COINOPS_CI_GITHUB_CONNECTION_ARN" \
 ci/aws/bootstrap-local.sh
 ```
 
+To receive email notifications when the pipeline waits for manual apply
+approval, include:
+
+```bash
+export COINOPS_CI_APPROVAL_NOTIFICATION_EMAIL='you@example.com'
+```
+
+AWS SNS sends a confirmation email. Notifications are delivered only after the
+subscription is confirmed.
+
 Use this when Terraform backend bootstrap already exists and only CI resources
 need updates:
 
@@ -166,12 +190,18 @@ ci/aws/bootstrap-local.sh --skip-terraform-bootstrap
 Expected output includes:
 
 ```text
-Pipeline:              coin-ops-k3s-plan
-Plan CodeBuild project:coin-ops-k3s-plan
-Apply CodeBuild project:coin-ops-k3s-plan-apply
+Pipeline:              coin-ops-k3s-deploy
+Plan CodeBuild project:coin-ops-k3s-deploy
+Apply CodeBuild project:coin-ops-k3s-deploy-apply
+Smoke CodeBuild project:coin-ops-k3s-deploy-smoke
+Approval SNS topic:    arn:aws:sns:eu-central-1:ACCOUNT:coin-ops-k3s-deploy-approvals
 Artifact bucket:       coin-ops-codepipeline-artifacts-ACCOUNT-eu-central-1
 Terraform state bucket:coinops-terraform-state-ACCOUNT-eu-central-1
 ```
+
+The current default pipeline name is `coin-ops-k3s-deploy`. If an older
+`coin-ops-k3s-plan` pipeline exists from previous iterations, treat it as a
+legacy resource and delete it only after the deploy pipeline is verified.
 
 ## Run Plan And Apply
 
@@ -180,7 +210,7 @@ Start the pipeline:
 ```bash
 aws codepipeline start-pipeline-execution \
   --region eu-central-1 \
-  --name coin-ops-k3s-plan
+  --name coin-ops-k3s-deploy
 ```
 
 Check pipeline state:
@@ -188,7 +218,7 @@ Check pipeline state:
 ```bash
 aws codepipeline get-pipeline-state \
   --region eu-central-1 \
-  --name coin-ops-k3s-plan
+  --name coin-ops-k3s-deploy
 ```
 
 Check latest CodeBuild build:
@@ -196,7 +226,7 @@ Check latest CodeBuild build:
 ```bash
 aws codebuild list-builds-for-project \
   --region eu-central-1 \
-  --project-name coin-ops-k3s-plan \
+  --project-name coin-ops-k3s-deploy \
   --sort-order DESCENDING \
   --max-items 1
 ```
@@ -212,6 +242,9 @@ Plan CodeBuild logs. Approving this stage allows the separate apply worker to ru
 `terraform apply` against the exact binary plan artifact from the Plan stage.
 Reject the approval if the plan is not expected.
 
+After Apply succeeds, the Smoke stage runs automatically. It reads Terraform
+outputs and state from the same backend and fails if the state is empty.
+
 ## Read Logs
 
 Get the latest build id:
@@ -220,7 +253,7 @@ Get the latest build id:
 BUILD_ID="$(
   aws codebuild list-builds-for-project \
     --region eu-central-1 \
-    --project-name coin-ops-k3s-plan \
+    --project-name coin-ops-k3s-deploy \
     --sort-order DESCENDING \
     --max-items 1 \
     --query 'ids[0]' \
@@ -232,11 +265,11 @@ echo "$BUILD_ID"
 Read CloudWatch logs:
 
 ```bash
-BUILD_UUID="${BUILD_ID#coin-ops-k3s-plan:}"
+BUILD_UUID="${BUILD_ID#coin-ops-k3s-deploy:}"
 
 aws logs get-log-events \
   --region eu-central-1 \
-  --log-group-name /aws/codebuild/coin-ops-k3s-plan \
+  --log-group-name /aws/codebuild/coin-ops-k3s-deploy \
   --log-stream-name "terraform-plan/${BUILD_UUID}" \
   --query 'events[].message' \
   --output text
@@ -251,18 +284,40 @@ Read apply logs by switching the project and log group:
 APPLY_BUILD_ID="$(
   aws codebuild list-builds-for-project \
     --region eu-central-1 \
-    --project-name coin-ops-k3s-plan-apply \
+    --project-name coin-ops-k3s-deploy-apply \
     --sort-order DESCENDING \
     --max-items 1 \
     --query 'ids[0]' \
     --output text
 )"
-APPLY_BUILD_UUID="${APPLY_BUILD_ID#coin-ops-k3s-plan-apply:}"
+APPLY_BUILD_UUID="${APPLY_BUILD_ID#coin-ops-k3s-deploy-apply:}"
 
 aws logs get-log-events \
   --region eu-central-1 \
-  --log-group-name /aws/codebuild/coin-ops-k3s-plan-apply \
+  --log-group-name /aws/codebuild/coin-ops-k3s-deploy-apply \
   --log-stream-name "terraform-apply/${APPLY_BUILD_UUID}" \
+  --query 'events[].message' \
+  --output text
+```
+
+Read smoke logs by switching the project and log group:
+
+```bash
+SMOKE_BUILD_ID="$(
+  aws codebuild list-builds-for-project \
+    --region eu-central-1 \
+    --project-name coin-ops-k3s-deploy-smoke \
+    --sort-order DESCENDING \
+    --max-items 1 \
+    --query 'ids[0]' \
+    --output text
+)"
+SMOKE_BUILD_UUID="${SMOKE_BUILD_ID#coin-ops-k3s-deploy-smoke:}"
+
+aws logs get-log-events \
+  --region eu-central-1 \
+  --log-group-name /aws/codebuild/coin-ops-k3s-deploy-smoke \
+  --log-stream-name "terraform-smoke/${SMOKE_BUILD_UUID}" \
   --query 'events[].message' \
   --output text
 ```
@@ -298,6 +353,7 @@ less /tmp/coinops-plan-artifact/terraform/plan.txt
 ```
 
 `terraform/plan.out` is the binary plan. `terraform/plan.txt` is for review.
+The smoke artifact contains `terraform/outputs.json` and `terraform/state.txt`.
 
 ## Common Failures
 

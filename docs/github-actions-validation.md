@@ -151,7 +151,7 @@ GitHub Actions is the fast validation layer. It checks repo structure, config
 contracts, Terraform syntax, and Ansible linting.
 
 AWS CodeBuild remains the managed AWS runtime for infrastructure planning and
-approved Terraform apply.
+approved Terraform apply, followed by a read-only smoke check.
 
 On push, GitHub Actions can start the AWS CodePipeline after the validation jobs
 finish successfully. This avoids running AWS plans for commits that already fail
@@ -160,7 +160,7 @@ repository checks.
 The AWS pipeline flow is:
 
 ```text
-Source -> Plan -> ApproveApply -> Apply
+Source -> Plan -> ApproveApply -> Apply -> Smoke
 ```
 
 The Plan worker does not run `terraform fmt -check` or `terraform validate`.
@@ -193,11 +193,11 @@ Optional repository variables:
 
 ```text
 AWS_REGION                 default: eu-central-1
-AWS_CODEPIPELINE_NAME      default: coin-ops-k3s-plan
+AWS_CODEPIPELINE_NAME      default: coin-ops-k3s-deploy
 ```
 
 Prefer a GitHub OIDC role instead of long-lived AWS access keys. The role only
-needs permission to start the plan pipeline:
+needs permission to start the deploy pipeline:
 
 ```json
 {
@@ -206,7 +206,7 @@ needs permission to start the plan pipeline:
     {
       "Effect": "Allow",
       "Action": "codepipeline:StartPipelineExecution",
-      "Resource": "arn:aws:codepipeline:eu-central-1:231648037082:coin-ops-k3s-plan"
+      "Resource": "arn:aws:codepipeline:eu-central-1:231648037082:coin-ops-k3s-deploy"
     }
   ]
 }
