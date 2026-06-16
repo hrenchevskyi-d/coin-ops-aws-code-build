@@ -1,5 +1,5 @@
 ---
-k3s_headlamp_tunnel_enabled: "{{ infra_deploy.get('headlamp', {}).get('cloudflare_tunnel', {}).get('enabled', false) | bool }}"
+k3s_headlamp_tunnel_enabled: "{{ (cloud_runtime_metadata | default({})).get('headlamp_tunnel_enabled', infra_deploy.get('headlamp', {}).get('cloudflare_tunnel', {}).get('enabled', false)) | bool }}"
 k3s_headlamp_tunnel_namespace: "{{ infra_deploy.get('headlamp', {}).get('cloudflare_tunnel', {}).get('namespace', 'cloudflare-tunnel') }}"
 k3s_headlamp_tunnel_release_name: "{{ infra_deploy.get('headlamp', {}).get('cloudflare_tunnel', {}).get('release_name', 'headlamp-tunnel') }}"
 k3s_headlamp_tunnel_chart_repo_name: cloudflare
