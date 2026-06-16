@@ -38,7 +38,7 @@
             "node_group": {
                 "name": "system",
                 "instance_types": [
-                    "m7i-flex.large"
+                    "t3.micro"
                 ],
                 "desired_size": 3,
                 "min_size": 2,
@@ -56,12 +56,7 @@
                     "enabled": true
                 },
                 "aws-ebs-csi-driver": {
-                    "enabled": true,
-                    "configuration_values": {
-                        "controller": {
-                            "replicaCount": 1
-                        }
-                    }
+                    "enabled": true
                 }
             }
         },

@@ -173,16 +173,9 @@ resource "aws_eks_addon" "this" {
   cluster_name                = aws_eks_cluster.this.name
   addon_name                  = each.key
   addon_version               = trimspace(try(each.value.version, "")) != "" ? each.value.version : null
-  configuration_values        = try(each.value.configuration_values, null) == null ? null : jsonencode(each.value.configuration_values)
   resolve_conflicts_on_create = "OVERWRITE"
   resolve_conflicts_on_update = "OVERWRITE"
   service_account_role_arn    = each.key == "aws-ebs-csi-driver" ? aws_iam_role.ebs_csi.arn : null
-
-  timeouts {
-    create = "45m"
-    update = "45m"
-    delete = "30m"
-  }
 
   depends_on = [
     aws_eks_node_group.system,
