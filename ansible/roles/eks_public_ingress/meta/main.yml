@@ -1,0 +1,7 @@
+---
+galaxy_info:
+  role_name: eks_public_ingress
+  author: coin-ops
+  description: Install public Traefik ingress for EKS.
+  min_ansible_version: "2.15"
+dependencies: []

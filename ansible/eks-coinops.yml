@@ -59,6 +59,7 @@
       until: (eks_coinops_kube_system.resources | default([]) | length) > 0
       tags: [coinops, eks]
   roles:
+    - eks_public_ingress
     - k3s_coinops_data
     - k3s_coinops_app
     - k3s_coinops_ui

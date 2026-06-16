@@ -39,16 +39,24 @@ resource "helm_release" "jenkins" {
         )
         ansible_runtime_json = jsonencode(jsonencode({
           aws = {
-            kubernetes_runtime      = "eks"
-            eks_cluster_name        = module.aws_eks[0].cluster_name
-            eks_kubeconfig_path     = "$${K8S_KUBECONFIG_PATH}"
-            eks_pod_cidr            = local.aws_vpc_cidr
-            eks_service_ipv4_cidr   = try(local.aws_eks_cfg.service_ipv4_cidr, "10.43.0.0/16")
+            kubernetes_runtime    = "eks"
+            eks_cluster_name      = module.aws_eks[0].cluster_name
+            eks_kubeconfig_path   = "$${K8S_KUBECONFIG_PATH}"
+            eks_pod_cidr          = local.aws_vpc_cidr
+            eks_service_ipv4_cidr = try(local.aws_eks_cfg.service_ipv4_cidr, "10.43.0.0/16")
+            public_ingress_eip_allocation_ids = (
+              local.aws_eks_public_ingress_enabled
+              ? [for name in local.aws_eks_public_ingress_subnet_names : aws_eip.aws_eks_public_ingress[name].allocation_id]
+              : []
+            )
+            public_ingress_eip_public_ips = (
+              local.aws_eks_public_ingress_enabled
+              ? [for name in local.aws_eks_public_ingress_subnet_names : aws_eip.aws_eks_public_ingress[name].public_ip]
+              : []
+            )
             headlamp_tunnel_enabled = local.headlamp_tunnel_enabled
             headlamp_tunnel_token   = local.headlamp_tunnel_enabled ? cloudflare_zero_trust_tunnel_cloudflared.headlamp[0].tunnel_token : ""
             headlamp_public_host    = local.headlamp_domain
-            coinops_tunnel_enabled  = local.coinops_tunnel_enabled
-            coinops_public_host     = local.coinops_domain
             homepage_public_host    = local.homepage_domain
             database = {
               host    = ""

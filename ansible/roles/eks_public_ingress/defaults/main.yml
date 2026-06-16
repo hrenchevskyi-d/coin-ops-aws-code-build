@@ -1,0 +1,11 @@
+---
+eks_public_ingress_enabled: "{{ kubernetes_runtime == 'eks' and (deploy_config.public_ingress_enabled | default(true) | bool) }}"
+eks_public_ingress_namespace: kube-system
+eks_public_ingress_release_name: traefik
+eks_public_ingress_chart_repo_name: traefik
+eks_public_ingress_chart_repo_url: https://traefik.github.io/charts
+eks_public_ingress_chart_ref: traefik/traefik
+eks_public_ingress_chart_version: ""
+eks_public_ingress_class_name: "{{ deploy_config.public_ingress_class_name | default('traefik') }}"
+eks_public_ingress_eip_allocation_ids: "{{ cloud_runtime_metadata.get('public_ingress_eip_allocation_ids', []) }}"
+eks_public_ingress_replicas: 2

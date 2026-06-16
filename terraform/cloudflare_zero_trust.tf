@@ -17,14 +17,6 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "headlamp" {
   tunnel_id  = cloudflare_zero_trust_tunnel_cloudflared.headlamp[0].id
 
   config {
-    dynamic "ingress_rule" {
-      for_each = local.coinops_tunnel_enabled ? [true] : []
-      content {
-        hostname = local.coinops_domain
-        service  = local.coinops_tunnel_service
-      }
-    }
-
     ingress_rule {
       hostname = local.headlamp_domain
       service  = try(local.headlamp_tunnel_cfg.service, "http://headlamp.headlamp.svc.cluster.local:80")

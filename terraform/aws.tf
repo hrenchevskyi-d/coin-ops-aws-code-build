@@ -92,6 +92,36 @@ module "aws_eks" {
   depends_on = [module.aws_network]
 }
 
+resource "aws_ec2_tag" "aws_eks_public_subnet_elb" {
+  for_each = local.aws_eks_public_ingress_enabled ? toset(local.aws_eks_public_ingress_subnet_names) : []
+
+  resource_id = module.aws_network[0].subnet_ids[each.key]
+  key         = "kubernetes.io/role/elb"
+  value       = "1"
+}
+
+resource "aws_ec2_tag" "aws_eks_public_subnet_cluster" {
+  for_each = local.aws_eks_public_ingress_enabled ? toset(local.aws_eks_public_ingress_subnet_names) : []
+
+  resource_id = module.aws_network[0].subnet_ids[each.key]
+  key         = "kubernetes.io/cluster/${module.aws_eks[0].cluster_name}"
+  value       = "shared"
+}
+
+resource "aws_eip" "aws_eks_public_ingress" {
+  for_each = local.aws_eks_public_ingress_enabled ? toset(local.aws_eks_public_ingress_subnet_names) : []
+
+  domain = "vpc"
+
+  tags = {
+    Name    = "${local.project_name}-eks-public-ingress-${each.key}"
+    Project = local.project_name
+    Cloud   = "aws"
+  }
+
+  depends_on = [module.aws_network]
+}
+
 resource "local_file" "aws_eks_kubeconfig" {
   count    = local.aws_eks_enabled ? 1 : 0
   filename = "${path.module}/../ansible/artifacts/kubeconfig-aws-eks.yaml"

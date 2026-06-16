@@ -19,5 +19,6 @@
         name: k3s_kubeconfig_access
       tags: [runtime_config, headlamp, kubeconfig, eks]
   roles:
+    - eks_public_ingress
     - k3s_headlamp
     - k3s_headlamp_tunnel

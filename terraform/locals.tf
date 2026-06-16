@@ -79,14 +79,20 @@ locals {
     if contains(local.instance_clouds[name], "azure")
   }
 
-  gcp_enabled           = contains(local.enabled_clouds, "gcp")
-  aws_enabled           = contains(local.enabled_clouds, "aws")
-  azure_enabled         = contains(local.enabled_clouds, "azure")
-  aws_eks_enabled       = local.aws_enabled && local.kubernetes_runtime == "eks" && try(local.aws_eks_cfg.enabled, false)
-  aws_k3s_enabled       = local.aws_enabled && !local.aws_eks_enabled
-  gcp_compute_enabled   = local.gcp_enabled && length(local.gcp_instances_base) > 0
-  aws_compute_enabled   = local.aws_enabled && length(local.aws_instances_base) > 0
-  azure_compute_enabled = local.azure_enabled && length(local.azure_instances_base) > 0
+  gcp_enabled     = contains(local.enabled_clouds, "gcp")
+  aws_enabled     = contains(local.enabled_clouds, "aws")
+  azure_enabled   = contains(local.enabled_clouds, "azure")
+  aws_eks_enabled = local.aws_enabled && local.kubernetes_runtime == "eks" && try(local.aws_eks_cfg.enabled, false)
+  aws_eks_public_ingress_enabled = (
+    local.aws_eks_enabled
+    && try(local.deploy.public_ingress.enabled, true)
+    && length(try(local.aws_eks_cfg.public_subnets, [])) > 0
+  )
+  aws_eks_public_ingress_subnet_names = try(local.aws_eks_cfg.public_subnets, [])
+  aws_k3s_enabled                     = local.aws_enabled && !local.aws_eks_enabled
+  gcp_compute_enabled                 = local.gcp_enabled && length(local.gcp_instances_base) > 0
+  aws_compute_enabled                 = local.aws_enabled && length(local.aws_instances_base) > 0
+  azure_compute_enabled               = local.azure_enabled && length(local.azure_instances_base) > 0
 
   cloud_networks = lookup(local.networks, "cloud_networks", {})
   routing        = lookup(local.networks, "routing", {})

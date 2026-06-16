@@ -171,12 +171,12 @@ module "local_operator_artifacts" {
         eks_kubeconfig_path                   = local.aws_eks_enabled ? local_file.aws_eks_kubeconfig[0].filename : ""
         eks_service_ipv4_cidr                 = local.aws_eks_enabled ? try(local.aws_eks_cfg.service_ipv4_cidr, "10.43.0.0/16") : ""
         eks_pod_cidr                          = local.aws_eks_enabled ? local.aws_vpc_cidr : ""
+        public_ingress_eip_allocation_ids     = local.aws_eks_public_ingress_enabled ? [for name in local.aws_eks_public_ingress_subnet_names : aws_eip.aws_eks_public_ingress[name].allocation_id] : []
+        public_ingress_eip_public_ips         = local.aws_eks_public_ingress_enabled ? [for name in local.aws_eks_public_ingress_subnet_names : aws_eip.aws_eks_public_ingress[name].public_ip] : []
         k3s_api_endpoint                      = local.aws_k3s_api_lb_enabled ? try(module.aws_k3s_api_lb[0].dns_name, "") : ""
         headlamp_tunnel_enabled               = local.headlamp_tunnel_enabled
         headlamp_tunnel_token                 = local.headlamp_tunnel_enabled ? cloudflare_zero_trust_tunnel_cloudflared.headlamp[0].tunnel_token : ""
         headlamp_public_host                  = local.headlamp_domain
-        coinops_tunnel_enabled                = local.coinops_tunnel_enabled
-        coinops_public_host                   = local.coinops_domain
         homepage_public_host                  = local.homepage_domain
         homepage_public_endpoint              = local.aws_k3s_public_ingress_lb_enabled ? try(module.aws_k3s_public_ingress_lb[0].dns_name, "") : ""
         public_ingress_load_balancer_dns_name = local.aws_k3s_public_ingress_lb_enabled ? try(module.aws_k3s_public_ingress_lb[0].dns_name, "") : ""

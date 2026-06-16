@@ -1,0 +1,66 @@
+---
+- name: eks-public-ingress-install-helm-client
+  include_role:
+    name: k3s_helm_client
+  when: eks_public_ingress_enabled | bool
+  tags: [eks, ingress, traefik, helm]
+
+- name: eks-public-ingress-assert-eip-allocations
+  assert:
+    that:
+      - eks_public_ingress_eip_allocation_ids | length > 0
+    fail_msg: >-
+      EKS public ingress is enabled, but Terraform runtime metadata does not
+      contain public_ingress_eip_allocation_ids. Run Terraform apply so it can
+      allocate Elastic IPs for public CoinOps/Homepage A records.
+  when: eks_public_ingress_enabled | bool
+  tags: [eks, ingress, traefik]
+
+- name: eks-public-ingress-add-traefik-repository
+  kubernetes.core.helm_repository:
+    name: "{{ eks_public_ingress_chart_repo_name }}"
+    repo_url: "{{ eks_public_ingress_chart_repo_url }}"
+  when: eks_public_ingress_enabled | bool
+  tags: [eks, ingress, traefik, helm]
+
+- name: eks-public-ingress-install-or-upgrade-traefik
+  kubernetes.core.helm:
+    name: "{{ eks_public_ingress_release_name }}"
+    chart_ref: "{{ eks_public_ingress_chart_ref }}"
+    chart_version: "{{ eks_public_ingress_chart_version if (eks_public_ingress_chart_version | length > 0) else omit }}"
+    release_namespace: "{{ eks_public_ingress_namespace }}"
+    create_namespace: true
+    kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
+    wait: true
+    values:
+      deployment:
+        replicas: "{{ eks_public_ingress_replicas | int }}"
+      ingressClass:
+        enabled: true
+        isDefaultClass: false
+        name: "{{ eks_public_ingress_class_name }}"
+      providers:
+        kubernetesIngress:
+          publishedService:
+            enabled: true
+      service:
+        type: LoadBalancer
+        annotations:
+          service.beta.kubernetes.io/aws-load-balancer-type: nlb
+          service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+          service.beta.kubernetes.io/aws-load-balancer-eip-allocations: "{{ eks_public_ingress_eip_allocation_ids | join(',') }}"
+      ports:
+        web:
+          port: 80
+          expose:
+            default: true
+          exposedPort: 80
+          protocol: TCP
+        websecure:
+          port: 443
+          expose:
+            default: true
+          exposedPort: 443
+          protocol: TCP
+  when: eks_public_ingress_enabled | bool
+  tags: [eks, ingress, traefik, helm]

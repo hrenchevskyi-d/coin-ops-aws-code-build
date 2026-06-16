@@ -12,7 +12,6 @@ k3s_coinops_ui_service_port: 80
 k3s_coinops_ui_hostname: "{{ deploy_config.coinops_hostname | default(app_domain) }}"
 k3s_coinops_ui_ingress_enabled: "{{ deploy_config.coinops_ingress_enabled | default(true) | bool }}"
 k3s_coinops_ui_ingress_class_name: "{{ deploy_config.coinops_ingress_class_name | default('traefik') }}"
-k3s_coinops_ui_tunnel_namespace: "{{ infra_deploy.get('headlamp', {}).get('cloudflare_tunnel', {}).get('namespace', 'cloudflare-tunnel') }}"
 k3s_coinops_ui_tls_enabled: "{{ tls_mode == 'certbot' }}"
 k3s_coinops_ui_tls_secret_name: coinops-ui-tls
 k3s_coinops_ui_certificate_name: coinops-ui-tls
