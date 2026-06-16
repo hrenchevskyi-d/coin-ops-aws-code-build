@@ -38,7 +38,7 @@
             "node_group": {
                 "name": "system",
                 "instance_types": [
-                    "t3.micro"
+                    "m7i-flex.large"
                 ],
                 "desired_size": 3,
                 "min_size": 2,
