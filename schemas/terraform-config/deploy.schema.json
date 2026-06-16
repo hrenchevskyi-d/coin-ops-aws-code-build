@@ -273,6 +273,7 @@
         "release_name": { "type": "string", "minLength": 1, "description": "Helm release name for Jenkins." },
         "chart_version": { "type": "string", "description": "Optional Jenkins Helm chart version. Empty means the provider uses the repository default." },
         "controller_tag": { "type": "string", "description": "Jenkins controller image tag." },
+        "public_url": { "type": "string", "minLength": 1, "description": "External URL Jenkins advertises for browser access and reverse proxy checks." },
         "storage_class": { "type": "string", "description": "StorageClass used by Jenkins persistent volume claim." },
         "storage_size": { "type": "string", "description": "Persistent volume size for Jenkins home." },
         "repository_url": { "type": "string", "minLength": 1, "description": "Git repository URL used by the seeded Jenkins job." },

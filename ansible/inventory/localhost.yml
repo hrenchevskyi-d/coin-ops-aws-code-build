@@ -2,4 +2,3 @@ all:
   hosts:
     localhost:
       ansible_connection: local
-      ansible_python_interpreter: /home/notebook/projects/coin-ops/.venv/bin/python
