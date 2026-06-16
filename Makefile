@@ -14,7 +14,7 @@ K8S_ARTIFACTS_DIR := $(ANSIBLE_DIR)/artifacts
 K8S_OPERATOR_ENV := $(K8S_ARTIFACTS_DIR)/k8s-operator-env.sh
 HEADLAMP_START_SCRIPT := $(K8S_ARTIFACTS_DIR)/headlamp-start.sh
 K8S_API_TUNNEL_SCRIPT := $(K8S_ARTIFACTS_DIR)/k8s-api-tunnel.sh
-EKS_KUBECONFIG := $(K8S_ARTIFACTS_DIR)/kubeconfig-aws-eks.yaml
+EKS_KUBECONFIG ?= $(if $(K8S_KUBECONFIG_PATH),$(K8S_KUBECONFIG_PATH),$(K8S_ARTIFACTS_DIR)/kubeconfig-aws-eks.yaml)
 VENV_PYTHON := $(REPO_ROOT)/.venv/bin/python
 KUBECTL ?= $(shell if [ -x /usr/bin/kubectl ]; then echo /usr/bin/kubectl; else command -v kubectl 2>/dev/null || echo kubectl; fi)
 
