@@ -100,19 +100,15 @@ PY
       }
     }
 
-    stage('CoinOps') {
+    stage('Headlamp') {
       steps {
         withCredentials([
-          string(credentialsId: 'coinops-db-password', variable: 'DB_PASSWORD'),
-          string(credentialsId: 'coinops-ghcr-token', variable: 'GHCR_TOKEN'),
-          string(credentialsId: 'coinops-cloudflare-api-token', variable: 'CLOUDFLARE_API_TOKEN'),
-          string(credentialsId: 'coinops-cnpg-backup-s3-access-key-id', variable: 'CNPG_BACKUP_S3_ACCESS_KEY_ID'),
-          string(credentialsId: 'coinops-cnpg-backup-s3-secret-access-key', variable: 'CNPG_BACKUP_S3_SECRET_ACCESS_KEY')
+          string(credentialsId: 'coinops-cloudflare-api-token', variable: 'CLOUDFLARE_API_TOKEN')
         ]) {
           sh '''
             set -eu
             . .venv/bin/activate
-            make eks-coinops
+            make eks-headlamp
           '''
         }
       }

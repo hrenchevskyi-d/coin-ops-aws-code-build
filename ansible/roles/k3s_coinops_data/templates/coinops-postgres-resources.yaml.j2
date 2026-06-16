@@ -98,6 +98,9 @@ spec:
         name: {{ k3s_coinops_data_app_secret_name }}
   storage:
     size: {{ k3s_coinops_data_storage_size }}
+{% if k3s_coinops_data_storage_class | length > 0 %}
+    storageClass: {{ k3s_coinops_data_storage_class }}
+{% endif %}
   postgresql:
     shared_preload_libraries:
       - pg_cron

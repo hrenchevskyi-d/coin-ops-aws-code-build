@@ -9,13 +9,15 @@ This path replaces the AWS k3s VM cluster with AWS managed Kubernetes.
 - Install EKS add-ons: VPC CNI, CoreDNS, kube-proxy, and EBS CSI.
 - Generate `ansible/artifacts/kubeconfig-aws-eks.yaml`.
 - Create the Cloudflare Zero Trust tunnel metadata for Headlamp.
-- Install Jenkins with Helm and seed the `coinops-eks-deploy` job through Jenkins CasC.
+- Install Jenkins with Helm and seed separate Headlamp and CoinOps jobs through Jenkins CasC.
 
 ## Ansible responsibilities
 
-- `make eks-platform` installs Headlamp and the Cloudflare Tunnel workload into EKS.
+- `make eks-headlamp` installs Headlamp and the Cloudflare Tunnel workload into EKS.
 - `make eks-coinops` installs CNPG, CoinOps backend workloads, and CoinOps UI into EKS.
-- Jenkins runs the same Make targets from `ci/jenkins/Jenkinsfile.eks-coinops`.
+- Jenkins runs these as separate jobs:
+  - `coinops-eks-deploy-headlamp` from `ci/jenkins/Jenkinsfile.eks-headlamp`
+  - `coinops-eks-deploy-coinops` from `ci/jenkins/Jenkinsfile.eks-coinops`
 
 ## Manual verification flow
 

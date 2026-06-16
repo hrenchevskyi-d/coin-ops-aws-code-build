@@ -69,8 +69,24 @@ credentials:
               description: "CNPG backup S3 secret access key."
 
 jobs:
-  - script: >
-      pipelineJob('${job_name}') {
+  - script: |
+      pipelineJob('${job_name}-headlamp') {
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url('${repository_url}')
+                  credentials('github-token')
+                }
+                branch('${branch}')
+              }
+            }
+            scriptPath('ci/jenkins/Jenkinsfile.eks-headlamp')
+          }
+        }
+      }
+      pipelineJob('${job_name}-coinops') {
         definition {
           cpsScm {
             scm {
