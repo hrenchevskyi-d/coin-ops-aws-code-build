@@ -539,7 +539,7 @@ locals {
       allow_user_preferences = false
     }
     theme = {
-      name                = "darkSystem"
+      name                = "dark"
       disable_user_themes = true
     }
   }, try(local.deploy.jenkins, {}))
@@ -549,7 +549,7 @@ locals {
     allow_user_preferences = false
   }, try(local.jenkins_cfg.locale, {}))
   jenkins_theme_cfg = merge({
-    name                = "darkSystem"
+    name                = "dark"
     disable_user_themes = true
   }, try(local.jenkins_cfg.theme, {}))
   jenkins_enabled = local.aws_eks_enabled && try(local.jenkins_cfg.enabled, false)

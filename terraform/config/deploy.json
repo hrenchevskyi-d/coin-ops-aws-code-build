@@ -115,7 +115,7 @@
                 "allow_user_preferences": false
             },
             "theme": {
-                "name": "darkSystem",
+                "name": "dark",
                 "disable_user_themes": true
             },
             "cloudflare_tunnel": {
