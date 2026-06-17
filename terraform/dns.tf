@@ -6,9 +6,11 @@ locals {
   dns_proxied             = try(local.cloudflare_config.proxied, false)
   coinops_domain          = try(local.deploy.coinops.hostname, local.app_domain)
   headlamp_domain         = try(local.deploy.headlamp.hostname, "headlamp.${local.app_domain}")
+  jenkins_domain_for_dns  = try(local.deploy.jenkins.hostname, "jenkins.${local.app_domain}")
   homepage_domain_for_dns = try(local.deploy.homepage.hostname, "home.${local.app_domain}")
   coinops_dns_name        = local.coinops_domain == local.app_domain ? "@" : trimsuffix(local.coinops_domain, ".${local.app_domain}")
   headlamp_dns_name       = local.headlamp_domain == local.app_domain ? "@" : trimsuffix(local.headlamp_domain, ".${local.app_domain}")
+  jenkins_dns_name        = local.jenkins_domain_for_dns == local.app_domain ? "@" : trimsuffix(local.jenkins_domain_for_dns, ".${local.app_domain}")
   homepage_dns_name       = local.homepage_domain_for_dns == local.app_domain ? "@" : trimsuffix(local.homepage_domain_for_dns, ".${local.app_domain}")
 
   dns_has_api_token  = nonsensitive(local.effective_cloudflare_api_token) != ""
@@ -22,6 +24,7 @@ locals {
   )
   headlamp_private_ip    = local.gcp_k3s_ingress_lb_enabled ? try(module.gcp_k3s_ingress_lb[0].ip_address, "") : ""
   headlamp_tunnel_target = local.headlamp_tunnel_enabled ? "${cloudflare_zero_trust_tunnel_cloudflared.headlamp[0].id}.cfargotunnel.com" : ""
+  jenkins_tunnel_target  = local.jenkins_tunnel_enabled ? local.headlamp_tunnel_target : ""
   homepage_public_ip     = local.gcp_k3s_public_ingress_lb_enabled ? try(module.gcp_k3s_public_ingress_lb[0].ip_address, "") : ""
   homepage_public_dns    = local.aws_k3s_public_ingress_lb_enabled ? try(module.aws_k3s_public_ingress_lb[0].dns_name, "") : ""
   dns_primary_is_gcp     = local.dns_primary_cloud == "gcp"
@@ -92,6 +95,15 @@ locals {
         enabled         = local.dns_enabled && local.headlamp_tunnel_enabled
         name            = local.headlamp_dns_name
         content         = local.headlamp_tunnel_target
+        type            = "CNAME"
+        proxied         = true
+        ttl             = 1
+        allow_overwrite = true
+      }
+      jenkins_tunnel_cname = {
+        enabled         = local.dns_enabled && local.jenkins_tunnel_enabled
+        name            = local.jenkins_dns_name
+        content         = local.jenkins_tunnel_target
         type            = "CNAME"
         proxied         = true
         ttl             = 1

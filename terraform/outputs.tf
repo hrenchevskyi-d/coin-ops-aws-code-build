@@ -134,6 +134,11 @@ output "jenkins_admin_password" {
   sensitive   = true
 }
 
+output "jenkins_public_url" {
+  description = "Preferred public Jenkins URL when Jenkins Cloudflare Tunnel is enabled."
+  value       = local.jenkins_tunnel_enabled ? "https://${local.jenkins_domain}" : ""
+}
+
 output "homepage_public_url" {
   description = "Preferred public Homepage URL when a public k3s ingress load balancer is enabled."
   value       = local.gcp_k3s_public_ingress_lb_enabled || local.aws_k3s_public_ingress_lb_enabled ? "https://${local.homepage_domain}" : ""

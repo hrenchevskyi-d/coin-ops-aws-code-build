@@ -522,11 +522,12 @@ locals {
   headlamp_cfg    = try(local.deploy.headlamp, {})
   jenkins_cfg = merge({
     enabled        = false
+    hostname       = "jenkins.${local.app_domain}"
     namespace      = "jenkins"
     release_name   = "jenkins"
     chart_version  = ""
     controller_tag = "2.555.3-jdk21"
-    public_url     = "http://localhost:8080/"
+    public_url     = "https://jenkins.${local.app_domain}/"
     storage_class  = "gp2"
     storage_size   = "8Gi"
     repository_url = ""
@@ -534,8 +535,8 @@ locals {
     job_name       = "coinops-eks-deploy"
   }, try(local.deploy.jenkins, {}))
   jenkins_enabled = local.aws_eks_enabled && try(local.jenkins_cfg.enabled, false)
-  # Cloudflare Tunnel is only for Headlamp access. Coin-Ops ingress continues
-  # through the normal k3s/Traefik path so app routing stays observable.
+  # Cloudflare Tunnel exposes private ops UIs. Coin-Ops ingress continues
+  # through the normal Kubernetes ingress path so app routing stays observable.
   headlamp_tunnel_cfg = merge({
     enabled       = false
     namespace     = "cloudflare-tunnel"
@@ -548,13 +549,24 @@ locals {
       allowed_emails = []
     }
   }, try(local.headlamp_cfg.cloudflare_tunnel, {}))
+  jenkins_tunnel_cfg = merge({
+    enabled = false
+    service = "http://${try(local.jenkins_cfg.release_name, "jenkins")}.${try(local.jenkins_cfg.namespace, "jenkins")}.svc.cluster.local:8080"
+    access = {
+      enabled        = true
+      allowed_emails = []
+    }
+  }, try(local.jenkins_cfg.cloudflare_tunnel, {}))
   cloudflare_config                      = lookup(local.dns, "cloudflare", {})
   cloudflare_zone_id                     = try(local.cloudflare_config.zone_id, var.cloudflare_zone_id)
   cloudflare_account_id                  = try(local.cloudflare_config.account_id, var.cloudflare_account_id)
+  jenkins_domain                         = try(local.jenkins_cfg.hostname, "jenkins.${local.app_domain}")
   headlamp_tunnel_name                   = "${local.project_name}-headlamp"
   headlamp_access_identity_provider_name = "${local.project_name}-headlamp-github"
   headlamp_access_application_name       = "${local.project_name}-headlamp"
   headlamp_access_policy_name            = "${local.project_name}-headlamp-github-access"
+  jenkins_access_application_name        = "${local.project_name}-jenkins"
+  jenkins_access_policy_name             = "${local.project_name}-jenkins-github-access"
 
   gcp_cfg = {
     zone = local.gcp_zone
@@ -681,6 +693,14 @@ locals {
     && nonsensitive(local.effective_github_oauth_client_id) != ""
     && nonsensitive(local.effective_github_oauth_client_secret) != ""
   )
+  jenkins_tunnel_enabled = (
+    local.jenkins_enabled
+    && local.headlamp_tunnel_enabled
+    && try(local.jenkins_tunnel_cfg.enabled, false)
+  )
   headlamp_access_enabled        = local.headlamp_tunnel_enabled && try(local.headlamp_tunnel_cfg.access.enabled, true)
   headlamp_access_allowed_emails = try(local.headlamp_tunnel_cfg.access.allowed_emails, [])
+  jenkins_access_enabled         = local.jenkins_tunnel_enabled && try(local.jenkins_tunnel_cfg.access.enabled, true)
+  jenkins_access_allowed_emails  = try(local.jenkins_tunnel_cfg.access.allowed_emails, [])
+  cloudflare_access_enabled      = local.headlamp_access_enabled || local.jenkins_access_enabled
 }

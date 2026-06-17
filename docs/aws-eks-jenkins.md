@@ -8,12 +8,12 @@ This path replaces the AWS k3s VM cluster with AWS managed Kubernetes.
 - Create the EKS control plane and private managed node group.
 - Install EKS add-ons: VPC CNI, CoreDNS, kube-proxy, and EBS CSI.
 - Generate `ansible/artifacts/kubeconfig-aws-eks.yaml`.
-- Create the Cloudflare Zero Trust tunnel metadata for Headlamp.
+- Create the Cloudflare Zero Trust tunnel metadata for Headlamp and Jenkins.
 - Install Jenkins with Helm and seed separate Headlamp and CoinOps jobs through Jenkins CasC.
 
 ## Ansible responsibilities
 
-- `make eks-headlamp` installs Headlamp and the Cloudflare Tunnel workload into EKS.
+- `make eks-headlamp` installs Headlamp and the shared Cloudflare Tunnel workload into EKS.
 - `make eks-coinops` installs CNPG, CoinOps backend workloads, and CoinOps UI into EKS.
 - Jenkins runs these as separate jobs:
   - `coinops-eks-deploy-headlamp` from `ci/jenkins/Jenkinsfile.eks-headlamp`
@@ -35,7 +35,17 @@ make eks-coinops
 make eks-kubectl ARGS='get pods -A'
 ```
 
-The Jenkins controller is installed as a ClusterIP service. For local access:
+The Jenkins controller is installed as a ClusterIP service. Primary browser
+access is through the shared Cloudflare Tunnel:
+
+```text
+https://jenkins.coinops-d.pp.ua/
+```
+
+Terraform manages the `jenkins` DNS record as a proxied CNAME to the tunnel
+target and Jenkins CasC advertises the same URL to avoid reverse proxy warnings.
+
+For fallback local access:
 
 ```bash
 kubectl --kubeconfig ansible/artifacts/kubeconfig-aws-eks.yaml -n jenkins port-forward svc/jenkins 8080:8080

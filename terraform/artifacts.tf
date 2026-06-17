@@ -141,6 +141,8 @@ module "local_operator_artifacts" {
         headlamp_tunnel_enabled         = local.headlamp_tunnel_enabled
         headlamp_tunnel_token           = local.headlamp_tunnel_enabled ? cloudflare_zero_trust_tunnel_cloudflared.headlamp[0].tunnel_token : ""
         headlamp_public_host            = local.headlamp_domain
+        jenkins_tunnel_enabled          = local.jenkins_tunnel_enabled
+        jenkins_public_host             = local.jenkins_domain
         homepage_public_ip              = local.gcp_k3s_public_ingress_lb_enabled ? try(module.gcp_k3s_public_ingress_lb[0].ip_address, "") : ""
         homepage_public_host            = local.homepage_domain
         homepage_public_endpoint        = local.gcp_k3s_public_ingress_lb_enabled ? try(module.gcp_k3s_public_ingress_lb[0].ip_address, "") : ""
@@ -177,6 +179,8 @@ module "local_operator_artifacts" {
         headlamp_tunnel_enabled               = local.headlamp_tunnel_enabled
         headlamp_tunnel_token                 = local.headlamp_tunnel_enabled ? cloudflare_zero_trust_tunnel_cloudflared.headlamp[0].tunnel_token : ""
         headlamp_public_host                  = local.headlamp_domain
+        jenkins_tunnel_enabled                = local.jenkins_tunnel_enabled
+        jenkins_public_host                   = local.jenkins_domain
         homepage_public_host                  = local.homepage_domain
         homepage_public_endpoint              = local.aws_k3s_public_ingress_lb_enabled ? try(module.aws_k3s_public_ingress_lb[0].dns_name, "") : ""
         public_ingress_load_balancer_dns_name = local.aws_k3s_public_ingress_lb_enabled ? try(module.aws_k3s_public_ingress_lb[0].dns_name, "") : ""

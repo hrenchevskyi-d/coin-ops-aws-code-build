@@ -95,16 +95,25 @@
         },
         "jenkins": {
             "enabled": true,
+            "hostname": "jenkins.coinops-d.pp.ua",
             "namespace": "jenkins",
             "release_name": "jenkins",
             "chart_version": "",
             "controller_tag": "2.555.3-jdk21",
-            "public_url": "http://localhost:8080/",
+            "public_url": "https://jenkins.coinops-d.pp.ua/",
             "storage_class": "gp2",
             "storage_size": "8Gi",
             "repository_url": "https://github.com/hrenchevskyi-d/coin-ops-aws-code-build.git",
             "branch": "hrenchevskyi-codebuild",
-            "job_name": "coinops-eks-deploy"
+            "job_name": "coinops-eks-deploy",
+            "cloudflare_tunnel": {
+                "enabled": true,
+                "service": "http://jenkins.jenkins.svc.cluster.local:8080",
+                "access": {
+                    "enabled": true,
+                    "allowed_emails": ["grenchevskiyd@gmail.com"]
+                }
+            }
         },
         "homepage": {
             "enabled": true,

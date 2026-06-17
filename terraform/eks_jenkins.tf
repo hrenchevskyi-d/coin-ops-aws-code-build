@@ -25,7 +25,7 @@ resource "helm_release" "jenkins" {
       casc_config = templatefile("${path.module}/helm/jenkins/casc.yaml.tftpl", {
         namespace            = try(local.jenkins_cfg.namespace, "jenkins")
         release_name         = try(local.jenkins_cfg.release_name, "jenkins")
-        public_url           = try(local.jenkins_cfg.public_url, "http://localhost:8080/")
+        public_url           = try(local.jenkins_cfg.public_url, "https://${local.jenkins_domain}/")
         job_name             = try(local.jenkins_cfg.job_name, "coinops-eks-deploy")
         repository_url       = try(local.jenkins_cfg.repository_url, "")
         branch               = try(local.jenkins_cfg.branch, "main")
@@ -57,6 +57,8 @@ resource "helm_release" "jenkins" {
             headlamp_tunnel_enabled = local.headlamp_tunnel_enabled
             headlamp_tunnel_token   = local.headlamp_tunnel_enabled ? cloudflare_zero_trust_tunnel_cloudflared.headlamp[0].tunnel_token : ""
             headlamp_public_host    = local.headlamp_domain
+            jenkins_tunnel_enabled  = local.jenkins_tunnel_enabled
+            jenkins_public_host     = local.jenkins_domain
             homepage_public_host    = local.homepage_domain
             database = {
               host    = ""

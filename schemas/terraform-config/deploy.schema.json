@@ -265,10 +265,11 @@
     },
     "jenkins": {
       "type": "object",
-      "required": ["enabled", "namespace", "release_name", "repository_url", "branch", "job_name"],
+      "required": ["enabled", "hostname", "namespace", "release_name", "repository_url", "branch", "job_name", "cloudflare_tunnel"],
       "additionalProperties": false,
       "properties": {
         "enabled": { "type": "boolean", "description": "Whether Terraform installs Jenkins into EKS." },
+        "hostname": { "type": "string", "minLength": 1, "description": "Public Jenkins hostname." },
         "namespace": { "type": "string", "minLength": 1, "description": "Kubernetes namespace for Jenkins." },
         "release_name": { "type": "string", "minLength": 1, "description": "Helm release name for Jenkins." },
         "chart_version": { "type": "string", "description": "Optional Jenkins Helm chart version. Empty means the provider uses the repository default." },
@@ -278,7 +279,29 @@
         "storage_size": { "type": "string", "description": "Persistent volume size for Jenkins home." },
         "repository_url": { "type": "string", "minLength": 1, "description": "Git repository URL used by the seeded Jenkins job." },
         "branch": { "type": "string", "minLength": 1, "description": "Git branch used by the seeded Jenkins job." },
-        "job_name": { "type": "string", "minLength": 1, "description": "Seeded Jenkins pipeline job name." }
+        "job_name": { "type": "string", "minLength": 1, "description": "Seeded Jenkins pipeline job name." },
+        "cloudflare_tunnel": {
+          "type": "object",
+          "required": ["enabled", "service", "access"],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "description": "Whether Jenkins access is exposed through the shared Cloudflare Tunnel." },
+            "service": { "type": "string", "minLength": 1, "description": "Internal Jenkins service URL reached by the tunnel." },
+            "access": {
+              "type": "object",
+              "required": ["enabled", "allowed_emails"],
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean", "description": "Whether Cloudflare Access policy is enabled for Jenkins." },
+                "allowed_emails": {
+                  "type": "array",
+                  "description": "Email addresses allowed through Cloudflare Access.",
+                  "items": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "coinops": {
