@@ -25,6 +25,8 @@ locals {
 
   aws_observability_alarms_cfg = merge({
     ec2            = {}
+    eks            = {}
+    nat_gateway    = {}
     nlb            = {}
     traefik        = {}
     container_logs = {}
@@ -76,6 +78,19 @@ locals {
     for name in keys(local.aws_instances_cfg) : name => module.aws_instances[0].instance_ids[name]
   } : {}
 
+  aws_observability_eks_cluster = {
+    enabled            = local.aws_eks_enabled
+    cluster_name       = local.aws_eks_enabled ? try(module.aws_eks[0].cluster_name, "") : ""
+    node_group_name    = local.aws_eks_enabled ? try(module.aws_eks[0].node_group_name, "") : ""
+    desired_nodes      = local.aws_eks_enabled ? try(local.aws_eks_cfg.node_group.desired_size, 0) : 0
+    autoscaling_groups = local.aws_eks_enabled ? try(module.aws_eks[0].node_group_autoscaling_group_names, []) : []
+  }
+
+  aws_observability_nat_gateway = {
+    enabled        = local.aws_enabled && try(module.aws_network[0].managed_nat_gateway_id, "") != ""
+    nat_gateway_id = local.aws_enabled ? try(module.aws_network[0].managed_nat_gateway_id, "") : ""
+  }
+
   aws_k3s_public_ingress_target_count = length(local.aws_k3s_server_names)
   aws_observability_public_ingress_nlb = {
     enabled                  = local.aws_k3s_public_ingress_lb_enabled
@@ -96,7 +111,7 @@ locals {
 }
 
 module "aws_observability_monitoring" {
-  count = local.aws_compute_enabled && local.aws_observability_enabled ? 1 : 0
+  count = local.aws_enabled && local.aws_observability_enabled ? 1 : 0
 
   source = "./modules/cloud/aws/observability_monitoring"
 
@@ -108,6 +123,10 @@ module "aws_observability_monitoring" {
   cloudwatch_agent_config    = local.aws_cloudwatch_agent_config
   instance_ids               = local.aws_observability_instance_ids
   ec2_alarms                 = local.aws_observability_alarms_cfg.ec2
+  eks_cluster                = local.aws_observability_eks_cluster
+  eks_alarms                 = local.aws_observability_alarms_cfg.eks
+  nat_gateway                = local.aws_observability_nat_gateway
+  nat_gateway_alarms         = local.aws_observability_alarms_cfg.nat_gateway
   public_ingress_nlb         = local.aws_observability_public_ingress_nlb
   nlb_alarms                 = local.aws_observability_alarms_cfg.nlb
   log_metric_definitions     = try(module.aws_observability_logs[0].metric_definitions, {})

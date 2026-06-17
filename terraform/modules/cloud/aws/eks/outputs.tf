@@ -18,6 +18,14 @@ output "node_group_name" {
   value = aws_eks_node_group.system.node_group_name
 }
 
+output "node_role_name" {
+  value = aws_iam_role.node.name
+}
+
+output "node_group_autoscaling_group_names" {
+  value = try([for group in aws_eks_node_group.system.resources[0].autoscaling_groups : group.name], [])
+}
+
 output "oidc_provider_arn" {
   value = aws_iam_openid_connect_provider.this.arn
 }

@@ -57,6 +57,9 @@
                 },
                 "aws-ebs-csi-driver": {
                     "enabled": true
+                },
+                "amazon-cloudwatch-observability": {
+                    "enabled": true
                 }
             }
         },

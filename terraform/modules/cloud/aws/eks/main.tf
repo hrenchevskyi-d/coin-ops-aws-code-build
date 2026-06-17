@@ -73,6 +73,11 @@ resource "aws_iam_role_policy_attachment" "node_registry" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
+resource "aws_iam_role_policy_attachment" "node_cloudwatch_agent" {
+  role       = aws_iam_role.node.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
 resource "aws_eks_cluster" "this" {
   name     = var.cluster_name
   role_arn = aws_iam_role.cluster.arn
@@ -163,7 +168,8 @@ resource "aws_eks_node_group" "system" {
   depends_on = [
     aws_iam_role_policy_attachment.node_worker,
     aws_iam_role_policy_attachment.node_cni,
-    aws_iam_role_policy_attachment.node_registry
+    aws_iam_role_policy_attachment.node_registry,
+    aws_iam_role_policy_attachment.node_cloudwatch_agent
   ]
 }
 

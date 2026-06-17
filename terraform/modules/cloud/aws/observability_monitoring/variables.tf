@@ -52,6 +52,48 @@ variable "public_ingress_nlb" {
   description = "Public ingress NLB CloudWatch dimensions and target metadata."
 }
 
+variable "eks_cluster" {
+  type = object({
+    enabled            = bool
+    cluster_name       = string
+    node_group_name    = string
+    desired_nodes      = number
+    autoscaling_groups = list(string)
+  })
+  description = "EKS cluster metadata used by CloudWatch dashboards and alarms."
+  default = {
+    enabled            = false
+    cluster_name       = ""
+    node_group_name    = ""
+    desired_nodes      = 0
+    autoscaling_groups = []
+  }
+}
+
+variable "eks_alarms" {
+  type        = map(any)
+  description = "EKS alarm definitions keyed by logical alarm name."
+  default     = {}
+}
+
+variable "nat_gateway" {
+  type = object({
+    enabled        = bool
+    nat_gateway_id = string
+  })
+  description = "Managed NAT Gateway CloudWatch dimensions."
+  default = {
+    enabled        = false
+    nat_gateway_id = ""
+  }
+}
+
+variable "nat_gateway_alarms" {
+  type        = map(any)
+  description = "NAT Gateway alarm definitions keyed by logical alarm name."
+  default     = {}
+}
+
 variable "nlb_alarms" {
   type        = map(any)
   description = "NLB alarm definitions keyed by logical alarm name."

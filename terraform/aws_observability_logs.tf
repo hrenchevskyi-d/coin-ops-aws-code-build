@@ -1,5 +1,5 @@
 module "aws_observability_logs" {
-  count = local.aws_compute_enabled && local.aws_observability_enabled ? 1 : 0
+  count = local.aws_enabled && local.aws_observability_enabled ? 1 : 0
 
   source = "./modules/cloud/aws/observability_logs"
 

@@ -5,7 +5,7 @@
             "email": "grenchevskiyd@gmail.com"
         },
         "logs": {
-            "container_log_group_name": "/coin-ops/k3s/containers",
+            "container_log_group_name": "/coin-ops/kubernetes/containers",
             "retention_in_days": 7,
             "container_log_silence_minutes": 15,
             "metric_filters": {
@@ -13,7 +13,7 @@
                     "name_suffix": "container-log-events",
                     "pattern": "{ $.kubernetes.container_name = * }",
                     "metric_name": "ContainerLogEvents",
-                    "namespace": "CoinOps/K3s",
+                    "namespace": "CoinOps/Kubernetes",
                     "value": "1"
                 },
                 "traefik_request_count": {
@@ -118,6 +118,105 @@
                     "period": 300,
                     "evaluation_periods": 2,
                     "threshold": 85,
+                    "comparison_operator": "GreaterThanThreshold",
+                    "treat_missing_data": "notBreaching"
+                }
+            },
+            "eks": {
+                "node_count_low": {
+                    "enabled": true,
+                    "name_suffix": "eks-node-count-low",
+                    "description": "EKS cluster node count is below the desired node count.",
+                    "dimension_scope": "cluster",
+                    "namespace": "ContainerInsights",
+                    "metric_name": "cluster_node_count",
+                    "statistic": "Average",
+                    "period": 300,
+                    "evaluation_periods": 2,
+                    "threshold_source": "desired_node_count",
+                    "comparison_operator": "LessThanThreshold",
+                    "treat_missing_data": "notBreaching"
+                },
+                "failed_nodes": {
+                    "enabled": true,
+                    "name_suffix": "eks-failed-nodes",
+                    "description": "EKS reports failed nodes.",
+                    "dimension_scope": "cluster",
+                    "namespace": "ContainerInsights",
+                    "metric_name": "cluster_failed_node_count",
+                    "statistic": "Maximum",
+                    "period": 300,
+                    "evaluation_periods": 1,
+                    "threshold": 0,
+                    "comparison_operator": "GreaterThanThreshold",
+                    "treat_missing_data": "notBreaching"
+                },
+                "pod_restarts_high": {
+                    "enabled": true,
+                    "name_suffix": "eks-pod-restarts-high",
+                    "description": "EKS pods are restarting frequently.",
+                    "dimension_scope": "cluster",
+                    "namespace": "ContainerInsights",
+                    "metric_name": "pod_number_of_container_restarts",
+                    "statistic": "Sum",
+                    "period": 300,
+                    "evaluation_periods": 1,
+                    "threshold": 5,
+                    "comparison_operator": "GreaterThanThreshold",
+                    "treat_missing_data": "notBreaching"
+                },
+                "failed_pods": {
+                    "enabled": true,
+                    "name_suffix": "eks-failed-pods",
+                    "description": "EKS has failed pods.",
+                    "dimension_scope": "cluster",
+                    "namespace": "ContainerInsights",
+                    "metric_name": "pod_status_failed",
+                    "statistic": "Maximum",
+                    "period": 300,
+                    "evaluation_periods": 1,
+                    "threshold": 0,
+                    "comparison_operator": "GreaterThanThreshold",
+                    "treat_missing_data": "notBreaching"
+                }
+            },
+            "nat_gateway": {
+                "port_allocation_errors": {
+                    "enabled": true,
+                    "name_suffix": "nat-gateway-port-allocation-errors",
+                    "description": "Managed NAT Gateway had port allocation errors.",
+                    "namespace": "AWS/NATGateway",
+                    "metric_name": "ErrorPortAllocation",
+                    "statistic": "Sum",
+                    "period": 300,
+                    "evaluation_periods": 1,
+                    "threshold": 0,
+                    "comparison_operator": "GreaterThanThreshold",
+                    "treat_missing_data": "notBreaching"
+                },
+                "packet_drops": {
+                    "enabled": true,
+                    "name_suffix": "nat-gateway-packet-drops",
+                    "description": "Managed NAT Gateway dropped packets.",
+                    "namespace": "AWS/NATGateway",
+                    "metric_name": "PacketsDropCount",
+                    "statistic": "Sum",
+                    "period": 300,
+                    "evaluation_periods": 1,
+                    "threshold": 0,
+                    "comparison_operator": "GreaterThanThreshold",
+                    "treat_missing_data": "notBreaching"
+                },
+                "bytes_out_high": {
+                    "enabled": true,
+                    "name_suffix": "nat-gateway-bytes-out-high",
+                    "description": "Baseline alarm: managed NAT Gateway sent more than 524288000 bytes in a 5 minute period.",
+                    "namespace": "AWS/NATGateway",
+                    "metric_name": "BytesOutToDestination",
+                    "statistic": "Sum",
+                    "period": 300,
+                    "evaluation_periods": 1,
+                    "threshold": 524288000,
                     "comparison_operator": "GreaterThanThreshold",
                     "treat_missing_data": "notBreaching"
                 }
