@@ -267,6 +267,24 @@ policy = {
             "Resource": f"arn:aws:logs:{region}:{account_id}:log-group:{log_group}:*",
         },
         {
+            "Sid": "ManageTerraformCloudWatchLogs",
+            "Effect": "Allow",
+            "Action": [
+                "logs:CreateLogGroup",
+                "logs:DeleteLogGroup",
+                "logs:DescribeLogGroups",
+                "logs:PutRetentionPolicy",
+                "logs:DeleteRetentionPolicy",
+                "logs:PutMetricFilter",
+                "logs:DeleteMetricFilter",
+                "logs:DescribeMetricFilters",
+                "logs:ListTagsForResource",
+                "logs:TagResource",
+                "logs:UntagResource"
+            ],
+            "Resource": "*",
+        },
+        {
             "Sid": "UsePipelineArtifacts",
             "Effect": "Allow",
             "Action": ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject"],
