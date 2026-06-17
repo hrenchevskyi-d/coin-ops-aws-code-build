@@ -22,4 +22,11 @@
     - eks_public_ingress
     - k3s_headlamp
     - k3s_headlamp_tunnel
-    - k3s_cloudwatch_logs
+    - role: k3s_cloudwatch_logs
+      vars:
+        k3s_cloudwatch_logs_namespace: coinops-cloudwatch
+        k3s_cloudwatch_logs_service_account: coinops-fluent-bit
+        k3s_cloudwatch_logs_config_name: coinops-fluent-bit-config
+        k3s_cloudwatch_logs_daemonset_name: coinops-fluent-bit
+        k3s_cloudwatch_logs_state_dir: /var/lib/coinops-fluent-bit
+        k3s_cloudwatch_logs_stream_prefix: eks/

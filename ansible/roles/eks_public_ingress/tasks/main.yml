@@ -32,9 +32,13 @@
     create_namespace: true
     kubeconfig: "{{ k3s_effective_kubeconfig_path }}"
     wait: true
+    set_values:
+      - value: "deployment.replicas={{ eks_public_ingress_replicas | int }}"
+        value_type: raw
     values:
-      deployment:
-        replicas: "{{ eks_public_ingress_replicas | int }}"
+      additionalArguments:
+        - "--accesslog=true"
+        - "--accesslog.format=json"
       ingressClass:
         enabled: true
         isDefaultClass: false
