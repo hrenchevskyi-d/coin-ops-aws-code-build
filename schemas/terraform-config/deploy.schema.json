@@ -280,6 +280,25 @@
         "repository_url": { "type": "string", "minLength": 1, "description": "Git repository URL used by the seeded Jenkins job." },
         "branch": { "type": "string", "minLength": 1, "description": "Git branch used by the seeded Jenkins job." },
         "job_name": { "type": "string", "minLength": 1, "description": "Seeded Jenkins pipeline job name." },
+        "locale": {
+          "type": "object",
+          "description": "Jenkins locale plugin settings applied through Configuration as Code.",
+          "additionalProperties": false,
+          "properties": {
+            "system_locale": { "type": "string", "minLength": 1, "description": "Default Jenkins locale code, for example 'en'." },
+            "ignore_accept_language": { "type": "boolean", "description": "Whether Jenkins ignores browser language preferences and forces the configured locale." },
+            "allow_user_preferences": { "type": "boolean", "description": "Whether users may override the global locale in their profile." }
+          }
+        },
+        "theme": {
+          "type": "object",
+          "description": "Jenkins Theme Manager settings applied through Configuration as Code.",
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string", "minLength": 1, "description": "Theme identifier, for example 'darkSystem' or 'dark' from the Dark Theme plugin." },
+            "disable_user_themes": { "type": "boolean", "description": "Whether users are prevented from selecting a different theme." }
+          }
+        },
         "cloudflare_tunnel": {
           "type": "object",
           "required": ["enabled", "service", "access"],

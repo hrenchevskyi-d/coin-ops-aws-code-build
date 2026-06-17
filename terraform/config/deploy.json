@@ -109,6 +109,15 @@
             "repository_url": "https://github.com/hrenchevskyi-d/coin-ops-aws-code-build.git",
             "branch": "hrenchevskyi-codebuild",
             "job_name": "coinops-eks-deploy",
+            "locale": {
+                "system_locale": "en",
+                "ignore_accept_language": true,
+                "allow_user_preferences": false
+            },
+            "theme": {
+                "name": "darkSystem",
+                "disable_user_themes": true
+            },
             "cloudflare_tunnel": {
                 "enabled": true,
                 "service": "http://jenkins.jenkins.svc.cluster.local:8080",

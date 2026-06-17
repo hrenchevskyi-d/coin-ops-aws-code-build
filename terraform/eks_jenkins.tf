@@ -29,11 +29,20 @@ resource "helm_release" "jenkins" {
         job_name             = try(local.jenkins_cfg.job_name, "coinops-eks-deploy")
         repository_url       = try(local.jenkins_cfg.repository_url, "")
         branch               = try(local.jenkins_cfg.branch, "main")
-        admin_password       = jsonencode(random_password.jenkins_admin[0].result)
-        github_username      = jsonencode(try(local.deploy.ghcr_username, ""))
-        github_token         = jsonencode(nonsensitive(local.effective_ghcr_token))
-        db_password          = jsonencode(nonsensitive(local.effective_db_password))
-        cloudflare_api_token = jsonencode(nonsensitive(local.effective_cloudflare_api_token))
+        locale_system_locale = local.jenkins_locale_cfg.system_locale
+        locale_ignore_accept_language = tostring(
+          local.jenkins_locale_cfg.ignore_accept_language
+        )
+        locale_allow_user_preferences = tostring(
+          local.jenkins_locale_cfg.allow_user_preferences
+        )
+        theme_name                = local.jenkins_theme_cfg.name
+        theme_disable_user_themes = tostring(local.jenkins_theme_cfg.disable_user_themes)
+        admin_password            = jsonencode(random_password.jenkins_admin[0].result)
+        github_username           = jsonencode(try(local.deploy.ghcr_username, ""))
+        github_token              = jsonencode(nonsensitive(local.effective_ghcr_token))
+        db_password               = jsonencode(nonsensitive(local.effective_db_password))
+        cloudflare_api_token      = jsonencode(nonsensitive(local.effective_cloudflare_api_token))
         headlamp_tunnel_token = jsonencode(
           local.headlamp_tunnel_enabled ? cloudflare_zero_trust_tunnel_cloudflared.headlamp[0].tunnel_token : ""
         )

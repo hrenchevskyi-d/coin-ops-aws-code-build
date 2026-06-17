@@ -533,7 +533,25 @@ locals {
     repository_url = ""
     branch         = "main"
     job_name       = "coinops-eks-deploy"
+    locale = {
+      system_locale          = "en"
+      ignore_accept_language = true
+      allow_user_preferences = false
+    }
+    theme = {
+      name                = "darkSystem"
+      disable_user_themes = true
+    }
   }, try(local.deploy.jenkins, {}))
+  jenkins_locale_cfg = merge({
+    system_locale          = "en"
+    ignore_accept_language = true
+    allow_user_preferences = false
+  }, try(local.jenkins_cfg.locale, {}))
+  jenkins_theme_cfg = merge({
+    name                = "darkSystem"
+    disable_user_themes = true
+  }, try(local.jenkins_cfg.theme, {}))
   jenkins_enabled = local.aws_eks_enabled && try(local.jenkins_cfg.enabled, false)
   # Cloudflare Tunnel exposes private ops UIs. Coin-Ops ingress continues
   # through the normal Kubernetes ingress path so app routing stays observable.
